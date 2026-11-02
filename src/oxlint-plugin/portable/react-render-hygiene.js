@@ -7,8 +7,9 @@ import {
 } from "../shared/scope.js";
 
 const HOOK_NAME = /^use[A-Z0-9]/u;
+const HOOK_CALL_NAME = /^(?:use|use[A-Z0-9])/u;
 const QUERY_HOOK_NAME =
-  /^use(?:Suspense)?(?:Infinite)?(?:Query|Mutation|PaginatedQuery)$/u;
+  /^use(?:Suspense)?(?:Infinite)?(?:Query|PaginatedQuery)$/u;
 const LIFECYCLE_ENVELOPE_KEYS = new Set([
   "isLoading",
   "isPending",
@@ -33,13 +34,13 @@ function functionNameOf(node) {
 
 function isHookCall(node) {
   const callee = unwrapExpression(node?.callee);
-  if (callee?.type === "Identifier") return HOOK_NAME.test(callee.name);
+  if (callee?.type === "Identifier") return HOOK_CALL_NAME.test(callee.name);
   if (
     callee?.type === "MemberExpression" &&
     !callee.computed &&
     callee.property?.type === "Identifier"
   ) {
-    return HOOK_NAME.test(callee.property.name);
+    return HOOK_CALL_NAME.test(callee.property.name);
   }
   return false;
 }
@@ -68,6 +69,12 @@ export const noHooklessUseFunctionRule = {
     function exit() {
       const frame = stack.pop();
       if (!frame?.name || !HOOK_NAME.test(frame.name)) return;
+      if (
+        frame.node.body?.type === "BlockStatement" &&
+        frame.node.body.body.length === 0
+      ) {
+        return;
+      }
       if (!frame.calledHook) {
         context.report({
           node: frame.node.id ?? frame.node,
@@ -203,7 +210,7 @@ export const noQueryEnvelopeLeakRule = {
     function checkReturnedExpr(expr, reportNode) {
       const node = unwrapExpression(expr);
       if (!node) return;
-      if (isQueryHookCall(node) || isEnvelopeObject(node)) {
+      if (isEnvelopeObject(node)) {
         context.report({
           node: reportNode,
           message:
@@ -364,43 +371,60 @@ export const noExternalDecodeInTsxRule = {
     ).replaceAll("\\", "/");
     if (!filename.endsWith(".tsx")) return {};
 
-    function isDecodeCall(node) {
+    function isExternalPayloadDecodeCall(node) {
       const callee = unwrapExpression(node.callee);
       if (
-        callee?.type === "MemberExpression" &&
-        !callee.computed &&
-        callee.property?.type === "Identifier"
+        callee?.type !== "MemberExpression" ||
+        callee.computed ||
+        callee.property?.type !== "Identifier"
       ) {
-        const method = callee.property.name;
-        if (
-          callee.object?.type === "Identifier" &&
-          callee.object.name === "JSON" &&
-          method === "parse"
-        ) {
-          return true;
-        }
+        return false;
+      }
+      const method = callee.property.name;
+      if (
+        callee.object?.type === "Identifier" &&
+        callee.object.name === "JSON" &&
+        method === "parse"
+      ) {
+        return true;
+      }
+      if (
+        method === "parseAsync" ||
+        method === "decodeUnknownSync" ||
+        method === "decodeUnknownEither"
+      ) {
+        return true;
+      }
+      if (method === "parse") {
+        const arg = unwrapExpression(node.arguments[0]);
         return (
-          method === "safeParse" ||
-          method === "parseAsync" ||
-          method === "decodeUnknownSync" ||
-          method === "decodeUnknownEither"
+          arg?.type === "MemberExpression" ||
+          arg?.type === "CallExpression" ||
+          (arg?.type === "Identifier" &&
+            /^(?:raw|payload|response|res|body|json|data)$/iu.test(arg.name))
         );
+      }
+      return false;
+    }
+
+    function isDirectComponentRender(node) {
+      for (let cur = node.parent; cur; cur = cur.parent) {
+        if (isFunctionLike(cur)) {
+          return functionReturnsJsx(cur);
+        }
       }
       return false;
     }
 
     return {
       CallExpression(node) {
-        if (!isDecodeCall(node)) return;
-        for (let cur = node.parent; cur; cur = cur.parent) {
-          if (isFunctionLike(cur) && functionReturnsJsx(cur)) {
-            context.report({
-              node,
-              message:
-                "Do not decode untrusted external payloads inside TSX components; decode once at the data boundary before rendering.",
-            });
-            return;
-          }
+        if (!isExternalPayloadDecodeCall(node)) return;
+        if (isDirectComponentRender(node)) {
+          context.report({
+            node,
+            message:
+              "Do not decode untrusted external payloads inside TSX components; decode once at the data boundary before rendering.",
+          });
         }
       },
     };

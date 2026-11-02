@@ -145,7 +145,7 @@ export const reactMaxComponentPropsRule = {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-    const max = context.options[0]?.max ?? 7;
+    const max = context.options[0]?.max ?? 12;
     const typeDeclarations = new Map();
 
     function countTypeMembers(typeNode) {
@@ -330,7 +330,15 @@ export const noReexportOnlyModuleRule = {
       context.getFilename?.() ??
       ""
     ).replaceAll("\\", "/");
-    if (/\/index\.[cm]?[jt]sx?$/u.test(filename)) return {};
+    if (
+      /\/index\.[cm]?[jt]sx?$/u.test(filename) ||
+      /\.(?:ios|android|native|web|electron)\.[cm]?[jt]sx?$/u.test(filename) ||
+      /(?:^|\/)app\/.*\.[cm]?[jt]sx?$/u.test(filename)
+    ) {
+      return {};
+    }
+    const baseMatch = filename.match(/\/([^/]+)\.[cm]?[jt]sx?$/u);
+    const stem = baseMatch ? baseMatch[1] : null;
     return {
       Program(node) {
         if (node.body.length === 0) return;
@@ -341,13 +349,20 @@ export const noReexportOnlyModuleRule = {
               stmt.source !== null &&
               stmt.declaration === null)
         );
-        if (allReexports) {
-          context.report({
-            node,
-            message:
-              "Module only re-exports symbols from other modules; import from the owning module directly.",
-          });
+        if (!allReexports) return;
+        if (
+          stem &&
+          node.body.length === 1 &&
+          typeof node.body[0].source?.value === "string" &&
+          node.body[0].source.value.includes(`${stem}.`)
+        ) {
+          return;
         }
+        context.report({
+          node,
+          message:
+            "Module only re-exports symbols from other modules; import from the owning module directly.",
+        });
       },
     };
   },

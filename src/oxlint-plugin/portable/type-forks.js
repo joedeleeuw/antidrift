@@ -1,5 +1,5 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
-import { unwrapExpression } from "../shared/scope.js";
+import { isFunctionLike, unwrapExpression } from "../shared/scope.js";
 
 export const noContractAppeasementProjectionRule = {
   meta: {
@@ -18,6 +18,52 @@ export const noContractAppeasementProjectionRule = {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
+    function enclosingSingleReturnFunction(objNode) {
+      const parent = objNode.parent;
+      if (isFunctionLike(parent) && parent.body === objNode) return parent;
+      if (
+        parent?.type === "ReturnStatement" &&
+        parent.parent?.type === "BlockStatement" &&
+        parent.parent.body.length === 1 &&
+        isFunctionLike(parent.parent.parent)
+      ) {
+        return parent.parent.parent;
+      }
+      return null;
+    }
+
+    function isExportedFunction(fnNode) {
+      const p = fnNode.parent;
+      return (
+        p?.type === "ExportNamedDeclaration" ||
+        p?.type === "ExportDefaultDeclaration" ||
+        p?.parent?.parent?.type === "ExportNamedDeclaration"
+      );
+    }
+
+    function isUnexportedContractProjectionFunction(objNode, sourceIdent) {
+      const fnNode = enclosingSingleReturnFunction(objNode);
+      if (!fnNode || fnNode.params.length !== 1 || isExportedFunction(fnNode)) {
+        return false;
+      }
+      const param = fnNode.params[0];
+      if (param.type !== "Identifier" || param.name !== sourceIdent) {
+        return false;
+      }
+      const paramType = param.typeAnnotation?.typeAnnotation;
+      const returnType = fnNode.returnType?.typeAnnotation;
+      if (
+        paramType?.type !== "TSTypeReference" ||
+        returnType?.type !== "TSTypeReference"
+      ) {
+        return false;
+      }
+      return (
+        context.sourceCode.getText(paramType.typeName) !==
+        context.sourceCode.getText(returnType.typeName)
+      );
+    }
+
     return {
       ObjectExpression(node) {
         if (node.properties.length < 3) return;
@@ -51,7 +97,11 @@ export const noContractAppeasementProjectionRule = {
             break;
           }
         }
-        if (allSameSource && sourceIdent) {
+        if (
+          allSameSource &&
+          sourceIdent &&
+          isUnexportedContractProjectionFunction(node, sourceIdent)
+        ) {
           context.report({
             node,
             message: `Object literal restates ${node.properties.length} properties verbatim from '${sourceIdent}'; pass '${sourceIdent}' directly instead of reshaping a parallel bag.`,

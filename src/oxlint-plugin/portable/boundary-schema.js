@@ -228,6 +228,24 @@ export const noRedundantZodParseRule = {
       };
     }
 
+    function matchesInferredParameterSchema(def, schemaText) {
+      if (def.type !== "Parameter") return false;
+      const ann = def.name?.typeAnnotation?.typeAnnotation;
+      if (
+        ann?.type !== "TSTypeReference" ||
+        ann.typeName?.type !== "TSQualifiedName"
+      ) {
+        return false;
+      }
+      const rightName = ann.typeName.right?.name;
+      if (rightName !== "infer" && rightName !== "output") return false;
+      const typeArg = ann.typeArguments?.params?.[0];
+      if (typeArg?.type !== "TSTypeQuery" || !typeArg.exprName) return false;
+      return (
+        sourceCode.getText(typeArg.exprName).replace(/\s+/gu, "") === schemaText
+      );
+    }
+
     return {
       CallExpression(node) {
         const outer = parseCallInfo(node);
@@ -246,8 +264,7 @@ export const noRedundantZodParseRule = {
           return;
         }
         if (arg?.type !== "Identifier") return;
-        const variable = findVariable(sourceCode, arg);
-        const def = variable?.defs?.[0];
+        const def = findVariable(sourceCode, arg)?.defs?.[0];
         if (!def) return;
         if (def.node?.type === "VariableDeclarator") {
           const initInfo = parseCallInfo(def.node.init);
@@ -262,19 +279,11 @@ export const noRedundantZodParseRule = {
             return;
           }
         }
-        if (def.type === "Parameter") {
-          const param = def.name;
-          const ann = param?.typeAnnotation?.typeAnnotation;
-          if (
-            ann?.type === "TSTypeReference" &&
-            ann.typeName?.type === "TSQualifiedName" &&
-            ann.typeName.right?.name === "infer"
-          ) {
-            context.report({
-              node,
-              message: `Parameter '${arg.name}' is already typed as a decoded schema output; do not re-parse internal typed values.`,
-            });
-          }
+        if (matchesInferredParameterSchema(def, outer.schemaText)) {
+          context.report({
+            node,
+            message: `Parameter '${arg.name}' is already typed as a decoded schema output; do not re-parse internal typed values.`,
+          });
         }
       },
     };
@@ -396,8 +405,19 @@ export const noSchemaValidatorTranscodingRule = {
         callee.property.name === "toJSONSchema"
       );
     }
+    function isLocalFunctionCall(node) {
+      const callee = unwrapExpression(node.callee);
+      if (callee?.type !== "Identifier") return false;
+      const v = findVariable(context.sourceCode, callee);
+      const def = v?.defs?.[0];
+      return (
+        def?.type === "FunctionName" ||
+        (def?.type === "Variable" && isFunctionLike(def.node?.init))
+      );
+    }
     return {
       CallExpression(node) {
+        if (isLocalFunctionCall(node)) return;
         if (node.arguments.some(isJsonSchemaCall)) {
           context.report({
             node,

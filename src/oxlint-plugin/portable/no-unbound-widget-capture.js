@@ -1,6 +1,20 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 
-const DEFAULT_INJECTED_MODULES = new Set(["@expo/ui/swift-ui", "react"]);
+const DEFAULT_INJECTED_MODULES = new Set([
+  "@expo/ui/swift-ui",
+  "@expo/ui/swift-ui/modifiers",
+  "@expo/ui/jetpack-compose",
+  "@expo/ui/jetpack-compose/modifiers",
+  "react",
+  "react/jsx-runtime",
+  "react/jsx-dev-runtime",
+]);
+
+const REACT_NATIVE_WIDGET_GLOBALS = new Set([
+  "PlatformColor",
+  "Image",
+  "useColorScheme",
+]);
 
 function hasWidgetDirective(fnNode) {
   if (fnNode?.body?.type !== "BlockStatement") return false;
@@ -101,37 +115,40 @@ export default {
       }
     }
 
+    function classifySpecifierAlias(spec) {
+      const importedName =
+        spec.imported?.type === "Identifier"
+          ? spec.imported.name
+          : spec.imported?.value;
+      if (importedName && importedName !== spec.local?.name) {
+        return {
+          kind: "aliased",
+          imported: importedName,
+          local: spec.local.name,
+        };
+      }
+      return { kind: "injected", imported: importedName };
+    }
+
     function classifyImportDef(def) {
       if (def?.type !== "ImportBinding") return null;
-      const importDecl = def.parent;
-      const source = importDecl?.source?.value;
-      if (typeof source !== "string" || !allowedModules.has(source)) {
-        return { kind: "forbidden" };
-      }
+      const source = def.parent?.source?.value;
+      if (typeof source !== "string") return { kind: "forbidden" };
       const spec = def.node;
-      if (spec?.type === "ImportSpecifier") {
-        const importedName =
-          spec.imported?.type === "Identifier"
-            ? spec.imported.name
-            : spec.imported?.value;
-        if (importedName && importedName !== spec.local?.name) {
-          return {
-            kind: "aliased",
-            imported: importedName,
-            local: spec.local.name,
-          };
-        }
-        return { kind: "injected" };
+      if (source === "react-native" && spec?.type === "ImportSpecifier") {
+        const result = classifySpecifierAlias(spec);
+        return REACT_NATIVE_WIDGET_GLOBALS.has(result.imported)
+          ? result
+          : { kind: "forbidden" };
       }
-      if (
+      if (!allowedModules.has(source)) return { kind: "forbidden" };
+      if (spec?.type === "ImportSpecifier") return classifySpecifierAlias(spec);
+      const isReactNamespace =
         source === "react" &&
         (spec?.type === "ImportDefaultSpecifier" ||
           spec?.type === "ImportNamespaceSpecifier") &&
-        spec.local?.name === "React"
-      ) {
-        return { kind: "injected" };
-      }
-      return { kind: "forbidden" };
+        spec.local?.name === "React";
+      return isReactNamespace ? { kind: "injected" } : { kind: "forbidden" };
     }
 
     function checkWidgetFunction(fnNode) {
