@@ -43,7 +43,7 @@ const SAFE_LOOKUP_METHODS = new Set([
   "getFocusedWindow",
 ]);
 const GUARD_HELPER_PREFIX =
-  /^(?:assert|verify|validate|require|check|ensure)/iu;
+  /^(?:isTrusted|isAllowed|assert|verify|validate|require|check|ensure)/iu;
 
 function calleeName(callee) {
   if (!callee) return null;
@@ -82,6 +82,16 @@ function referencesSenderOrFrame(node, eventParamName) {
       cur.object.name === eventParamName &&
       cur.property?.type === "Identifier" &&
       (cur.property.name === "sender" || cur.property.name === "senderFrame")
+    ) {
+      found = true;
+      return;
+    }
+    if (
+      cur.type === "CallExpression" &&
+      GUARD_HELPER_PREFIX.test(calleeName(cur.callee) ?? "") &&
+      cur.arguments.some(
+        (arg) => arg.type === "Identifier" && arg.name === eventParamName
+      )
     ) {
       found = true;
       return;

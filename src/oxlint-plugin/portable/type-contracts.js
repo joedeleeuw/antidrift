@@ -1,3 +1,4 @@
+import { isKnownEvidenceExpression } from "../anti-slop/shared/dictionary-types.js";
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import { findVariable, unwrapExpression } from "../shared/scope.js";
 
@@ -63,17 +64,73 @@ export const noAppeasementCastRule = {
   },
 };
 
-function erasedUnknownInitializer(node) {
-  if (node.id?.typeAnnotation?.typeAnnotation?.type === "TSUnknownKeyword") {
-    return node.init?.type === "TSAsExpression"
-      ? node.init.expression
-      : node.init;
-  }
+function isAsUnknownExpression(node) {
+  return (
+    (node?.type === "TSAsExpression" || node?.type === "TSTypeAssertion") &&
+    node.typeAnnotation?.type === "TSUnknownKeyword"
+  );
+}
+
+function isUnknownOrAnyAnnotation(typeAnnotation) {
+  const inner = typeAnnotation?.typeAnnotation;
+  return inner?.type === "TSUnknownKeyword" || inner?.type === "TSAnyKeyword";
+}
+
+function rootIdentifierOf(expr) {
+  const unwrapped = unwrapExpression(expr);
+  if (unwrapped?.type === "Identifier") return unwrapped;
   if (
-    node.init?.type === "TSAsExpression" &&
-    node.init.typeAnnotation?.type === "TSUnknownKeyword"
+    unwrapped?.type === "MemberExpression" &&
+    unwrapped.object?.type === "Identifier"
   ) {
-    return node.init.expression;
+    return unwrapped.object;
+  }
+  return null;
+}
+
+function hasKnownAnnotation(identifiers) {
+  for (const ident of identifiers ?? []) {
+    if (
+      ident.typeAnnotation &&
+      !isUnknownOrAnyAnnotation(ident.typeAnnotation)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function constInitOfVariable(variable) {
+  const def = variable?.defs?.[0];
+  if (def?.type !== "Variable") return null;
+  const decl = def.node;
+  if (decl?.type !== "VariableDeclarator" || decl.parent?.kind !== "const") {
+    return null;
+  }
+  if (isUnknownOrAnyAnnotation(decl.id?.typeAnnotation)) return null;
+  return decl.init ?? null;
+}
+
+function hasKnownValueOrigin(sourceCode, expr, seen = new Set()) {
+  if (!expr) return false;
+  if (isKnownEvidenceExpression(expr)) return !isContractFreeLiteral(expr);
+  const rootIdent = rootIdentifierOf(expr);
+  if (!rootIdent) return false;
+  const variable = findVariable(sourceCode, rootIdent);
+  if (!variable || seen.has(variable)) return false;
+  seen.add(variable);
+  if (hasKnownAnnotation(variable.identifiers)) return true;
+  const init = constInitOfVariable(variable);
+  return init ? hasKnownValueOrigin(sourceCode, init, seen) : false;
+}
+
+function erasedUnknownInitializer(sourceCode, node) {
+  if (isAsUnknownExpression(node.init)) {
+    const inner = node.init.expression;
+    return isContractFreeLiteral(inner) ? null : inner;
+  }
+  if (node.id?.typeAnnotation?.typeAnnotation?.type === "TSUnknownKeyword") {
+    return hasKnownValueOrigin(sourceCode, node.init) ? node.init : null;
   }
   return null;
 }
@@ -133,8 +190,8 @@ export const noAppeasementErasureRule = {
         if (node.id?.type !== "Identifier" || node.parent?.kind !== "const") {
           return;
         }
-        const init = erasedUnknownInitializer(node);
-        if (!init || isContractFreeLiteral(init)) return;
+        const init = erasedUnknownInitializer(sourceCode, node);
+        if (!init) return;
         const variable = findVariable(sourceCode, node.id);
         if (!variable) return;
         if (

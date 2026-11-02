@@ -366,7 +366,22 @@ export const noClosedStringParameterRule = {
     if (!isRuleFile(context)) return {};
     const sourceCode = context.sourceCode;
 
-    function collectReferenceLiterals(ref, literals) {
+    const BOUNDARY_DECODER_NAME = /^(?:decode|parse|normalize)[A-Z]/u;
+
+    function conditionRootGroup(node) {
+      let cur = node;
+      while (
+        cur.parent &&
+        (cur.parent.type === "ParenthesizedExpression" ||
+          (cur.parent.type === "LogicalExpression" &&
+            cur.parent.operator === "||"))
+      ) {
+        cur = cur.parent;
+      }
+      return cur;
+    }
+
+    function collectReferenceLiterals(ref, literals, groups) {
       const parent = ref.identifier?.parent;
       if (
         parent?.type === "BinaryExpression" &&
@@ -376,6 +391,15 @@ export const noClosedStringParameterRule = {
           parent.left === ref.identifier ? parent.right : parent.left;
         if (other?.type === "Literal" && typeof other.value === "string") {
           literals.add(`"${other.value}"`);
+          if (
+            parent.operator === "!==" &&
+            parent.parent?.type === "LogicalExpression" &&
+            parent.parent.operator === "&&"
+          ) {
+            groups.add(parent);
+          } else {
+            groups.add(conditionRootGroup(parent));
+          }
           return true;
         }
         return false;
@@ -390,6 +414,7 @@ export const noClosedStringParameterRule = {
             typeof switchCase.test.value === "string"
           ) {
             literals.add(`"${switchCase.test.value}"`);
+            groups.add(switchCase);
           }
         }
         return true;
@@ -398,6 +423,7 @@ export const noClosedStringParameterRule = {
     }
 
     function checkFunction(node) {
+      if (node.id?.name && BOUNDARY_DECODER_NAME.test(node.id.name)) return;
       for (const parameter of node.params) {
         if (
           parameter.type !== "Identifier" ||
@@ -408,10 +434,11 @@ export const noClosedStringParameterRule = {
         const binding = findVariable(sourceCode, parameter);
         if (!binding || binding.references.length < 2) continue;
         const literals = new Set();
+        const groups = new Set();
         const allComparisons = binding.references.every((ref) =>
-          collectReferenceLiterals(ref, literals)
+          collectReferenceLiterals(ref, literals, groups)
         );
-        if (allComparisons && literals.size >= 2) {
+        if (allComparisons && literals.size >= 2 && groups.size >= 2) {
           context.report({
             node: parameter,
             messageId: "closedString",

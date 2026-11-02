@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import {
   findVariable,
@@ -190,6 +192,32 @@ export const reactMaxComponentPropsRule = {
       return false;
     }
 
+    function extractOmittedKeys(typeNode, keys = new Set()) {
+      if (
+        typeNode?.type === "TSTypeReference" &&
+        typeNode.typeName?.type === "Identifier" &&
+        typeNode.typeName.name === "Omit"
+      ) {
+        const keyArg = typeNode.typeArguments?.params?.[1];
+        let parts = [];
+        if (keyArg?.type === "TSUnionType") {
+          parts = keyArg.types;
+        } else if (keyArg) {
+          parts = [keyArg];
+        }
+        for (const part of parts) {
+          if (
+            part?.type === "TSLiteralType" &&
+            part.literal?.type === "Literal" &&
+            typeof part.literal.value === "string"
+          ) {
+            keys.add(part.literal.value);
+          }
+        }
+      }
+      return keys;
+    }
+
     function collectTypePropertyNames(
       typeNode,
       names = new Set(),
@@ -219,8 +247,13 @@ export const reactMaxComponentPropsRule = {
         return names;
       }
       if (typeNode.type === "TSIntersectionType") {
+        const omittedKeys = new Set();
         for (const part of typeNode.types) {
+          extractOmittedKeys(part, omittedKeys);
           collectTypePropertyNames(part, names, seen);
+        }
+        for (const key of omittedKeys) {
+          names.delete(key);
         }
         return names;
       }
@@ -290,6 +323,30 @@ export const reactMaxComponentPropsRule = {
   },
 };
 
+function hasLiteralEqualityTest(test) {
+  if (!test) return false;
+  if (test.type === "LogicalExpression") {
+    return (
+      hasLiteralEqualityTest(test.left) || hasLiteralEqualityTest(test.right)
+    );
+  }
+  if (
+    test.type === "BinaryExpression" &&
+    (test.operator === "===" ||
+      test.operator === "!==" ||
+      test.operator === "==" ||
+      test.operator === "!=")
+  ) {
+    return (
+      test.left?.type === "Literal" ||
+      test.right?.type === "Literal" ||
+      test.left?.type === "TemplateLiteral" ||
+      test.right?.type === "TemplateLiteral"
+    );
+  }
+  return false;
+}
+
 export const noBranchTreeRule = {
   meta: {
     type: "suggestion",
@@ -316,16 +373,20 @@ export const noBranchTreeRule = {
           return;
         }
         let branches = 1;
+        let allLiteralTests = hasLiteralEqualityTest(node.test);
         let cur = node;
         while (cur.alternate) {
           branches += 1;
           if (cur.alternate.type === "IfStatement") {
             cur = cur.alternate;
+            if (!hasLiteralEqualityTest(cur.test)) {
+              allLiteralTests = false;
+            }
           } else {
             break;
           }
         }
-        if (branches >= 5) {
+        if (branches >= 5 && allLiteralTests) {
           context.report({
             node,
             message: `Branch tree has ${branches} arms; declare a typed case table instead of chaining if/else branches.`,
@@ -391,6 +452,28 @@ export const noMutableLetAliasRule = {
   },
 };
 
+const PLATFORM_SUFFIXES = ["ios", "android", "native", "web", "electron"];
+const MODULE_EXTS = [".ts", ".tsx", ".js", ".jsx", ".mts", ".cts"];
+
+function hasPlatformSibling(filename, stem) {
+  if (!stem || !filename.startsWith("/")) return false;
+  const dir = dirname(filename);
+  for (const suffix of PLATFORM_SUFFIXES) {
+    for (const ext of MODULE_EXTS) {
+      if (existsSync(join(dir, `${stem}.${suffix}${ext}`))) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function isOwnSliceReexport(stem, stmt) {
+  if (!stem || typeof stmt.source?.value !== "string") return false;
+  const src = stmt.source.value;
+  return src.startsWith(`./${stem}.`) || src.startsWith(`./${stem}-`);
+}
+
 export const noReexportOnlyModuleRule = {
   meta: {
     type: "problem",
@@ -423,6 +506,7 @@ export const noReexportOnlyModuleRule = {
     }
     const baseMatch = filename.match(/\/([^/]+)\.[cm]?[jt]sx?$/u);
     const stem = baseMatch ? baseMatch[1] : null;
+    if (hasPlatformSibling(filename, stem)) return {};
     return {
       Program(node) {
         if (node.body.length === 0) return;
@@ -434,12 +518,7 @@ export const noReexportOnlyModuleRule = {
               stmt.declaration === null)
         );
         if (!allReexports) return;
-        if (
-          stem &&
-          node.body.length === 1 &&
-          typeof node.body[0].source?.value === "string" &&
-          node.body[0].source.value.includes(`${stem}.`)
-        ) {
+        if (node.body.every((stmt) => isOwnSliceReexport(stem, stmt))) {
           return;
         }
         context.report({

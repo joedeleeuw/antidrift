@@ -1,3 +1,5 @@
+import { resolveOwnerStatusValues } from "../owned-union-source.js";
+
 const FUNCTION_TYPES = new Set([
   "FunctionDeclaration",
   "FunctionExpression",
@@ -216,9 +218,7 @@ export function canonicalStatusLiteralOwner(node, statuses) {
     return null;
   }
   for (const [name, entry] of Object.entries(statuses)) {
-    const literals = Array.isArray(entry?.values)
-      ? entry.values.filter((v) => typeof v === "string")
-      : [];
+    const literals = resolveOwnerStatusValues(name, entry);
     if (literals.includes(literalText) && isStatusLiteralContext(node, name)) {
       const owner = entry?.owner;
       if (typeof owner !== "string") {

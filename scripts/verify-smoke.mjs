@@ -106,7 +106,8 @@ export function processLegacyData(
   } else if (mode === "turbo") {
     chosen = 4;
   }
-  const parsed = z.object({ id: z.string() }).parse(payload);
+  const erasedKnown = { id: "known" } as unknown;
+  const parsed = z.object({ id: z.string() }).parse(erasedKnown);
   return [chosen, z.object({ id: z.string() }).parse(parsed)];
 }
 
@@ -210,6 +211,11 @@ export function parseTwoStage(raw: unknown) {
   const first = InputSchema.parse(raw);
   return PublicSchema.parse(first);
 }
+
+export function decodeBoundaryJson(rawText: string) {
+  const boundaryRaw: unknown = JSON.parse(rawText);
+  return PublicSchema.parse(boundaryRaw);
+}
 `;
 
 const expectedRules = [
@@ -231,6 +237,7 @@ const expectedRules = [
   "antidrift/require-stable-snapshot",
   "antidrift/require-authz-check",
   "antidrift/no-handrolled-resource-lifecycle-cells",
+  "antidrift/no-appeasement-erasure",
 ];
 
 const workDir = mkdtempSync(join(tmpdir(), "antidrift-smoke-"));

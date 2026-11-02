@@ -197,6 +197,19 @@ export function exportedArrays(filename, text) {
     }
   }
 
+  const zEnumRegex =
+    /(?:^|[;\n])\s*(export\s+)?const\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+?)?=\s*z\.enum\(\s*\[([\s\S]*?)\]\s*\)/gu;
+  for (const match of cleaned.matchAll(zEnumRegex)) {
+    const isExported = Boolean(match[1]);
+    const localName = match[2];
+    const members = memberSet(parseArrayElementTokens(match[3]));
+    if (!members) continue;
+    bindings.set(localName, members);
+    if (isExported) {
+      exports.set(localName, localName);
+    }
+  }
+
   const namedExportRegex = /(?:^|[;\n])\s*export\s*\{([^}]+)\}(?!\s*from\b)/gu;
   for (const match of cleaned.matchAll(namedExportRegex)) {
     for (const part of match[1].split(",")) {
@@ -293,4 +306,39 @@ export function importedArrays(filename, specifier, cache) {
   const arrays = exportedArrays(target, text);
   cache.set(target, arrays);
   return arrays;
+}
+
+const statusOwnerFileCache = new Map();
+
+export function resolveOwnerStatusValues(statusName, entry) {
+  if (Array.isArray(entry?.values)) {
+    return entry.values.filter((v) => typeof v === "string");
+  }
+  const owner = entry?.owner;
+  if (typeof owner !== "string" || owner.length === 0) return [];
+  const target = probeSourceFile(
+    isAbsolute(owner) ? owner : resolve(process.cwd(), owner)
+  );
+  if (!target) return [];
+  let arrays = statusOwnerFileCache.get(target);
+  if (!arrays) {
+    arrays = exportedArrays(target, readFileSync(target, "utf8"));
+    statusOwnerFileCache.set(target, arrays);
+  }
+  const camel = statusName.charAt(0).toLowerCase() + statusName.slice(1);
+  const candidates =
+    typeof entry?.export === "string"
+      ? [entry.export]
+      : [
+          `${camel}Literals`,
+          `${camel}Values`,
+          `${camel}Schema`,
+          camel,
+          statusName,
+        ];
+  const matched = arrays.find((arr) => candidates.includes(arr.name));
+  if (!matched) return [];
+  return JSON.parse(matched.members)
+    .map((item) => JSON.parse(item))
+    .filter((v) => typeof v === "string");
 }

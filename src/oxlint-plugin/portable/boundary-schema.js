@@ -125,6 +125,31 @@ export const unknownInputMustBeDecodedRule = {
     if (!isRuleFile(context)) return {};
     const sourceCode = context.sourceCode;
 
+    function isUnknownPreservingAssertionType(typeNode) {
+      if (!typeNode) return false;
+      if (
+        typeNode.type === "TSUnknownKeyword" ||
+        typeNode.type === "TSNullKeyword" ||
+        typeNode.type === "TSUndefinedKeyword"
+      ) {
+        return true;
+      }
+      if (typeNode.type === "TSUnionType") {
+        return typeNode.types.every(isUnknownPreservingAssertionType);
+      }
+      if (typeNode.type === "TSTypeLiteral") {
+        return (
+          typeNode.members.length > 0 &&
+          typeNode.members.every(
+            (m) =>
+              m.type === "TSPropertySignature" &&
+              m.typeAnnotation?.typeAnnotation?.type === "TSUnknownKeyword"
+          )
+        );
+      }
+      return false;
+    }
+
     function isPredicateFunction(fnNode) {
       return fnNode.returnType?.typeAnnotation?.type === "TSTypePredicate";
     }
@@ -145,7 +170,7 @@ export const unknownInputMustBeDecodedRule = {
           const parent = ref.identifier?.parent;
           if (
             parent?.type === "TSAsExpression" &&
-            parent.typeAnnotation?.type !== "TSUnknownKeyword"
+            !isUnknownPreservingAssertionType(parent.typeAnnotation)
           ) {
             context.report({
               node: parent,
