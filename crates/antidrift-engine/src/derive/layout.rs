@@ -37,19 +37,35 @@ impl Role {
 }
 
 pub(crate) struct SourceLayout {
+    app_prefix: String,
     src_prefix: String,
 }
 
 impl SourceLayout {
     pub(crate) fn new(src_dir: &Path) -> Self {
+        let mut app_prefix = src_dir
+            .parent()
+            .map(|parent| tspath::normalize_slashes(&parent.to_string_lossy()))
+            .unwrap_or_default();
+        if !app_prefix.is_empty() {
+            app_prefix.push('/');
+        }
         let mut src_prefix = tspath::normalize_slashes(&src_dir.to_string_lossy());
         src_prefix.push('/');
-        Self { src_prefix }
+        Self {
+            app_prefix,
+            src_prefix,
+        }
     }
 
     pub(crate) fn relative<'a>(&self, file_name: &'a str) -> &'a str {
         file_name
             .strip_prefix(&self.src_prefix)
+            .or_else(|| {
+                (!self.app_prefix.is_empty())
+                    .then(|| file_name.strip_prefix(&self.app_prefix))
+                    .flatten()
+            })
             .unwrap_or(file_name)
     }
 

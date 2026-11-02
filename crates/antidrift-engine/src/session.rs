@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use antidrift_kernel::span_index::{DiagnosticLocation, LineIndex};
+use antidrift_kernel::directives::effective_token_start;
 use rustc_hash::{FxHashMap, FxHashSet};
 use tsrs_ast::SourceFile;
 use tsrs_core::P;
@@ -8,7 +8,6 @@ use tsrs_core::tspath;
 use tsrslint::linter::{Options, lint_files};
 use tsrslint::rule::Rule;
 
-use crate::batch::reported_to_rule_diagnostic;
 use crate::headless_host::{BoundProgram, ProgramBuilderEnv, base_fs, collect_missing_bound_files};
 use crate::rule_catalog::{RequestedRule, RuleCatalog, RuleRequest};
 use crate::runner::{collect_lintable_files, is_supported_file};
@@ -17,7 +16,8 @@ use crate::runner::{collect_lintable_files, is_supported_file};
 pub struct Finding {
     pub rule: String,
     pub message: String,
-    pub location: DiagnosticLocation,
+    pub start: u32,
+    pub end: u32,
 }
 
 struct Batch {
@@ -262,6 +262,20 @@ fn is_requestable_file(path: &Path) -> bool {
             .is_some_and(tspath::is_declaration_file_name)
 }
 
+fn utf16_offset(source_text: &str, byte_offset: u32) -> u32 {
+    let clamped = usize::try_from(byte_offset)
+        .unwrap_or(source_text.len())
+        .min(source_text.len());
+    u32::try_from(
+        source_text
+            .get(..clamped)
+            .unwrap_or("")
+            .encode_utf16()
+            .count(),
+    )
+    .unwrap_or(0)
+}
+
 fn record(bound: &BoundProgram, rules: &[&'static dyn Rule]) -> Vec<(String, Finding)> {
     let (ts_files, js_files): (Vec<P<SourceFile>>, Vec<P<SourceFile>>) = bound
         .source_files
@@ -280,22 +294,18 @@ fn record(bound: &BoundProgram, rules: &[&'static dyn Rule]) -> Vec<(String, Fin
         &script_rules,
         &Options::default(),
     ));
-    let mut line_indexes: FxHashMap<String, LineIndex> = FxHashMap::default();
-    let severities = FxHashMap::default();
     reported
         .iter()
         .map(|item| {
             let file = tspath::normalize_slashes(item.file.file_name());
             let source_text = item.file.text();
-            let line_index = line_indexes
-                .entry(file.clone())
-                .or_insert_with(|| LineIndex::new(source_text));
-            let diagnostic =
-                reported_to_rule_diagnostic(item, source_text, line_index, &severities);
+            let start_byte = effective_token_start(source_text, item.pos, item.end);
+            let end_byte = u32::try_from(item.end.max(0)).unwrap_or(start_byte);
             let finding = Finding {
-                rule: diagnostic.rule_id,
-                message: diagnostic.message,
-                location: diagnostic.location,
+                rule: item.rule_name.to_owned(),
+                message: item.message.description.clone(),
+                start: utf16_offset(source_text, start_byte),
+                end: utf16_offset(source_text, end_byte),
             };
             (file, finding)
         })

@@ -1,5 +1,5 @@
 use crate::diagnostic::{RuleDiagnostic, Severity};
-use crate::span_index::LineIndex;
+use crate::span_index::{LineIndex, line_terminator_len};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum DirectiveKind {
@@ -128,11 +128,7 @@ impl DirectiveSet {
 }
 
 fn directive_applies_to_rule(rules: &[String], rule_id: &str) -> bool {
-    if rules.is_empty() {
-        return true;
-    }
-    let short = rule_id.strip_prefix("antidrift/").unwrap_or(rule_id);
-    rules.iter().any(|entry| entry == rule_id || entry == short)
+    rules.is_empty() || rules.iter().any(|entry| entry == rule_id)
 }
 
 fn parse_directive_text(text: &str) -> Option<(DirectiveKind, Vec<String>)> {
@@ -161,12 +157,18 @@ fn skip_leading_trivia(source_text: &str, start: usize, end: usize) -> usize {
     let limit = end.min(bytes.len());
     let mut pos = start.min(limit);
     while pos < limit {
-        while pos < limit && matches!(bytes[pos], b' ' | b'\t' | b'\r' | b'\n') {
-            pos += 1;
+        while pos < limit {
+            if matches!(bytes[pos], b' ' | b'\t') {
+                pos += 1;
+            } else if let Some(len) = line_terminator_len(&bytes[pos..limit]) {
+                pos += len;
+            } else {
+                break;
+            }
         }
         if pos + 1 < limit && bytes[pos] == b'/' && bytes[pos + 1] == b'/' {
             pos += 2;
-            while pos < limit && bytes[pos] != b'\n' {
+            while pos < limit && line_terminator_len(&bytes[pos..limit]).is_none() {
                 pos += 1;
             }
         } else if pos + 1 < limit && bytes[pos] == b'/' && bytes[pos + 1] == b'*' {
@@ -184,7 +186,7 @@ fn skip_leading_trivia(source_text: &str, start: usize, end: usize) -> usize {
 
 fn skip_quoted_literal(bytes: &[u8], start: usize, quote: u8) -> usize {
     let mut idx = start + 1;
-    while idx < bytes.len() && bytes[idx] != quote && bytes[idx] != b'\n' {
+    while idx < bytes.len() && bytes[idx] != quote && !matches!(bytes[idx], b'\n' | b'\r') {
         idx = if bytes[idx] == b'\\' {
             (idx + 2).min(bytes.len())
         } else {
@@ -202,16 +204,22 @@ fn skip_template_literal(bytes: &[u8], start: usize, line: &mut usize) -> usize 
     let mut idx = start + 1;
     while idx < bytes.len() && bytes[idx] != b'`' {
         if bytes[idx] == b'\\' {
-            if idx + 1 < bytes.len() && bytes[idx + 1] == b'\n' {
+            if idx + 1 < bytes.len()
+                && let Some(len) = line_terminator_len(&bytes[idx + 1..])
+            {
                 *line += 1;
+                idx = (idx + 1 + len).min(bytes.len());
+                continue;
             }
             idx = (idx + 2).min(bytes.len());
             continue;
         }
-        if bytes[idx] == b'\n' {
+        if let Some(len) = line_terminator_len(&bytes[idx..]) {
             *line += 1;
+            idx += len;
+        } else {
+            idx += 1;
         }
-        idx += 1;
     }
     (idx + 1).min(bytes.len())
 }
@@ -225,10 +233,12 @@ fn read_block_comment<'a>(
     let content_start = start + 2;
     let mut idx = content_start;
     while idx + 1 < bytes.len() && !(bytes[idx] == b'*' && bytes[idx + 1] == b'/') {
-        if bytes[idx] == b'\n' {
+        if let Some(len) = line_terminator_len(&bytes[idx..]) {
             *line += 1;
+            idx += len;
+        } else {
+            idx += 1;
         }
-        idx += 1;
     }
     let raw = source_text.get(content_start..idx);
     ((idx + 2).min(bytes.len()), raw)
@@ -260,11 +270,12 @@ fn scan_comments_until_line(source_text: &str, max_line: usize) -> Vec<ScannedCo
     let mut line = 0_usize;
     let mut comments = Vec::new();
     while idx < bytes.len() && line <= max_line {
+        if let Some(len) = line_terminator_len(&bytes[idx..]) {
+            line += 1;
+            idx += len;
+            continue;
+        }
         match bytes[idx] {
-            b'\n' => {
-                line += 1;
-                idx += 1;
-            }
             b'\'' | b'"' if idx == 0 || bytes[idx - 1] != b'\\' => {
                 idx = skip_quoted_literal(bytes, idx, bytes[idx]);
             }
@@ -278,7 +289,7 @@ fn scan_comments_until_line(source_text: &str, max_line: usize) -> Vec<ScannedCo
                 let comment_pos = idx;
                 let start = idx + 2;
                 idx += 2;
-                while idx < bytes.len() && bytes[idx] != b'\n' {
+                while idx < bytes.len() && line_terminator_len(&bytes[idx..]).is_none() {
                     idx += 1;
                 }
                 if let Some(raw_content) = source_text.get(start..idx) {
@@ -338,8 +349,8 @@ pub fn is_inline_disabled(source_text: &str, pos: i32, end: i32, rule_id: &str) 
     let start_offset = usize::try_from(pos.max(0)).unwrap_or(0);
     let end_offset = usize::try_from(end.max(0)).unwrap_or(0);
     let token_pos = skip_leading_trivia(source_text, start_offset, end_offset);
-    let prefix = source_text.get(..token_pos).unwrap_or(source_text);
-    let target_line = prefix.bytes().filter(|&ch| ch == b'\n').count();
+    let target_line =
+        count_ecma_line_terminators(source_text.get(..token_pos).unwrap_or(source_text));
     let mut block_disabled = false;
     for comment in scan_comments_until_line(source_text, target_line) {
         let Some((kind, rules)) = parse_directive_text(comment.text) else {
@@ -357,6 +368,21 @@ pub fn is_inline_disabled(source_text: &str, pos: i32, end: i32, rule_id: &str) 
         }
     }
     block_disabled
+}
+
+fn count_ecma_line_terminators(text: &str) -> usize {
+    let bytes = text.as_bytes();
+    let mut idx = 0;
+    let mut lines = 0;
+    while idx < bytes.len() {
+        if let Some(len) = line_terminator_len(&bytes[idx..]) {
+            lines += 1;
+            idx += len;
+        } else {
+            idx += 1;
+        }
+    }
+    lines
 }
 
 #[must_use]

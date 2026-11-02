@@ -187,6 +187,35 @@ function proveIdleDirective(repoRoot, project) {
   );
 }
 
+function proveLineSeparatorRange(repoRoot, project) {
+  const plainSource =
+    'export const label = "ab";\nexport const value = (1 as unknown) as never;\n';
+  const sepSource =
+    'export const label = "a\u2028b";\nexport const value = (1 as unknown) as never;\n';
+  writeFileSync(join(project, "src/plain.ts"), plainSource);
+  writeFileSync(join(project, "src/sep.ts"), sepSource);
+  const run = runOxlint({
+    repoRoot,
+    project,
+    level: "error",
+    files: ["src/plain.ts", "src/sep.ts"],
+  });
+  const byFile = new Map(
+    run.diagnostics.map((diag) => [diag.filename, diag.labels[0]?.span])
+  );
+  const castExpr = "(1 as unknown) as never";
+  assert.equal(
+    byFile.get("src/plain.ts")?.offset,
+    Buffer.byteLength(plainSource.slice(0, plainSource.indexOf(castExpr)))
+  );
+  assert.equal(
+    byFile.get("src/sep.ts")?.offset,
+    Buffer.byteLength(sepSource.slice(0, sepSource.indexOf(castExpr)))
+  );
+  rmSync(join(project, "src/plain.ts"));
+  rmSync(join(project, "src/sep.ts"));
+}
+
 const FIXABLE_FILE = "src/fixable.ts";
 
 function proveFixAfterRegularPass(repoRoot, project, linter) {
@@ -248,7 +277,8 @@ export async function proveOxlintPluginBridge(repoRoot, linter) {
     proveConfiguredLevels(repoRoot, project);
     proveRuleOptions(repoRoot, project);
     proveIdleDirective(repoRoot, project);
-    proveTypeAwareRelay(repoRoot, project, linter);
+    proveLineSeparatorRange(repoRoot, project);
+    await proveTypeAwareRelay(repoRoot, project, linter);
     proveFixAfterRegularPass(repoRoot, project, linter);
     await proveDirectAddonAndCreate(project, linter);
   } finally {

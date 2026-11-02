@@ -12,13 +12,15 @@ import {
   coreHeadlessProbes,
   portableCases,
 } from "./portable-cases.mjs";
-import { headlessRuleProbes } from "./headless-rule-probes.mjs";
+import {
+  headlessRuleProbes,
+  proveInferredTypesSmoke,
+  verifyHeaderAndOptionFailureProbes,
+} from "./headless-rule-probes.mjs";
 import { proveOxlintPluginBridge } from "./oxlint-plugin-bridge.mjs";
 import {
   proveDeriveSmoke,
-  proveInferredTypesSmoke,
   proveProjectRootSmoke,
-  verifyHeaderAndOptionFailureProbes,
 } from "./rust-parity-derive.mjs";
 import { proveLineCapSmokes } from "./rust-parity-line-caps.mjs";
 import { runRustLinterSmokes } from "./rust-linter-smokes.mjs";

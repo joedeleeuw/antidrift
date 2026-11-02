@@ -67,10 +67,7 @@ function reportFindings(context, ruleId) {
   for (const finding of currentFile.findings.get(ruleId).findings) {
     context.report({
       message: finding.message,
-      loc: {
-        start: { line: finding.line, column: finding.column - 1 },
-        end: { line: finding.endLine, column: finding.endColumn - 1 },
-      },
+      node: { range: [finding.start, finding.end] },
     });
   }
 }

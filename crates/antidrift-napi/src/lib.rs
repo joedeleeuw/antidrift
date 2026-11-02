@@ -8,10 +8,8 @@ use napi_derive::napi;
 pub struct EngineFinding {
     pub rule: String,
     pub message: String,
-    pub line: u32,
-    pub column: u32,
-    pub end_line: u32,
-    pub end_column: u32,
+    pub start: u32,
+    pub end: u32,
 }
 
 #[napi(object)]
@@ -58,10 +56,8 @@ pub fn lint_file(
         .map(|finding| EngineFinding {
             rule: finding.rule,
             message: finding.message,
-            line: finding.location.line,
-            column: finding.location.column,
-            end_line: finding.location.end_line,
-            end_column: finding.location.end_column,
+            start: finding.start,
+            end: finding.end,
         })
         .collect())
 }

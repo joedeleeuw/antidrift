@@ -9,6 +9,39 @@ pub struct DiagnosticLocation {
     pub end_column: u32,
 }
 
+#[must_use]
+pub fn line_terminator_len(bytes: &[u8]) -> Option<usize> {
+    match bytes {
+        [b'\r', b'\n', ..] => Some(2),
+        [b'\n' | b'\r', ..] => Some(1),
+        [0xE2, 0x80, 0xA8 | 0xA9, ..] => Some(3),
+        _ => None,
+    }
+}
+
+#[must_use]
+pub fn split_first_line(text: &str) -> (&str, Option<&str>) {
+    let bytes = text.as_bytes();
+    let mut idx = 0;
+    while idx < bytes.len() {
+        if let Some(len) = line_terminator_len(&bytes[idx..]) {
+            return (&text[..idx], Some(&text[idx + len..]));
+        }
+        idx += 1;
+    }
+    (text, None)
+}
+
+pub fn split_ecma_lines(text: &str) -> impl Iterator<Item = &str> {
+    let mut remaining = (!text.is_empty()).then_some(text);
+    std::iter::from_fn(move || {
+        let current = remaining.take()?;
+        let (line, rest) = split_first_line(current);
+        remaining = rest.filter(|tail| !tail.is_empty());
+        Some(line)
+    })
+}
+
 #[derive(Debug, Clone)]
 pub struct LineIndex {
     starts: Vec<u32>,
@@ -18,10 +51,14 @@ impl LineIndex {
     #[must_use]
     pub fn new(source_text: &str) -> Self {
         let mut starts = vec![0];
-        for (idx, byte) in source_text.bytes().enumerate() {
-            if byte == b'\n' {
-                let next = u32::try_from(idx.saturating_add(1)).unwrap_or(u32::MAX);
-                starts.push(next);
+        let bytes = source_text.as_bytes();
+        let mut idx = 0;
+        while idx < bytes.len() {
+            if let Some(len) = line_terminator_len(&bytes[idx..]) {
+                idx += len;
+                starts.push(u32::try_from(idx).unwrap_or(u32::MAX));
+            } else {
+                idx += 1;
             }
         }
         Self { starts }

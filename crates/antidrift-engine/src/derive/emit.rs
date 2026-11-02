@@ -4,7 +4,7 @@ use std::path::Path;
 use serde::Serialize;
 
 use super::contracts::{InjectedParam, MethodContract, PublicationContract, WireParam};
-use super::decoders::{decoder_const, js_string};
+use super::decoders::{decoder_const, js_key, js_string};
 use super::route_contracts::RouteContract;
 use super::{DeriveDiagnostic, DeriveReport};
 
@@ -22,22 +22,27 @@ struct DiagnosticsFile<'a> {
 
 pub(crate) fn write_generated(dir: &Path, report: &DeriveReport) -> Result<(), String> {
     fs::create_dir_all(dir).map_err(|err| format!("cannot create {}: {err}", dir.display()))?;
+    let diagnostics = serde_json::to_string_pretty(&DiagnosticsFile {
+        diagnostics: &report.diagnostics,
+    })
+    .map_err(|err| format!("derive report is not serializable: {err}"))?;
+    let report_path = dir.join("derive-report.json");
+    fs::write(&report_path, format!("{diagnostics}\n"))
+        .map_err(|err| format!("cannot write {}: {err}", report_path.display()))?;
+    if !report.diagnostics.is_empty() {
+        return Ok(());
+    }
     let manifest = serde_json::to_string_pretty(&Manifest {
         methods: &report.methods,
         publications: &report.publications,
         routes: &report.routes,
     })
     .map_err(|err| format!("manifest is not serializable: {err}"))?;
-    let diagnostics = serde_json::to_string_pretty(&DiagnosticsFile {
-        diagnostics: &report.diagnostics,
-    })
-    .map_err(|err| format!("derive report is not serializable: {err}"))?;
     let outputs = [
         ("wire.ts", wire_module(report)),
         ("client.ts", client_module(report)),
         ("server.ts", server_module(report)),
         ("manifest.json", manifest),
-        ("derive-report.json", diagnostics),
     ];
     for (name, content) in outputs {
         let path = dir.join(name);
@@ -47,7 +52,51 @@ pub(crate) fn write_generated(dir: &Path, report: &DeriveReport) -> Result<(), S
     Ok(())
 }
 
-fn pascal(name: &str) -> String {
+pub(crate) const DECODE_HELPERS: &[&str] = &[
+    "expectArray",
+    "expectBoolean",
+    "expectDate",
+    "expectLiteral",
+    "expectNull",
+    "expectNumber",
+    "expectObject",
+    "expectString",
+    "firstOf",
+];
+
+pub(crate) const RESERVED_IDENTIFIERS: &[&str] = &[
+    "expectArray",
+    "expectBoolean",
+    "expectDate",
+    "expectLiteral",
+    "expectNull",
+    "expectNumber",
+    "expectObject",
+    "expectString",
+    "firstOf",
+    "expectArgs",
+    "callMethod",
+    "subscribePub",
+    "Decoder",
+    "YieldOf",
+    "Session",
+    "DispatchTable",
+    "MethodInvoker",
+    "PubInvoker",
+    "RouteEntry",
+    "AbortSignal",
+    "args",
+    "session",
+    "signal",
+    "raw",
+    "path",
+    "methods",
+    "pubs",
+    "routes",
+    "table",
+];
+
+pub(crate) fn pascal(name: &str) -> String {
     let mut chars = name.chars();
     match chars.next() {
         Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
@@ -68,18 +117,6 @@ fn param_type_names(contract_name: &str, params: &[WireParam]) -> Vec<String> {
         .map(|index| format!("{}Arg{index}", pascal(contract_name)))
         .collect()
 }
-
-const DECODE_HELPERS: &[&str] = &[
-    "expectArray",
-    "expectBoolean",
-    "expectDate",
-    "expectLiteral",
-    "expectNull",
-    "expectNumber",
-    "expectObject",
-    "expectString",
-    "firstOf",
-];
 
 fn owner_import(name: &str, file: &str) -> String {
     format!(
@@ -271,7 +308,8 @@ fn server_module(report: &DeriveReport) -> String {
     lines.push("\nconst methods = {".to_owned());
     for method in &report.methods {
         lines.push(format!(
-            "  {name}: async (args: readonly unknown[], session: Session): Promise<unknown> => {{\n    expectArgs(args, {arity});\n    const {{ {name} }} = await import({spec});\n    return {name}({call});\n  }},",
+            "  {key}: async (args: readonly unknown[], session: Session): Promise<unknown> => {{\n    expectArgs(args, {arity});\n    const {{ {name} }} = await import({spec});\n    return {name}({call});\n  }},",
+            key = js_key(&method.name),
             name = method.name,
             arity = method.params.len(),
             spec = js_string(&module_specifier(&method.file)),
@@ -282,7 +320,8 @@ fn server_module(report: &DeriveReport) -> String {
     lines.push("\nconst pubs = {".to_owned());
     for publication in &report.publications {
         lines.push(format!(
-            "  {name}: async function* (args: readonly unknown[], session: Session, signal: AbortSignal): AsyncGenerator {{\n    expectArgs(args, {arity});\n    const {{ {name} }} = await import({spec});\n    yield* {name}({call});\n  }},",
+            "  {key}: async function* (args: readonly unknown[], session: Session, signal: AbortSignal): AsyncGenerator {{\n    expectArgs(args, {arity});\n    const {{ {name} }} = await import({spec});\n    yield* {name}({call});\n  }},",
+            key = js_key(&publication.name),
             name = publication.name,
             arity = publication.params.len(),
             spec = js_string(&module_specifier(&publication.file)),

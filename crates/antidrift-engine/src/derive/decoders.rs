@@ -12,8 +12,10 @@ fn is_identifier(name: &str) -> bool {
         && chars.all(|rest| rest.is_ascii_alphanumeric() || rest == '_' || rest == '$')
 }
 
-fn js_key(name: &str) -> String {
-    if is_identifier(name) {
+pub(super) fn js_key(name: &str) -> String {
+    if name == "__proto__" {
+        format!("[{}]", js_string(name))
+    } else if is_identifier(name) {
         name.to_owned()
     } else {
         js_string(name)

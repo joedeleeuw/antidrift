@@ -3,6 +3,7 @@ use antidrift_kernel::file_role;
 use antidrift_kernel::jsx::{is_pascal_case_name, react_function_name};
 use antidrift_kernel::line_caps::{CappedUnit, LineCapFinding};
 use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
+use antidrift_kernel::span_index::split_first_line;
 use antidrift_kernel::tsrs_kernel::{is_function_like, property_name_text, unwrap_expression};
 use tsrs_ast::{Kind, Node};
 use tsrs_core::P;
@@ -201,8 +202,7 @@ fn report_first_line(ctx: &mut Ctx, start: usize, end: usize, finding: LineCapFi
     ) as usize;
     let line_end = text
         .get(token_start..end)
-        .and_then(|rest| rest.find('\n'))
-        .map_or(end, |offset| token_start + offset);
+        .map_or(end, |rest| token_start + split_first_line(rest).0.len());
     ctx.report_range(
         i32::try_from(token_start).unwrap_or(i32::MAX),
         i32::try_from(line_end).unwrap_or(i32::MAX),

@@ -1,3 +1,16 @@
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import {
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+
 import { dataFlowProbes } from "./headless-data-flow-probes.mjs";
 import { typeContractProbes } from "./headless-type-contract-probes.mjs";
 
@@ -187,3 +200,104 @@ export const headlessRuleProbes = [
   ...dataFlowProbes,
   ...typeContractProbes,
 ];
+
+const OPTION_FAILURE_PROBES = [
+  [
+    { name: "antidrift/react-max-component-props", options: [{ max: 0 }] },
+    /max must be >= 1/,
+  ],
+  [
+    { name: "antidrift/no-compat-names", options: [{ files: ["["] }] },
+    /invalid glob/,
+  ],
+  [
+    { name: "antidrift/no-adhoc-loader", options: [{ owner: "" }] },
+    /'owner' must be a non-empty string/,
+  ],
+  [
+    {
+      name: "antidrift/no-adhoc-loader",
+      options: [{ allowedFiles: [{ path: "x.tsx", reason: "" }] }],
+    },
+    /'allowedFiles\[\]\.reason' must be a non-empty string/,
+  ],
+];
+
+const GENERATED_HEADER_PROBES = [
+  ['/** do not edit the retries default */\nexport { foo } from "./bar";\n', 1],
+  ['/** @generated */\nexport { foo } from "./bar";\n', 0],
+  ['"use client";\n// @generated\nexport { foo } from "./bar";\n', 0],
+  ['#!/usr/bin/env node\r// @generated\rexport { foo } from "./bar";\n', 0],
+  ['// license\u2028// @generated\u2028export { foo } from "./bar";\n', 0],
+  ['\uFEFF// license\n\uFEFF// @generated\nexport { foo } from "./bar";\n', 0],
+];
+
+export function verifyHeaderAndOptionFailureProbes(
+  runHeadlessProbe,
+  probeFileA
+) {
+  const reexportRule = [{ name: "antidrift/no-reexport-only-module" }];
+  for (const [source, expected] of GENERATED_HEADER_PROBES) {
+    const diags = runHeadlessProbe({
+      version: 2,
+      configs: [{ file_paths: [probeFileA], rules: reexportRule }],
+      source_overrides: { [probeFileA]: source },
+    });
+    assert.equal(diags.length, expected, JSON.stringify(diags));
+  }
+  for (const [rule, pattern] of OPTION_FAILURE_PROBES) {
+    const payload = {
+      version: 2,
+      configs: [{ file_paths: [probeFileA], rules: [rule] }],
+      source_overrides: { [probeFileA]: "export const x = 1;\n" },
+    };
+    assert.throws(() => runHeadlessProbe(payload), pattern);
+  }
+}
+
+function inferredFindings(binaryPath, cwd, target) {
+  const run = spawnSync(binaryPath, ["--format", "json", target], {
+    cwd,
+    encoding: "utf8",
+  });
+  return JSON.parse(String(run.stdout ?? "[]")).flatMap((entry) =>
+    entry.messages.map((message) => `${message.line} ${message.ruleId}`)
+  );
+}
+
+export function proveInferredTypesSmoke(binaryPath, repoRoot) {
+  const workspace = mkdtempSync(join(tmpdir(), "antidrift-inferred-types-"));
+  try {
+    const monorepoDir = join(workspace, "monorepo");
+    const appDir = join(monorepoDir, "packages/app");
+    mkdirSync(join(appDir, "node_modules/@types"), { recursive: true });
+    mkdirSync(join(appDir, "scripts"), { recursive: true });
+    symlinkSync(
+      realpathSync(resolve(repoRoot, "node_modules/@types/node")),
+      join(appDir, "node_modules/@types/node"),
+      "junction"
+    );
+    const pkg =
+      '{ "name": "probe", "version": "0.0.0", "type": "module", "private": true }\n';
+    writeFileSync(join(monorepoDir, "package.json"), pkg);
+    writeFileSync(join(appDir, "package.json"), pkg);
+    writeFileSync(
+      join(appDir, "scripts/probe.mjs"),
+      'import { readFileSync } from "node:fs";\nconst fromDisk = JSON.parse(readFileSync("x.json", "utf8"));\nconst fromNowhere = JSON.parse(globalThis.untypedThing);\nconsole.log(fromDisk, fromNowhere);\n'
+    );
+    assert.deepEqual(
+      inferredFindings(
+        binaryPath,
+        monorepoDir,
+        "packages/app/scripts/probe.mjs"
+      ),
+      ["3 antidrift/no-unsafe-deserialize"]
+    );
+    assert.deepEqual(
+      inferredFindings(binaryPath, appDir, "scripts/probe.mjs"),
+      ["3 antidrift/no-unsafe-deserialize"]
+    );
+  } finally {
+    rmSync(workspace, { recursive: true, force: true });
+  }
+}

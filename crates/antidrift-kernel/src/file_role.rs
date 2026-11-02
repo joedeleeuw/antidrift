@@ -2,6 +2,7 @@ use tsrs_compiler::Program;
 use tsrs_core::tspath;
 
 use crate::provenance::relative_to_cwd;
+use crate::span_index::{split_ecma_lines, split_first_line};
 
 const GENERATED_DIRS: &[&str] = &[
     "__generated__",
@@ -215,9 +216,10 @@ fn strip_source_ext(file_path: &str) -> Option<&str> {
 }
 
 const PROLOGUE_DIRECTIVES: &[&str] = &["use client", "use server", "use strict"];
+const HEADER_WHITESPACE: &[char] = &[' ', '\t', '\r', '\n', '\u{2028}', '\u{2029}', '\u{feff}'];
 
 fn strip_prologue_directive(rest: &str) -> Option<&str> {
-    let trimmed = rest.trim_start();
+    let trimmed = rest.trim_start_matches(HEADER_WHITESPACE);
     let quote = trimmed.as_bytes().first().copied()?;
     if quote != b'"' && quote != b'\'' {
         return None;
@@ -231,26 +233,28 @@ fn strip_prologue_directive(rest: &str) -> Option<&str> {
         .strip_prefix(';')
         .map(|tail| tail.trim_start_matches([' ', '\t']))
         .or_else(|| {
-            (after.is_empty() || after.starts_with('\n') || after.starts_with("\r\n"))
+            (after.is_empty() || after.starts_with(['\n', '\r', '\u{2028}', '\u{2029}']))
                 .then_some(after)
         })
 }
 
 fn has_blank_line(gap: &str) -> bool {
-    gap.split_once('\n').is_some_and(|(_, after_first)| {
-        after_first
-            .split('\n')
-            .take_while(|_| true)
+    split_first_line(gap).1.is_some_and(|after_first| {
+        split_ecma_lines(after_first)
             .collect::<Vec<_>>()
             .split_last()
-            .is_some_and(|(_, middle)| middle.iter().any(|line| line.trim().is_empty()))
+            .is_some_and(|(_, middle)| {
+                middle
+                    .iter()
+                    .any(|line| line.trim_matches(HEADER_WHITESPACE).is_empty())
+            })
     })
 }
 
 fn leading_comment_text(source_text: &str) -> String {
     let mut rest = source_text.trim_start_matches('\u{feff}');
     if rest.starts_with("#!") {
-        rest = rest.split_once('\n').map_or("", |(_, tail)| tail);
+        rest = split_first_line(rest).1.unwrap_or("");
     }
     let mut header = String::new();
     loop {
@@ -258,10 +262,10 @@ fn leading_comment_text(source_text: &str) -> String {
             rest = after_directive;
             continue;
         }
-        let trimmed = rest.trim_start();
+        let trimmed = rest.trim_start_matches(HEADER_WHITESPACE);
         let (comment, is_jsdoc, tail) = if let Some(body) = trimmed.strip_prefix("//") {
-            let (line, after) = body.split_once('\n').unwrap_or((body, ""));
-            (line, false, after)
+            let (line, after) = split_first_line(body);
+            (line, false, after.unwrap_or(""))
         } else if let Some(body) = trimmed.strip_prefix("/*") {
             let is_jsdoc = body.starts_with('*') && !body.starts_with("*/");
             let (block, after) = body.split_once("*/").unwrap_or((body, ""));
@@ -269,7 +273,7 @@ fn leading_comment_text(source_text: &str) -> String {
         } else {
             return header.to_ascii_lowercase();
         };
-        let next = tail.trim_start();
+        let next = tail.trim_start_matches(HEADER_WHITESPACE);
         let followed_by_code = !next.is_empty()
             && !next.starts_with("//")
             && !next.starts_with("/*")

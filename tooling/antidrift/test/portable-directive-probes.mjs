@@ -34,6 +34,17 @@ export const directiveCoreHeadlessProbes = [
     expectedCount: 2,
   },
   {
+    name: "no-wrapping-functions (generator words after CR on line 1 do not mark the file generated)",
+    rule: "antidrift/no-wrapping-functions",
+    source: [
+      '// license\rconst notice = "do not edit";',
+      "function loadName(id: string): string { return id.trim(); }",
+      "function readName(id: string): string { return loadName(id); }",
+      "export function render(id: string): string { return readName(id) + notice; }",
+    ].join("\n"),
+    expectedCount: 2,
+  },
+  {
     name: "no-wrapping-functions (widened return type string | null must stay clean)",
     rule: "antidrift/no-wrapping-functions",
     source: `
@@ -66,6 +77,16 @@ export const directiveCoreHeadlessProbes = [
       export const legacyAdapter = 1;
     `,
     expectedCount: 0,
+  },
+  {
+    name: "short rule name in disable directive does not suppress antidrift rule",
+    rule: "antidrift/no-compat-names",
+    source: `
+      export const adapter = 0;
+      // oxlint-disable-next-line no-compat-names -- short alias rejected
+      export const legacyAdapter = 1;
+    `,
+    expectedCount: 1,
   },
   {
     name: "eslint-disable inside string literal does not suppress native antidrift rule",

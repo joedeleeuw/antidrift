@@ -61,29 +61,24 @@ fn serve(receiver: &Receiver<EngineRequest>) {
     let mut sessions: FxHashMap<String, Session> = FxHashMap::default();
     let mut rule_plans = RulePlanCache::default();
     for request in receiver {
-        let delivered = match request {
+        match request {
             EngineRequest::Lint {
                 cwd,
                 file_path,
                 rules,
                 reply,
-            } => reply
-                .send(guarded(|| {
+            } => {
+                drop(reply.send(guarded(|| {
                     session_for(&mut sessions, &cwd)?.lint_file(&file_path, &rules)
-                }))
-                .is_ok(),
+                })));
+            }
             EngineRequest::Headless { request, reply } => {
                 let shared = sessions
                     .get(&tspath::normalize_path(&request.cwd))
                     .map(|session| &session.env);
                 let answered = guarded(|| Ok(request.serve_cached(shared, &mut rule_plans)));
-                reply
-                    .send(answered.unwrap_or_else(RelayReply::Failure))
-                    .is_ok()
+                drop(reply.send(answered.unwrap_or_else(RelayReply::Failure)));
             }
-        };
-        if !delivered {
-            break;
         }
     }
 }

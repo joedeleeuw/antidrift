@@ -1,9 +1,10 @@
 use antidrift_kernel::tsrs_kernel::property_name_text;
 use serde::Serialize;
-use tsrs_ast::SourceFile;
+use tsrs_ast::{Node, SourceFile};
 use tsrs_checker::{Checker, ObjectFlags, SignatureKind, Type};
 use tsrs_core::P;
 
+use super::emit::RESERVED_IDENTIFIERS;
 use super::layout::{ExportedFunction, exported_functions, file_stem, has_non_function_exports};
 use super::wire_shape::{WireShape, shape_of};
 use super::{DeriveReport, DeriveRule};
@@ -87,6 +88,50 @@ fn injected_param_kind(checker: &mut Checker, declared: P<Type>) -> Option<Injec
     }
 }
 
+fn is_reserved_generated_identifier(name: &str) -> bool {
+    RESERVED_IDENTIFIERS.contains(&name) || name.starts_with("decode")
+}
+
+fn validate_param_declaration(
+    param_node: P<Node>,
+    function_name: &str,
+    relative: &str,
+    report: &mut DeriveReport,
+) -> Option<&'static str> {
+    let param_decl = param_node.as_parameter_declaration();
+    let Some(name) = property_name_text(param_decl.name()) else {
+        report.flag(
+            relative,
+            DeriveRule::UnnamedParameter,
+            format!(
+                "`{function_name}` destructures a parameter; wire parameters need names, so take `input` and destructure inside."
+            ),
+        );
+        return None;
+    };
+    if param_decl.dot_dot_dot_token().is_some() {
+        report.flag(
+            relative,
+            DeriveRule::MethodParamNotWire,
+            format!(
+                "`{function_name}({name})` is a rest parameter; wire calls send a fixed positional argument tuple, so take an explicit array parameter instead."
+            ),
+        );
+        return None;
+    }
+    if param_decl.initializer().is_some() {
+        report.flag(
+            relative,
+            DeriveRule::MethodParamNotWire,
+            format!(
+                "`{function_name}({name})` has a default initializer; JSON serializes omitted or `undefined` positional arguments as `null`, so take an options object with an optional field instead."
+            ),
+        );
+        return None;
+    }
+    Some(name)
+}
+
 fn wire_params(
     checker: &mut Checker,
     function: ExportedFunction,
@@ -97,17 +142,7 @@ fn wire_params(
     let mut params = Vec::new();
     let mut injected = Vec::new();
     for &param_node in function.node.parameters() {
-        let Some(name) = property_name_text(param_node.as_parameter_declaration().name()) else {
-            report.flag(
-                relative,
-                DeriveRule::UnnamedParameter,
-                format!(
-                    "`{}` destructures a parameter; wire parameters need names, so take `input` and destructure inside.",
-                    function.name
-                ),
-            );
-            return None;
-        };
+        let name = validate_param_declaration(param_node, function.name, relative, report)?;
         let declared = checker.get_type_at_location(param_node);
         if let Some(kind) = injected_param_kind(checker, declared) {
             if !allowed.contains(&kind) {
@@ -130,6 +165,17 @@ fn wire_params(
                 DeriveRule::InjectedParamPlacement,
                 format!(
                     "`{}` declares wire parameter `{name}` after an injected parameter; the runtime injects Session and AbortSignal after the wire arguments, so they come last.",
+                    function.name
+                ),
+            );
+            return None;
+        }
+        if is_reserved_generated_identifier(name) {
+            report.flag(
+                relative,
+                DeriveRule::ReservedGeneratedIdentifier,
+                format!(
+                    "`{}({name})` uses reserved generated identifier `{name}`; rename the parameter so it does not shadow a runtime helper or decoder binding in `src/generated/`.",
                     function.name
                 ),
             );
@@ -209,6 +255,38 @@ fn promised_result_shape(
     }
 }
 
+fn check_contract_name(
+    function: ExportedFunction,
+    relative: &str,
+    noun: &str,
+    report: &mut DeriveReport,
+) -> bool {
+    if function.name != file_stem(relative) {
+        report.flag(
+            relative,
+            DeriveRule::MethodExportName,
+            format!(
+                "exports `{}` but the file is `{}`; the file name is the {noun} name on the wire, so rename one of them.",
+                function.name,
+                file_stem(relative)
+            ),
+        );
+        return false;
+    }
+    if is_reserved_generated_identifier(function.name) {
+        report.flag(
+            relative,
+            DeriveRule::ReservedGeneratedIdentifier,
+            format!(
+                "`{}` uses reserved generated identifier `{}`; rename the {noun} so it does not collide with a runtime helper or decoder binding in `src/generated/`.",
+                function.name, function.name
+            ),
+        );
+        return false;
+    }
+    true
+}
+
 pub(crate) fn inspect_method(
     checker: &mut Checker,
     sf: P<SourceFile>,
@@ -229,16 +307,7 @@ pub(crate) fn inspect_method(
         );
         return;
     }
-    if function.name != file_stem(relative) {
-        report.flag(
-            relative,
-            DeriveRule::MethodExportName,
-            format!(
-                "exports `{}` but the file is `{}`; the file name is the method name on the wire, so rename one of them.",
-                function.name,
-                file_stem(relative)
-            ),
-        );
+    if !check_contract_name(function, relative, "method", report) {
         return;
     }
     let Some((params, injected)) = wire_params(
@@ -340,16 +409,7 @@ pub(crate) fn inspect_publication(
         );
         return;
     }
-    if function.name != file_stem(relative) {
-        report.flag(
-            relative,
-            DeriveRule::MethodExportName,
-            format!(
-                "exports `{}` but the file is `{}`; the file name is the publication name on the wire.",
-                function.name,
-                file_stem(relative)
-            ),
-        );
+    if !check_contract_name(function, relative, "publication", report) {
         return;
     }
     let allowed = [InjectedParam::Session, InjectedParam::AbortSignal];

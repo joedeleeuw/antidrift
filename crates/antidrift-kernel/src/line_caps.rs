@@ -1,4 +1,5 @@
 use crate::diagnostic::Severity;
+use crate::span_index::split_ecma_lines;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum LineCount {
@@ -10,7 +11,7 @@ impl LineCount {
     #[must_use]
     pub fn count(self, text: &str) -> usize {
         match self {
-            Self::Physical => text.lines().count(),
+            Self::Physical => split_ecma_lines(text).count(),
             Self::NonBlank => text.lines().filter(|line| !line.trim().is_empty()).count(),
         }
     }

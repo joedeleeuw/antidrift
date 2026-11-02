@@ -8,6 +8,7 @@ mod wire_shape;
 
 use std::sync::Arc;
 
+use rustc_hash::FxHashMap;
 use serde::Serialize;
 use tsrs_compiler::Context;
 use tsrs_core::tspath;
@@ -27,6 +28,8 @@ pub(crate) enum DeriveRule {
     MethodSingleExport,
     MethodParamNotWire,
     MethodResultNotWire,
+    DuplicateWireName,
+    ReservedGeneratedIdentifier,
     InjectedParamPlacement,
     UnnamedParameter,
     PublicationMustBeGenerator,
@@ -37,6 +40,7 @@ pub(crate) enum DeriveRule {
     RouteReturnType,
     SharedMustBeSync,
     ClientReachesServer,
+    TypeScriptDiagnostic,
 }
 
 #[derive(Serialize)]
@@ -117,26 +121,125 @@ pub(crate) fn run_derive(args: &[String]) -> Result<i32, String> {
     }
     let mut report = DeriveReport::default();
     for (config_file_name, config_files) in &programs {
-        let bound = env
-            .configured_program(config_file_name, config_files, true)
-            .map_err(|diags| {
-                let messages: Vec<String> = diags
-                    .into_iter()
-                    .map(|diag| diag.message.description)
-                    .collect();
-                format!("failed to load {config_file_name}: {}", messages.join("; "))
-            })?;
+        let bound = match env.configured_program(config_file_name, config_files, false) {
+            Ok(bound) => bound,
+            Err(diags) => {
+                for diag in diags {
+                    let file_path = diag.file_path.as_deref().unwrap_or(config_file_name);
+                    let detail = diag
+                        .message
+                        .help
+                        .as_deref()
+                        .unwrap_or(&diag.message.description);
+                    report.flag(
+                        layout.relative(&tspath::normalize_slashes(file_path)),
+                        DeriveRule::TypeScriptDiagnostic,
+                        detail.to_owned(),
+                    );
+                }
+                continue;
+            }
+        };
         inspect_program(&bound, &layout, &mut report);
     }
+    check_duplicate_wire_names(&mut report);
     emit::write_generated(&src_dir.join("generated"), &report)?;
     print_report(&report);
     Ok(i32::from(!report.diagnostics.is_empty()))
 }
 
-fn inspect_program(bound: &BoundProgram, layout: &SourceLayout, report: &mut DeriveReport) {
-    let checker_context = Context::default();
+fn check_duplicate_wire_names(report: &mut DeriveReport) {
+    let mut seen: FxHashMap<String, String> = FxHashMap::default();
+    let entries: Vec<(String, String)> = report
+        .methods
+        .iter()
+        .map(|method| (method.name.clone(), method.file.clone()))
+        .chain(
+            report
+                .publications
+                .iter()
+                .map(|pub_contract| (pub_contract.name.clone(), pub_contract.file.clone())),
+        )
+        .collect();
+    for (name, file) in entries {
+        if let Some(first_file) = seen.get(&name) {
+            report.flag(
+                &file,
+                DeriveRule::DuplicateWireName,
+                format!(
+                    "wire name `{name}` is already declared by `{first_file}`; every method and publication needs a distinct wire name across `methods/` and `pubs/`."
+                ),
+            );
+        } else {
+            seen.insert(name, file);
+        }
+    }
+}
+
+fn collect_contract_diagnostics(
+    bound: &BoundProgram,
+    checker_context: &Context,
+    layout: &SourceLayout,
+    report: &mut DeriveReport,
+) -> rustc_hash::FxHashSet<String> {
+    let mut blocked_files = rustc_hash::FxHashSet::default();
     for &sf in &bound.source_files {
         let file_name = tspath::normalize_slashes(sf.file_name());
+        let Some(role) = layout.role_of(&file_name) else {
+            continue;
+        };
+        if !matches!(
+            role,
+            Role::Method | Role::Publication | Role::Route | Role::Shared
+        ) {
+            continue;
+        }
+        let mut file_diags = bound
+            .program
+            .get_syntactic_diagnostics(checker_context, Some(sf));
+        file_diags.extend(
+            bound
+                .program
+                .get_bind_diagnostics(checker_context, Some(sf)),
+        );
+        file_diags.extend(
+            bound
+                .program
+                .get_semantic_diagnostics(checker_context, Some(sf)),
+        );
+        if file_diags.is_empty() {
+            continue;
+        }
+        blocked_files.insert(file_name.clone());
+        let relative = layout.relative(&file_name);
+        for diag in file_diags {
+            let message = tsrs_compiler::diagnosticwriter::flatten_diagnostic_message(diag, "\n");
+            report.flag(relative, DeriveRule::TypeScriptDiagnostic, message);
+        }
+    }
+    for diag in bound.program.get_global_diagnostics(checker_context) {
+        let file_name = diag
+            .file()
+            .map(|sf| tspath::normalize_slashes(sf.file_name()))
+            .unwrap_or_default();
+        let message = tsrs_compiler::diagnosticwriter::flatten_diagnostic_message(diag, "\n");
+        report.flag(
+            layout.relative(&file_name),
+            DeriveRule::TypeScriptDiagnostic,
+            message,
+        );
+    }
+    blocked_files
+}
+
+fn inspect_program(bound: &BoundProgram, layout: &SourceLayout, report: &mut DeriveReport) {
+    let checker_context = Context::default();
+    let blocked_files = collect_contract_diagnostics(bound, &checker_context, layout, report);
+    for &sf in &bound.source_files {
+        let file_name = tspath::normalize_slashes(sf.file_name());
+        if blocked_files.contains(&file_name) {
+            continue;
+        }
         let Some(role) = layout.role_of(&file_name) else {
             continue;
         };

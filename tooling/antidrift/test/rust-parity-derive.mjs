@@ -5,7 +5,6 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
-  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -26,6 +25,22 @@ const PLANTED_DERIVE_VIOLATIONS = {
     "export async function voidResult(): Promise<void> {\n  await Promise.resolve();\n}\n",
   "src/methods/optionalArg.ts":
     "export async function optionalArg(todoId: string, note?: string): Promise<string> {\n  return Promise.resolve(note ?? todoId);\n}\n",
+  "src/methods/defaultArg.ts":
+    'export async function defaultArg(note: string = "default"): Promise<string> {\n  return Promise.resolve(note);\n}\n',
+  "src/methods/restArg.ts":
+    "export async function restArg(...numbers: number[]): Promise<number> {\n  return Promise.resolve(numbers.length);\n}\n",
+  "src/methods/expectString.ts":
+    "export async function expectString(label: string): Promise<string> {\n  return Promise.resolve(label);\n}\n",
+  "src/methods/decodeAddTodoResult.ts":
+    "export async function decodeAddTodoResult(label: string): Promise<string> {\n  return Promise.resolve(label);\n}\n",
+  "src/methods/shadowCallMethod.ts":
+    "export async function shadowCallMethod(callMethod: string): Promise<string> {\n  return Promise.resolve(callMethod);\n}\n",
+  "src/methods/nested/addTodo.ts":
+    "export async function addTodo(label: string): Promise<string> {\n  return Promise.resolve(label);\n}\n",
+  "src/pubs/completeTodo.ts":
+    'export async function* completeTodo(): AsyncGenerator<string> {\n  yield "done";\n}\n',
+  "src/methods/brokenImport.ts":
+    'import type { MissingWire } from "../shared/missingWire";\nexport async function brokenImport(input: MissingWire): Promise<string> {\n  return Promise.resolve(String(input));\n}\n',
   "src/routes/lists/route.ts":
     "export function GET(): Response {\n  return Response.json([]);\n}\n",
   "src/shared/asyncShared.ts":
@@ -63,19 +78,27 @@ const DERIVE_GENERATED_FILES = [
 const EXPECTED_PLANTED_DERIVE_DIAGNOSTICS = [
   "client/leaky.ts client-reaches-server",
   "methods/arrayOverlap.ts method-result-not-wire",
+  "methods/brokenImport.ts type-script-diagnostic",
   "methods/callbacky.ts method-param-not-wire",
   "methods/dateOrIsoLiteral.ts method-result-not-wire",
   "methods/dateOrText.ts method-result-not-wire",
+  "methods/decodeAddTodoResult.ts reserved-generated-identifier",
+  "methods/defaultArg.ts method-param-not-wire",
+  "methods/expectString.ts reserved-generated-identifier",
   "methods/mappedSymbolKey.ts method-param-not-wire",
+  "methods/nested/addTodo.ts duplicate-wire-name",
   "methods/optionalArg.ts method-param-not-wire",
   "methods/overlap.ts method-result-not-wire",
   "methods/primitiveArrayOverlap.ts method-result-not-wire",
   "methods/renamed.ts method-export-name",
+  "methods/restArg.ts method-param-not-wire",
+  "methods/shadowCallMethod.ts reserved-generated-identifier",
   "methods/surrogateKey.ts method-param-not-wire",
   "methods/surrogateLiteral.ts method-result-not-wire",
   "methods/symbolKey.ts method-param-not-wire",
   "methods/syncMethod.ts method-must-be-async",
   "methods/voidResult.ts method-result-not-wire",
+  "pubs/completeTodo.ts duplicate-wire-name",
   "routes/lists/route.ts route-must-be-async",
   "shared/asyncShared.ts shared-must-be-sync",
   "shared/asyncShared.ts shared-must-be-sync",
@@ -161,109 +184,6 @@ export function proveProjectRootSmoke(binaryPath) {
   }
 }
 
-function inferredFindings(binaryPath, cwd, target) {
-  const run = spawnSync(binaryPath, ["--format", "json", target], {
-    cwd,
-    encoding: "utf8",
-  });
-  return JSON.parse(String(run.stdout ?? "[]")).flatMap((entry) =>
-    entry.messages.map((message) => `${message.line} ${message.ruleId}`)
-  );
-}
-
-const OPTION_FAILURE_PROBES = [
-  [
-    { name: "antidrift/react-max-component-props", options: [{ max: 0 }] },
-    /max must be >= 1/,
-  ],
-  [
-    { name: "antidrift/no-compat-names", options: [{ files: ["["] }] },
-    /invalid glob/,
-  ],
-  [
-    { name: "antidrift/no-adhoc-loader", options: [{ owner: "" }] },
-    /'owner' must be a non-empty string/,
-  ],
-  [
-    {
-      name: "antidrift/no-adhoc-loader",
-      options: [{ allowedFiles: [{ path: "x.tsx", reason: "" }] }],
-    },
-    /'allowedFiles\[\]\.reason' must be a non-empty string/,
-  ],
-];
-
-export function verifyHeaderAndOptionFailureProbes(
-  runHeadlessProbe,
-  probeFileA
-) {
-  for (const [source, expected] of [
-    [
-      '/** do not edit the retries default */\nexport { foo } from "./bar";\n',
-      1,
-    ],
-    ['/** @generated */\nexport { foo } from "./bar";\n', 0],
-    ['"use client";\n// @generated\nexport { foo } from "./bar";\n', 0],
-  ]) {
-    const diags = runHeadlessProbe({
-      version: 2,
-      configs: [
-        {
-          file_paths: [probeFileA],
-          rules: [{ name: "antidrift/no-reexport-only-module" }],
-        },
-      ],
-      source_overrides: { [probeFileA]: source },
-    });
-    assert.equal(diags.length, expected, JSON.stringify(diags));
-  }
-  for (const [rule, pattern] of OPTION_FAILURE_PROBES) {
-    const payload = {
-      version: 2,
-      configs: [{ file_paths: [probeFileA], rules: [rule] }],
-      source_overrides: { [probeFileA]: "export const x = 1;\n" },
-    };
-    assert.throws(() => runHeadlessProbe(payload), pattern);
-  }
-}
-
-export function proveInferredTypesSmoke(binaryPath, repoRoot) {
-  const workspace = mkdtempSync(join(tmpdir(), "antidrift-inferred-types-"));
-  try {
-    const monorepoDir = join(workspace, "monorepo");
-    const appDir = join(monorepoDir, "packages/app");
-    mkdirSync(join(appDir, "node_modules/@types"), { recursive: true });
-    mkdirSync(join(appDir, "scripts"), { recursive: true });
-    symlinkSync(
-      realpathSync(resolve(repoRoot, "node_modules/@types/node")),
-      join(appDir, "node_modules/@types/node"),
-      "junction"
-    );
-    const pkg =
-      '{ "name": "probe", "version": "0.0.0", "type": "module", "private": true }\n';
-    writeFileSync(join(monorepoDir, "package.json"), pkg);
-    writeFileSync(join(appDir, "package.json"), pkg);
-    writeFileSync(
-      join(appDir, "scripts/probe.mjs"),
-      'import { readFileSync } from "node:fs";\nconst fromDisk = JSON.parse(readFileSync("x.json", "utf8"));\nconst fromNowhere = JSON.parse(globalThis.untypedThing);\nconsole.log(fromDisk, fromNowhere);\n'
-    );
-    assert.deepEqual(
-      inferredFindings(
-        binaryPath,
-        monorepoDir,
-        "packages/app/scripts/probe.mjs"
-      ),
-      ["3 antidrift/no-unsafe-deserialize"]
-    );
-    assert.deepEqual(
-      inferredFindings(binaryPath, appDir, "scripts/probe.mjs"),
-      ["3 antidrift/no-unsafe-deserialize"]
-    );
-  } finally {
-    rmSync(workspace, { recursive: true, force: true });
-  }
-}
-
 function copyDeriveSample(repoRoot, workspace) {
   const sampleRoot = resolve(repoRoot, "apps/shape-sample");
   const copyRoot = join(workspace, "apps/shape-sample");
@@ -310,7 +230,7 @@ function verifyPlantedDeriveViolations(binaryPath, sampleRoot, copyRoot) {
       strictUtf8.decode(readFileSync(join(copyRoot, "src/generated", name)))
     );
   }
-  for (const name of ["wire.ts", "client.ts", "server.ts"]) {
+  for (const name of ["wire.ts", "client.ts", "server.ts", "manifest.json"]) {
     assert.equal(
       readFileSync(join(copyRoot, "src/generated", name), "utf8"),
       readFileSync(join(sampleRoot, "src/generated", name), "utf8")
@@ -365,7 +285,47 @@ function verifyNameStatusRecordProbes() {
   }
 }
 
+function verifyProtoAndTsconfigDeriveProbes(binaryPath, copyRoot) {
+  const protoFile = join(copyRoot, "src/methods/protoKey.ts");
+  writeFileSync(
+    protoFile,
+    'export async function protoKey(input: { ["__proto__"]: string }): Promise<{ ["__proto__"]: string }> {\n  return Promise.resolve({ ["__proto__"]: input["__proto__"] });\n}\n'
+  );
+  const protoRun = spawnSync(binaryPath, ["derive", copyRoot], {
+    encoding: "utf8",
+  });
+  assert.equal(protoRun.status, 0, `${protoRun.stdout}${protoRun.stderr}`);
+  assert.match(
+    readFileSync(join(copyRoot, "src/generated/wire.ts"), "utf8"),
+    /\["__proto__"\]/u
+  );
+  rmSync(protoFile);
+
+  const tsconfigPath = join(copyRoot, "tsconfig.json");
+  const originalTsconfig = readFileSync(tsconfigPath, "utf8");
+  writeFileSync(
+    tsconfigPath,
+    '{ "compilerOptions": { "target": "es2525", "unknownFlag": true }, "include": ["src"] }\n'
+  );
+  const badRun = spawnSync(binaryPath, ["derive", copyRoot], {
+    encoding: "utf8",
+  });
+  assert.equal(badRun.status, 1, `${badRun.stdout}${badRun.stderr}`);
+  const badReport = JSON.parse(
+    readFileSync(join(copyRoot, "src/generated/derive-report.json"), "utf8")
+  );
+  assert.deepEqual(
+    badReport.diagnostics.map((d) => `${d.file} ${d.rule}`),
+    [
+      "tsconfig.json type-script-diagnostic",
+      "tsconfig.json type-script-diagnostic",
+    ]
+  );
+  writeFileSync(tsconfigPath, originalTsconfig);
+}
+
 function verifyAcceptedAndRuntimeProbes(binaryPath, copyRoot) {
+  verifyProtoAndTsconfigDeriveProbes(binaryPath, copyRoot);
   const acceptedFile = join(copyRoot, "src/methods/acceptedShapes.ts");
   writeFileSync(
     acceptedFile,

@@ -52,13 +52,13 @@ const lineCapShapes = {
   },
 };
 
-function lineCapSource(ruleId, count) {
+function lineCapSource(ruleId, count, separator = "\n") {
   const { head, tail, line } = lineCapShapes[ruleId];
   const body = Array.from(
     { length: count - head.length - tail.length },
     (_, index) => line(index)
   );
-  return `${[...head, ...body, ...tail].join("\n")}\n`;
+  return `${[...head, ...body, ...tail].join(separator)}${separator}`;
 }
 
 const rustRuleRowsSchema = z.array(
@@ -140,8 +140,8 @@ async function loadLineCaps(binaryPath, repoRoot) {
 function buildScriptCases(lineCaps, workspace) {
   return lineCaps
     .filter(({ ruleId }) => ruleId.startsWith("antidrift/"))
-    .flatMap((cap) =>
-      lineCapBoundaries(cap).map(([count, expected]) => ({
+    .flatMap((cap) => [
+      ...lineCapBoundaries(cap).map(([count, expected]) => ({
         id: `${cap.ruleId}:${count}`,
         filename: join(
           workspace,
@@ -152,8 +152,23 @@ function buildScriptCases(lineCaps, workspace) {
         rules: { [cap.ruleId]: "error" },
         cap,
         expected,
-      }))
-    );
+      })),
+      ...[
+        ["cr", "\r"],
+        ["ls", "\u2028"],
+      ].map(([label, separator]) => ({
+        id: `${cap.ruleId}:${cap.max + 1}:${label}`,
+        filename: join(
+          workspace,
+          `${cap.ruleId.replace("antidrift/", "")}-${cap.max + 1}-${label}.tsx`
+        ),
+        cwd: workspace,
+        sourceText: lineCapSource(cap.ruleId, cap.max + 1, separator),
+        rules: { [cap.ruleId]: "error" },
+        cap,
+        expected: ["error"],
+      })),
+    ]);
 }
 
 const CLASSIFICATION_CASES = [

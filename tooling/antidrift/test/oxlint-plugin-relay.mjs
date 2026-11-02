@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
+import { createConnection, createServer } from "node:net";
 import { join, resolve } from "node:path";
 
 import { loadNativeAddon, resolveOxlintBinary } from "../src/policy/oxlint.mjs";
@@ -207,7 +208,82 @@ function runTypeAwareOxlint({ repoRoot, project, linter, plugin }) {
   return { status: run.status, output: `${run.stdout}${run.stderr}` };
 }
 
-export function proveTypeAwareRelay(repoRoot, project, linter) {
+async function proveSilentForeignListenerTimeout(project, linter) {
+  const sockets = new Set();
+  const server = createServer((socket) => {
+    sockets.add(socket);
+  });
+  await new Promise((resolveListen) => {
+    server.listen(0, "127.0.0.1", resolveListen);
+  });
+  const { port } = server.address();
+  const endpoint = `127.0.0.1:${port}/silent-token`;
+  try {
+    const child = spawn(linter, ["headless"], {
+      cwd: project,
+      env: { ...process.env, ANTIDRIFT_ENGINE: endpoint },
+    });
+    child.stdin.end(headlessPayload(project, undefined));
+    const chunks = [];
+    child.stdout.on("data", (chunk) => chunks.push(chunk));
+    child.stderr.on("data", (chunk) => chunks.push(chunk));
+    const status = await new Promise((resolveExit) => {
+      child.on("close", resolveExit);
+    });
+    const output = Buffer.concat(chunks).toString("utf8");
+    assert.notEqual(status, 0, output);
+    assert.match(
+      output,
+      new RegExp(
+        `ANTIDRIFT_ENGINE \\(127\\.0\\.0\\.1:${port}/silent-token\\)`,
+        "u"
+      )
+    );
+  } finally {
+    for (const socket of sockets) {
+      socket.destroy();
+    }
+    await new Promise((resolveClose) => {
+      server.close(resolveClose);
+    });
+  }
+}
+
+async function proveConcurrentRelayHeadOfLine(project, linter, addon) {
+  const endpoint = addon.engineEndpoint();
+  const [address, token] = endpoint.split("/");
+  const [host, portText] = address.split(":");
+  const version = execFileSync(linter, ["--version"], { encoding: "utf8" })
+    .trim()
+    .split(" ")[1];
+  const socket = createConnection({ host, port: Number(portText) });
+  try {
+    const handshake = Buffer.from(JSON.stringify({ version, token }), "utf8");
+    const frame = Buffer.alloc(4 + handshake.length);
+    frame.writeUInt32LE(handshake.length, 0);
+    handshake.copy(frame, 4);
+    const ack = await new Promise((resolveAck, rejectAck) => {
+      socket.once("error", rejectAck);
+      socket.once("data", (chunk) => resolveAck(chunk[0]));
+      socket.write(frame);
+    });
+    assert.equal(ack, 0xaa, "Connection A must receive HANDSHAKE_ACK (0xAA)");
+    const relayed = runHeadless({
+      linter,
+      cwd: project,
+      payload: headlessPayload(project, undefined),
+      environment: { ...process.env, ANTIDRIFT_ENGINE: endpoint },
+    });
+    assert.ok(
+      relayed.length >= 3,
+      "Connection B must complete while Connection A holds its handshake open"
+    );
+  } finally {
+    socket.destroy();
+  }
+}
+
+export async function proveTypeAwareRelay(repoRoot, project, linter) {
   const withPlugin = runTypeAwareOxlint({
     repoRoot,
     project,
@@ -238,6 +314,12 @@ export function proveTypeAwareRelay(repoRoot, project, linter) {
     /antidrift engine relay named by ANTIDRIFT_ENGINE \(127\.0\.0\.1:9\/stale-token\) failed/u,
     "The type-aware helper must fail loudly on an engine it cannot reach"
   );
+  await proveSilentForeignListenerTimeout(project, linter);
+  await proveConcurrentRelayHeadOfLine(
+    project,
+    linter,
+    loadNativeAddon(project)
+  );
 }
 
 export async function proveDirectAddonAndCreate(project, linter) {
@@ -245,25 +327,24 @@ export async function proveDirectAddonAndCreate(project, linter) {
     await import("../src/oxlint-plugin/index.mjs");
   const findings = [];
   const castFile = join(project, CAST_FILES[0]);
-  const rule = antidriftPlugin.rules["no-as-never"];
-  const visitor = rule.create({
+  const visitor = antidriftPlugin.rules["no-as-never"].create({
     cwd: project,
     filename: castFile,
     options: [],
-    report(finding) {
-      findings.push(finding.loc.start.line);
-    },
+    report: (finding) => findings.push(finding.node.range),
   });
   visitor.Program();
   assert.deepEqual(
     findings,
-    [2, 6],
+    [
+      [52, 66],
+      [195, 218],
+    ],
     "The standard ESLint/Bun create(context) visitor must report findings through Program()"
   );
-
   const addon = loadNativeAddon(project);
   assert.deepEqual(
-    addon.lintFile(project, join(project, CAST_FILES[0]), []),
+    addon.lintFile(project, castFile, []),
     [],
     "A lint request with no rules must report nothing"
   );
