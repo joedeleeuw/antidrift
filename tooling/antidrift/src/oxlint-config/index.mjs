@@ -15,7 +15,14 @@ function antidriftRuleLevels(repoRoot) {
     loadNativeAddon(repoRoot)
       .antidriftRules()
       .filter(({ defaultEnabled }) => defaultEnabled)
-      .map(({ name }) => [name, "error"])
+      .flatMap(({ name, lineCap }) =>
+        lineCap
+          ? [
+              [name, "error"],
+              [`${name}-near`, "warn"],
+            ]
+          : [[name, "error"]]
+      )
   );
 }
 

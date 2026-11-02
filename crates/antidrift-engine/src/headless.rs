@@ -10,10 +10,37 @@ use tsrslint::protocol::{
 };
 
 use crate::headless_host::{
-    ProgramBuilderEnv, base_fs, collect_missing_bound_files, filter_suppressed_diagnostics,
+    ProgramBuilderEnv, base_fs, collect_missing_bound_files, suppress_program_diagnostics_enabled,
 };
 use crate::relay;
 use crate::rule_plan::{RulePlanCache, build_config_rule_plan, lint_program_files};
+
+fn filter_suppressed_diagnostics(
+    cwd: &str,
+    diagnostics: Vec<Diagnostic>,
+) -> Result<Vec<Diagnostic>, String> {
+    let path = std::path::Path::new(cwd).join("eslint-suppressions.json");
+    let suppressions = antidrift_kernel::suppressions::SuppressionsTable::load(&path)?;
+    let mut seen_counts: FxHashMap<(String, String), usize> = FxHashMap::default();
+    Ok(diagnostics
+        .into_iter()
+        .filter(|diag| {
+            let Some(fp) = &diag.file_path else {
+                return true;
+            };
+            let rel = antidrift_kernel::provenance::relative_to_cwd(cwd, fp);
+            let allowed = suppressions.suppressed_count(&rel, &diag.message.id);
+            if allowed == 0 {
+                return true;
+            }
+            let seen = seen_counts
+                .entry((rel, diag.message.id.clone()))
+                .and_modify(|count| *count += 1)
+                .or_insert(1);
+            *seen > allowed
+        })
+        .collect())
+}
 
 fn apply_debug_flag(raw: &str, opts: &mut Options) -> Result<(), String> {
     for part in raw.split(',') {
@@ -63,10 +90,6 @@ fn parse_headless_flags(args: &[String]) -> Result<Options, String> {
         idx += 1;
     }
     Ok(opts)
-}
-
-fn env_flag(name: &str, enabled: &str) -> bool {
-    std::env::var(name).is_ok_and(|value| value == enabled)
 }
 
 fn requested_files(payload: &Payload) -> Vec<String> {
@@ -123,10 +146,7 @@ impl HeadlessRequest {
             cwd: tspath::normalize_path(&cwd.to_string_lossy()),
             args: args.to_vec(),
             payload,
-            suppress_program_diagnostics: env_flag(
-                "OXLINT_TSGOLINT_DANGEROUSLY_SUPPRESS_PROGRAM_DIAGNOSTICS",
-                "true",
-            ),
+            suppress_program_diagnostics: suppress_program_diagnostics_enabled(),
         })
     }
 

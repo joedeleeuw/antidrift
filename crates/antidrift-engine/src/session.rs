@@ -8,7 +8,10 @@ use tsrs_core::tspath;
 use tsrslint::linter::{Options, lint_files};
 use tsrslint::rule::Rule;
 
-use crate::headless_host::{BoundProgram, ProgramBuilderEnv, base_fs, collect_missing_bound_files};
+use crate::headless_host::{
+    BoundProgram, ProgramBuilderEnv, base_fs, collect_missing_bound_files,
+    suppress_program_diagnostics_enabled,
+};
 use crate::rule_catalog::{RequestedRule, RuleCatalog, RuleRequest};
 use crate::runner::{collect_lintable_files, is_supported_file};
 
@@ -61,7 +64,7 @@ impl Session {
     pub(crate) fn new(cwd: &str) -> Result<Self, String> {
         tsrs_checker::links::set_sparse_id_pages(true);
         let catalog = RuleCatalog::load(Path::new(cwd))?;
-        let cwd = tspath::normalize_slashes(cwd);
+        let cwd = tspath::normalize_path(cwd);
         let env = ProgramBuilderEnv::new(base_fs(None), &cwd);
         let mut session = Self {
             env,
@@ -160,7 +163,11 @@ impl Session {
         }
         let bound = self
             .env
-            .configured_program(config_file_name, &batch.files, true)
+            .configured_program(
+                config_file_name,
+                &batch.files,
+                suppress_program_diagnostics_enabled(),
+            )
             .map_err(|diagnostics| {
                 let messages: Vec<String> = diagnostics
                     .into_iter()
@@ -223,35 +230,90 @@ impl Session {
         let Some(bound) = batch.bound.as_ref().filter(|_| !missing.is_empty()) else {
             return Ok(());
         };
-        let identities: FxHashMap<&str, &str> = missing
-            .iter()
-            .map(|requested| (requested.rule.name(), requested.identity.as_str()))
-            .collect();
-        let instances: Vec<&'static dyn Rule> =
-            missing.iter().map(|requested| requested.rule).collect();
-        let recorded = record(bound, &instances);
-        batch
-            .linted
-            .extend(missing.iter().map(|requested| requested.identity.clone()));
         for sf in &bound.source_files {
             self.findings
                 .entry(tspath::normalize_slashes(sf.file_name()))
                 .or_default();
         }
-        for (file, finding) in recorded {
-            let identity = identities.get(finding.rule.as_str()).ok_or_else(|| {
-                format!(
-                    "{} reported under a rule id that was not requested",
-                    finding.rule
-                )
-            })?;
-            self.findings
-                .entry(file)
-                .or_default()
-                .push(((*identity).to_owned(), finding));
+        for group in group_rule_passes(&missing) {
+            let instances: Vec<&'static dyn Rule> = group.iter().map(|&(_, rule)| rule).collect();
+            let group_keys: FxHashSet<&str> = group.iter().map(|&(key, _)| key).collect();
+            let pass_missing: Vec<&RequestedRule> = missing
+                .iter()
+                .copied()
+                .filter(|req| group_keys.contains(req.rule_key.as_str()))
+                .collect();
+            for (file, message_id, finding) in record(bound, &instances) {
+                record_matched_findings(
+                    &mut self.findings,
+                    &pass_missing,
+                    &file,
+                    message_id,
+                    &finding,
+                )?;
+            }
         }
+        batch
+            .linted
+            .extend(missing.iter().map(|requested| requested.identity.clone()));
         Ok(())
     }
+}
+
+fn group_rule_passes<'a>(missing: &[&'a RequestedRule]) -> Vec<Vec<(&'a str, &'static dyn Rule)>> {
+    let mut unique: Vec<(&'a str, &'static dyn Rule)> = Vec::new();
+    let mut seen_keys = FxHashSet::default();
+    for requested in missing {
+        if seen_keys.insert(requested.rule_key.as_str()) {
+            unique.push((requested.rule_key.as_str(), requested.rule));
+        }
+    }
+    let mut passes: Vec<Vec<(&'a str, &'static dyn Rule)>> = Vec::new();
+    for (rule_key, rule) in unique {
+        if let Some(pass) = passes.iter_mut().find(|pass| {
+            pass.iter()
+                .all(|(_, existing)| existing.name() != rule.name())
+        }) {
+            pass.push((rule_key, rule));
+        } else {
+            passes.push(vec![(rule_key, rule)]);
+        }
+    }
+    passes
+}
+
+fn record_matched_findings(
+    findings: &mut FxHashMap<String, Vec<(String, Finding)>>,
+    missing: &[&RequestedRule],
+    file: &str,
+    message_id: &str,
+    finding: &Finding,
+) -> Result<(), String> {
+    let mut matched_rule = false;
+    for requested in missing {
+        if requested.rule.name() != finding.rule {
+            continue;
+        }
+        matched_rule = true;
+        if requested
+            .tier
+            .is_none_or(|tier| tier.message_id() == message_id)
+        {
+            let mut item = finding.clone();
+            item.rule.clone_from(&requested.output_name);
+            findings
+                .entry(file.to_owned())
+                .or_default()
+                .push((requested.identity.clone(), item));
+        }
+    }
+    if !matched_rule {
+        return Err(format!(
+            "{} reported under a rule id that was not requested",
+            finding.rule
+        ));
+    }
+    Ok(())
 }
 
 fn is_requestable_file(path: &Path) -> bool {
@@ -276,7 +338,10 @@ fn utf16_offset(source_text: &str, byte_offset: u32) -> u32 {
     .unwrap_or(0)
 }
 
-fn record(bound: &BoundProgram, rules: &[&'static dyn Rule]) -> Vec<(String, Finding)> {
+fn record(
+    bound: &BoundProgram,
+    rules: &[&'static dyn Rule],
+) -> Vec<(String, &'static str, Finding)> {
     let (ts_files, js_files): (Vec<P<SourceFile>>, Vec<P<SourceFile>>) = bound
         .source_files
         .iter()
@@ -307,7 +372,7 @@ fn record(bound: &BoundProgram, rules: &[&'static dyn Rule]) -> Vec<(String, Fin
                 start: utf16_offset(source_text, start_byte),
                 end: utf16_offset(source_text, end_byte),
             };
-            (file, finding)
+            (file, item.message.id, finding)
         })
         .collect()
 }

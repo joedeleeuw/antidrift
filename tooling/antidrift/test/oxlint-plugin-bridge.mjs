@@ -13,6 +13,7 @@ import { join, resolve } from "node:path";
 
 import {
   ADDON_LIBRARY_NAMES,
+  loadNativeAddon,
   resolveOxlintBinary,
 } from "../src/policy/oxlint.mjs";
 import {
@@ -216,6 +217,57 @@ function proveLineSeparatorRange(repoRoot, project) {
   rmSync(join(project, "src/sep.ts"));
 }
 
+function runLineCapOxlint(repoRoot, project, file) {
+  const configPath = join(project, "oxlintrc.line-cap.json");
+  writeFileSync(
+    configPath,
+    JSON.stringify({
+      jsPlugins: [
+        resolve(repoRoot, "tooling/antidrift/src/oxlint-plugin/index.mjs"),
+      ],
+      categories: { correctness: "off" },
+      rules: {
+        "antidrift/max-module-lines": "error",
+        "antidrift/max-module-lines-near": "warn",
+      },
+    })
+  );
+  const run = spawnSync(
+    process.execPath,
+    [resolveOxlintBinary(), "-c", configPath, "--format", "json", file],
+    { cwd: project, encoding: "utf8" }
+  );
+  return [run.status, summarize(JSON.parse(run.stdout).diagnostics)];
+}
+
+function proveLineCapNearWarning(repoRoot, project) {
+  const lines = (count) =>
+    `${Array.from({ length: count }, (_, idx) => `export const c${idx} = ${idx};`).join("\n")}\n`;
+  writeFileSync(join(project, "src/near.ts"), lines(450));
+  writeFileSync(join(project, "src/over.ts"), lines(501));
+  assert.deepEqual(runLineCapOxlint(repoRoot, project, "src/near.ts"), [
+    0,
+    [["src/near.ts", "antidrift(max-module-lines-near)", "warning", 1]],
+  ]);
+  assert.deepEqual(runLineCapOxlint(repoRoot, project, "src/over.ts"), [
+    1,
+    [["src/over.ts", "antidrift(max-module-lines)", "error", 1]],
+  ]);
+  const addon = loadNativeAddon();
+  const nearExcluded = {
+    rule: "antidrift/max-module-lines-near",
+    options: JSON.stringify([{ excludeFiles: ["src/**"] }]),
+  };
+  const baseRule = { rule: "antidrift/max-module-lines" };
+  const overPath = join(project, "src/over.ts");
+  assert.deepEqual(
+    addon.lintFile(project, overPath, [nearExcluded, baseRule]),
+    addon.lintFile(project, overPath, [baseRule, nearExcluded])
+  );
+  rmSync(join(project, "src/near.ts"));
+  rmSync(join(project, "src/over.ts"));
+}
+
 const FIXABLE_FILE = "src/fixable.ts";
 
 function proveFixAfterRegularPass(repoRoot, project, linter) {
@@ -281,6 +333,7 @@ export async function proveOxlintPluginBridge(repoRoot, linter) {
     await proveTypeAwareRelay(repoRoot, project, linter);
     proveFixAfterRegularPass(repoRoot, project, linter);
     await proveDirectAddonAndCreate(project, linter);
+    proveLineCapNearWarning(repoRoot, project);
   } finally {
     rmSync(project, { recursive: true, force: true });
   }

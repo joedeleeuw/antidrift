@@ -133,31 +133,34 @@ pub(crate) fn build_shared_host(
     })
 }
 
-pub(crate) fn filter_suppressed_diagnostics(
-    cwd: &str,
-    diagnostics: Vec<Diagnostic>,
-) -> Result<Vec<Diagnostic>, String> {
-    let path = std::path::Path::new(cwd).join("eslint-suppressions.json");
-    let suppressions = antidrift_kernel::suppressions::SuppressionsTable::load(&path)?;
-    let mut seen_counts: FxHashMap<(String, String), usize> = FxHashMap::default();
-    Ok(diagnostics
-        .into_iter()
-        .filter(|diag| {
-            let Some(fp) = &diag.file_path else {
-                return true;
-            };
-            let rel = antidrift_kernel::provenance::relative_to_cwd(cwd, fp);
-            let allowed = suppressions.suppressed_count(&rel, &diag.message.id);
-            if allowed == 0 {
-                return true;
-            }
-            let seen = seen_counts
-                .entry((rel, diag.message.id.clone()))
-                .and_modify(|count| *count += 1)
-                .or_insert(1);
-            *seen > allowed
-        })
-        .collect())
+pub(crate) fn suppress_program_diagnostics_enabled() -> bool {
+    std::env::var("OXLINT_TSGOLINT_DANGEROUSLY_SUPPRESS_PROGRAM_DIAGNOSTICS")
+        .is_ok_and(|value| value == "true")
+}
+
+fn build_tsconfig_diagnostic(
+    file_path: String,
+    range: Option<Range>,
+    help: Option<String>,
+) -> Diagnostic {
+    let description = match help.as_deref().filter(|text| !text.is_empty()) {
+        Some(text) => format!("Invalid tsconfig ({file_path}): {text}"),
+        None => format!("Invalid tsconfig ({file_path})"),
+    };
+    Diagnostic {
+        kind: 1,
+        range,
+        message: Message {
+            id: "tsconfig-error".to_owned(),
+            description,
+            help,
+        },
+        file_path: Some(file_path),
+        labeled_ranges: Vec::new(),
+        rule: None,
+        fixes: Vec::new(),
+        suggestions: Vec::new(),
+    }
 }
 
 pub(crate) fn tsconfig_error_diagnostic(
@@ -170,20 +173,24 @@ pub(crate) fn tsconfig_error_diagnostic(
         .filter(|name| !name.is_empty())
         .unwrap_or_else(|| config_file_name.to_owned());
     let help = tsrs_compiler::diagnosticwriter::flatten_diagnostic_message(diag, "\n");
-    Diagnostic {
-        kind: 1,
-        range: diag.loc().map(Range::from),
-        message: Message {
-            id: "tsconfig-error".to_owned(),
-            description: "Invalid tsconfig".to_owned(),
-            help: Some(help),
-        },
-        file_path: Some(file_path),
-        labeled_ranges: Vec::new(),
-        rule: None,
-        fixes: Vec::new(),
-        suggestions: Vec::new(),
+    build_tsconfig_diagnostic(file_path, diag.loc().map(Range::from), Some(help))
+}
+
+fn parsed_config_errors(
+    errors: &[P<tsrs_ast::Diagnostic>],
+    config_file_name: &str,
+) -> Vec<Diagnostic> {
+    if errors.is_empty() {
+        return vec![build_tsconfig_diagnostic(
+            config_file_name.to_owned(),
+            None,
+            None,
+        )];
     }
+    errors
+        .iter()
+        .map(|diag| tsconfig_error_diagnostic(*diag, config_file_name))
+        .collect()
 }
 
 pub(crate) struct BoundProgram {
@@ -209,13 +216,7 @@ impl ProgramFactory {
         let parsed = self.resolver.load(config_file_name);
         let config = match parsed.config {
             Some(config) if parsed.errors.is_empty() => config,
-            _ => {
-                return Err(parsed
-                    .errors
-                    .iter()
-                    .map(|diag| tsconfig_error_diagnostic(*diag, config_file_name))
-                    .collect());
-            }
+            _ => return Err(parsed_config_errors(&parsed.errors, config_file_name)),
         };
         let config_errors: Vec<Diagnostic> = config
             .errors
@@ -243,6 +244,31 @@ impl ProgramFactory {
             program,
             diagnostics,
         })
+    }
+
+    fn is_broken_tsconfig(&self, candidate: &str) -> bool {
+        if !self.fs.file_exists(candidate) {
+            return false;
+        }
+        let parsed = self.resolver.load(candidate);
+        parsed.config.as_ref().is_none_or(|cfg| {
+            !parsed.errors.is_empty() || (!cfg.errors.is_empty() && cfg.file_names().is_empty())
+        })
+    }
+
+    fn broken_ancestor_tsconfig(&self, file: &str) -> Option<String> {
+        let mut dir = tspath::get_directory_path(file);
+        loop {
+            let candidate = tspath::combine_paths(&dir, &["tsconfig.json"]);
+            if self.is_broken_tsconfig(&candidate) {
+                return Some(candidate);
+            }
+            let parent = tspath::get_directory_path(&dir);
+            if parent == dir {
+                return None;
+            }
+            dir = parent;
+        }
     }
 
     fn inferred(&self, unmatched: &[String]) -> &'static Program {
@@ -338,12 +364,19 @@ impl ProgramBuilderEnv {
         let mut program_index: FxHashMap<String, usize> = FxHashMap::default();
         let mut unmatched: Vec<String> = Vec::new();
         for (file, config) in files.iter().zip(assignment) {
-            if config.is_empty() {
+            let resolved = if config.is_empty() {
+                self.factory
+                    .broken_ancestor_tsconfig(file)
+                    .unwrap_or_default()
+            } else {
+                config
+            };
+            if resolved.is_empty() {
                 unmatched.push(file.clone());
                 continue;
             }
-            let idx = *program_index.entry(config.clone()).or_insert_with(|| {
-                programs.push((config.clone(), Vec::new()));
+            let idx = *program_index.entry(resolved.clone()).or_insert_with(|| {
+                programs.push((resolved.clone(), Vec::new()));
                 programs.len() - 1
             });
             programs[idx].1.push(file.clone());

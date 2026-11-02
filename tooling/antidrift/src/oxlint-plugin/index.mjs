@@ -119,8 +119,13 @@ function localRuleName(ruleId) {
 export default {
   meta: { name: "antidrift" },
   rules: Object.fromEntries(
-    addon
-      .antidriftRules()
-      .map(({ name }) => [localRuleName(name), bridgeRule(name)])
+    addon.antidriftRules().flatMap(({ name, lineCap }) => {
+      const local = localRuleName(name);
+      const entries = [[local, bridgeRule(name)]];
+      if (lineCap) {
+        entries.push([`${local}-near`, bridgeRule(`${name}-near`)]);
+      }
+      return entries;
+    })
   ),
 };

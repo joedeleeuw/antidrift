@@ -14,7 +14,7 @@ use tsrs_compiler::Context;
 use tsrs_core::tspath;
 use tsrs_vfs::{FS, bundled, cachedvfs, osvfs};
 
-use crate::headless_host::{BoundProgram, ProgramBuilderEnv};
+use crate::headless_host::{BoundProgram, ProgramBuilderEnv, suppress_program_diagnostics_enabled};
 use crate::runner::collect_lintable_files;
 use contracts::{MethodContract, PublicationContract};
 use layout::{Role, SourceLayout};
@@ -68,6 +68,30 @@ impl DeriveReport {
     }
 }
 
+fn verify_required_runtime(
+    root: &std::path::Path,
+    src_dir: &std::path::Path,
+) -> Result<(), String> {
+    let missing_runtime: Vec<String> = [
+        "runtime/decode.ts",
+        "runtime/client.ts",
+        "runtime/server.ts",
+        "shared/session.ts",
+    ]
+    .into_iter()
+    .filter(|rel| !src_dir.join(rel).is_file())
+    .map(|rel| format!("src/{rel}"))
+    .collect();
+    if missing_runtime.is_empty() {
+        return Ok(());
+    }
+    Err(format!(
+        "{} is missing required derive runtime module(s): {}",
+        root.display(),
+        missing_runtime.join(", ")
+    ))
+}
+
 pub(crate) fn run_derive(args: &[String]) -> Result<i32, String> {
     let package_root = args
         .first()
@@ -86,23 +110,7 @@ pub(crate) fn run_derive(args: &[String]) -> Result<i32, String> {
             root.display()
         ));
     }
-    let missing_runtime: Vec<String> = [
-        "runtime/decode.ts",
-        "runtime/client.ts",
-        "runtime/server.ts",
-        "shared/session.ts",
-    ]
-    .into_iter()
-    .filter(|rel| !src_dir.join(rel).is_file())
-    .map(|rel| format!("src/{rel}"))
-    .collect();
-    if !missing_runtime.is_empty() {
-        return Err(format!(
-            "{} is missing required derive runtime module(s): {}",
-            root.display(),
-            missing_runtime.join(", ")
-        ));
-    }
+    verify_required_runtime(&root, &src_dir)?;
     let layout = SourceLayout::new(&src_dir);
     let files = collect_lintable_files(std::slice::from_ref(&src_dir), &cwd)?;
     let normalized: Vec<String> = files
@@ -121,7 +129,11 @@ pub(crate) fn run_derive(args: &[String]) -> Result<i32, String> {
     }
     let mut report = DeriveReport::default();
     for (config_file_name, config_files) in &programs {
-        let bound = match env.configured_program(config_file_name, config_files, false) {
+        let bound = match env.configured_program(
+            config_file_name,
+            config_files,
+            suppress_program_diagnostics_enabled(),
+        ) {
             Ok(bound) => bound,
             Err(diags) => {
                 for diag in diags {

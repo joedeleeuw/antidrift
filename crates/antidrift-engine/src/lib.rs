@@ -128,7 +128,7 @@ pub fn run_cli() -> ExitCode {
         .any(|arg| matches!(arg.as_str(), "--help" | "-h") || (raw_vec.len() == 1 && arg == "help"))
     {
         println!(
-            "Usage:\n  antidrift-linter [--format human|stylish|json|sarif] [--json] [--fix] [--list-rules]\n                   [--batch-json <spec>] [--suppress-rule <id>] [--prune-suppressions]\n                   [--suppressions-location <path>] [--report-unused-disable-directives] [paths...]\n  antidrift-linter rust [--json] [--format human|stylish|json] [paths...]\n  antidrift-linter derive <package-root>\n  antidrift-linter headless"
+            "Usage:\n  antidrift-linter [--format human|stylish|json|sarif] [--json] [--fix] [--deny-warnings]\n                   [--rule <id>=<error|warn|off>] [--list-rules] [--batch-json <spec>]\n                   [--suppress-rule <id>] [--prune-suppressions] [--suppressions-location <path>]\n                   [--report-unused-disable-directives] [paths...]\n  antidrift-linter rust [--json] [--format human|stylish|json] [paths...]\n  antidrift-linter derive <package-root>\n  antidrift-linter headless"
         );
         return ExitCode::SUCCESS;
     }

@@ -11,6 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
+import { collectTouchedModuleGraph } from "../src/change-scope/module-graph.mjs";
 import { dataFlowProbes } from "./headless-data-flow-probes.mjs";
 import { typeContractProbes } from "./headless-type-contract-probes.mjs";
 
@@ -265,6 +266,88 @@ function inferredFindings(binaryPath, cwd, target) {
   );
 }
 
+function verifyCliLevelsAndPaths(binaryPath, workspace) {
+  const pkgA = join(workspace, "levels/packages/a");
+  const pkgB = join(workspace, "levels/packages/b");
+  mkdirSync(pkgA, { recursive: true });
+  mkdirSync(pkgB, { recursive: true });
+  const near = `${Array.from({ length: 450 }, (_, i) => `export const c${i} = ${i};`).join("\n")}\n`;
+  writeFileSync(join(pkgA, "near.ts"), near);
+  writeFileSync(join(pkgB, "cast.ts"), "export const legacyValue = 1;\n");
+  const warnRun = spawnSync(binaryPath, ["--format", "json", "near.ts"], {
+    cwd: pkgA,
+    encoding: "utf8",
+  });
+  assert.equal(warnRun.status, 0);
+  const denyRun = spawnSync(
+    binaryPath,
+    ["--format", "json", "--deny-warnings", "near.ts"],
+    { cwd: pkgA, encoding: "utf8" }
+  );
+  assert.equal(denyRun.status, 1);
+  const ruleWarn = spawnSync(
+    binaryPath,
+    [
+      "--format",
+      "json",
+      "--rule",
+      "antidrift/no-compat-names=warn",
+      "../b/cast.ts",
+      "../b/./cast.ts",
+    ],
+    { cwd: pkgA, encoding: "utf8" }
+  );
+  assert.equal(ruleWarn.status, 0);
+  assert.deepEqual(
+    JSON.parse(ruleWarn.stdout).map((e) => [e.filePath, e.warningCount]),
+    [["../b/cast.ts", 1]]
+  );
+}
+
+function verifyBrokenTsconfigFails(binaryPath, repoRoot, workspace) {
+  verifyCliLevelsAndPaths(binaryPath, workspace);
+  const brokenDir = join(workspace, "broken-tsconfig");
+  mkdirSync(join(brokenDir, "src/deep"), { recursive: true });
+  symlinkSync("src/deep", join(brokenDir, "link"));
+  writeFileSync(join(brokenDir, "src/index.ts"), "export const x = 1;\n");
+  writeFileSync(join(brokenDir, "index.ts"), "export const legacyValue = 1;\n");
+  assert.deepEqual(
+    inferredFindings(binaryPath, brokenDir, "link/../index.ts"),
+    []
+  );
+  for (const [cfg, pattern] of [
+    ["{ invalid json\n", /Invalid tsconfig/u],
+    [
+      '{ "compilerOptions": { "baseUrl": "." }, "include": ["src"] }\n',
+      /baseUrl/u,
+    ],
+  ]) {
+    writeFileSync(join(brokenDir, "tsconfig.json"), cfg);
+    const run = spawnSync(binaryPath, ["src/index.ts"], {
+      cwd: brokenDir,
+      encoding: "utf8",
+    });
+    assert.notEqual(run.status, 0);
+    assert.match(`${run.stdout}${run.stderr}`, pattern);
+  }
+  const changedFiles = [
+    {
+      path: "tooling/antidrift/src/oxlint-config/index.mjs",
+      operation: "modify",
+    },
+  ];
+  const graph = collectTouchedModuleGraph({
+    cwd: repoRoot,
+    head: "HEAD",
+    tsconfig: "tsconfig.json",
+    changedFiles,
+    allowedEntrypoints: ["tooling/antidrift/src/index.mjs"],
+    maxTouchedModuleRadius: 2,
+  });
+  assert.deepEqual(graph.entrypoints, ["tooling/antidrift/src/index.mjs"]);
+  assert.equal(graph.touchedFiles[0]?.withinRadius, true);
+}
+
 export function proveInferredTypesSmoke(binaryPath, repoRoot) {
   const workspace = mkdtempSync(join(tmpdir(), "antidrift-inferred-types-"));
   try {
@@ -297,6 +380,7 @@ export function proveInferredTypesSmoke(binaryPath, repoRoot) {
       inferredFindings(binaryPath, appDir, "scripts/probe.mjs"),
       ["3 antidrift/no-unsafe-deserialize"]
     );
+    verifyBrokenTsconfigFails(binaryPath, repoRoot, workspace);
   } finally {
     rmSync(workspace, { recursive: true, force: true });
   }

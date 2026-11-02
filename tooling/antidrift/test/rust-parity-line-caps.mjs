@@ -19,12 +19,13 @@ const policyRowsSchema = z.object({
   ),
 });
 
-const lineCapDiagnosticsSchema = z.array(
-  z.object({ ruleId: z.string(), severity: z.string() })
-);
-
 const lineCapBatchSchema = z.array(
-  z.object({ id: z.string(), diagnostics: lineCapDiagnosticsSchema })
+  z.object({
+    id: z.string(),
+    diagnostics: z.array(
+      z.object({ ruleId: z.string(), severity: z.string() })
+    ),
+  })
 );
 
 const lineCapDetector = /^antidrift:(max-[^,]+)$/u;
@@ -211,6 +212,38 @@ const CLASSIFICATION_CASES = [
     "  return values.map((template: unknown = <div />) => String(template));",
     "}",
     ["antidrift/max-function-lines:error"],
+  ],
+  [
+    "production-describe-not-exempt",
+    "src/service.ts",
+    "declare function describe(name: string, fn: () => void): void;\ndescribe('prod', () => {",
+    "  return;",
+    "});",
+    ["antidrift/max-function-lines:error"],
+  ],
+  [
+    "vitest-import-describe-exempt",
+    "src/Check.ts",
+    'import { describe } from "vitest";\ndescribe["each"]([1])("suite", (() => {',
+    "  return;",
+    "}) as () => void);",
+    [],
+  ],
+  [
+    "uninvoked-cast-arrow-not-iife",
+    "src/cast-arrow.ts",
+    "export const fn = (() => {",
+    "  return 1;",
+    "}) as () => number;",
+    ["antidrift/max-function-lines:error"],
+  ],
+  [
+    "invoked-cast-arrow-and-new-iife-exempt",
+    "src/cast-iife.ts",
+    "export const val = ((() => {",
+    "  return 1;",
+    "}) as () => number)();",
+    [],
   ],
 ];
 

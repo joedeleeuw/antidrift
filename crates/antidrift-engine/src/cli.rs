@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use antidrift_kernel::diagnostic::Severity;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum OutputFormat {
     Human,
@@ -11,6 +13,8 @@ pub(crate) enum OutputFormat {
 pub(crate) struct CliArgs {
     pub(crate) format: OutputFormat,
     pub(crate) fix: bool,
+    pub(crate) deny_warnings: bool,
+    pub(crate) rule_levels: Vec<(String, Severity)>,
     pub(crate) prune_suppressions: bool,
     pub(crate) suppress_rules: Vec<String>,
     pub(crate) suppressions_path: PathBuf,
@@ -30,6 +34,8 @@ impl Default for CliArgs {
         Self {
             format: OutputFormat::Human,
             fix: false,
+            deny_warnings: false,
+            rule_levels: Vec::new(),
             prune_suppressions: false,
             suppress_rules: Vec::new(),
             suppressions_path: PathBuf::from("eslint-suppressions.json"),
@@ -81,12 +87,36 @@ where
     match arg {
         "--fix" => parsed.fix = true,
         "--json" => parsed.format = OutputFormat::Json,
+        "--deny-warnings" => parsed.deny_warnings = true,
         "--prune-suppressions" => parsed.prune_suppressions = true,
         "--report-unused-disable-directives" => parsed.report_unused_directives = true,
         "--list-rules" => *list_rules = true,
+        other => apply_value_or_path_arg(other, iter, parsed, batch_json)?,
+    }
+    Ok(())
+}
+
+fn apply_value_or_path_arg<I>(
+    arg: &str,
+    iter: &mut I,
+    parsed: &mut CliArgs,
+    batch_json: &mut Option<String>,
+) -> Result<(), String>
+where
+    I: Iterator<Item = String>,
+{
+    if let Some(raw) = arg.strip_prefix("--rule=") {
+        parsed.rule_levels.push(parse_rule_level(raw)?);
+        return Ok(());
+    }
+    match arg {
         "--format" => {
             let val = iter.next().ok_or("missing value for --format")?;
             parsed.format = parse_format(&val)?;
+        }
+        "--rule" => {
+            let val = iter.next().ok_or("missing value for --rule")?;
+            parsed.rule_levels.push(parse_rule_level(&val)?);
         }
         "--suppress-rule" => {
             let val = iter.next().ok_or("missing value for --suppress-rule")?;
@@ -102,12 +132,35 @@ where
             let val = iter.next().ok_or("missing value for --batch-json")?;
             *batch_json = Some(val);
         }
-        other if other.starts_with('-') => {
-            return Err(format!("unknown flag: {other}"));
-        }
+        other if other.starts_with('-') => return Err(format!("unknown flag: {other}")),
         path => parsed.paths.push(PathBuf::from(path)),
     }
     Ok(())
+}
+
+fn parse_rule_level(raw: &str) -> Result<(String, Severity), String> {
+    let Some((rule_id, level)) = raw.split_once('=') else {
+        return Err(format!(
+            "invalid --rule '{raw}' (expected <rule-id>=<error|warn|off>)"
+        ));
+    };
+    let rule_id = rule_id.trim();
+    if rule_id.is_empty() {
+        return Err(format!(
+            "invalid --rule '{raw}' (rule id must be non-empty)"
+        ));
+    }
+    let severity = match level.trim() {
+        "error" => Severity::Error,
+        "warn" | "warning" => Severity::Warn,
+        "off" => Severity::Off,
+        other => {
+            return Err(format!(
+                "invalid severity '{other}' for rule '{rule_id}' (expected error, warn, or off)"
+            ));
+        }
+    };
+    Ok((rule_id.to_owned(), severity))
 }
 
 fn parse_format(raw: &str) -> Result<OutputFormat, String> {

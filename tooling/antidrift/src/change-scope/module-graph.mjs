@@ -1,12 +1,20 @@
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, relative, resolve } from "node:path";
 
 import ts from "typescript";
 
 const MAX_GIT_BUFFER = 64 * 1024 * 1024;
-const TS_SOURCE_RE = /\.(?:ts|tsx|mts|cts)$/u;
+const SOURCE_FILE_RE = /\.(?:ts|tsx|mts|cts|js|jsx|mjs|cjs)$/u;
 const TS_DECLARATION_RE = /\.d\.(?:ts|mts|cts)$/u;
 
 function compareStrings(left, right) {
@@ -19,23 +27,8 @@ function repoPath(cwd, fileName) {
   return relative(cwd, fileName).replace(/\\/gu, "/");
 }
 
-function isTsSourcePath(path) {
-  return TS_SOURCE_RE.test(path) && !TS_DECLARATION_RE.test(path);
-}
-
-function gitOrThrow(args, cwd) {
-  const result = spawnSync("git", args, {
-    cwd,
-    encoding: "utf8",
-    maxBuffer: MAX_GIT_BUFFER,
-  });
-  if (result.error) throw result.error;
-  if (result.status !== 0) {
-    throw new Error(
-      `git ${args.join(" ")} failed in ${cwd} (status ${result.status}): ${(result.stderr ?? "").trim()}`
-    );
-  }
-  return result.stdout;
+function isSourcePath(path) {
+  return SOURCE_FILE_RE.test(path) && !TS_DECLARATION_RE.test(path);
 }
 
 function runOrThrow(command, args, cwd) {
@@ -50,13 +43,52 @@ function runOrThrow(command, args, cwd) {
       `${command} ${args.join(" ")} failed in ${cwd} (status ${result.status}): ${(result.stderr ?? "").trim()}`
     );
   }
+  return result.stdout;
 }
 
-function readTsconfig(cwd, tsconfig) {
-  const configPath = resolve(cwd, tsconfig);
-  const loaded = ts.readConfigFile(configPath, (fileName) =>
-    ts.sys.readFile(fileName)
+function resolveConfigPath(baseDir, target) {
+  const candidate = resolve(baseDir, target);
+  return existsSync(candidate) && candidate.endsWith(".json")
+    ? candidate
+    : resolve(candidate, "tsconfig.json");
+}
+
+function childTsconfigs(configDir, projectReferences) {
+  const configs = projectReferences.map((ref) =>
+    resolveConfigPath(configDir, ref.path)
   );
+  if (projectReferences.length === 0) return configs;
+  for (const group of ["apps", "packages", "tooling"]) {
+    const groupDir = resolve(configDir, group);
+    if (!existsSync(groupDir)) continue;
+    for (const entry of readdirSync(groupDir, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        configs.push(resolve(groupDir, entry.name, "tsconfig.json"));
+      }
+    }
+  }
+  return configs;
+}
+
+function declarationSibling(filePath) {
+  return TS_DECLARATION_RE.test(filePath)
+    ? filePath.replace(/\.d\.(m?c?)ts$/u, ".$1js")
+    : null;
+}
+
+function implementationFilesFor(fileNames) {
+  const results = new Set();
+  for (const file of fileNames) {
+    const sibling = declarationSibling(file);
+    if (sibling === null) results.add(file);
+    else if (existsSync(sibling)) results.add(sibling);
+  }
+  return [...results];
+}
+
+function readTsconfig(cwd, tsconfig, visited = new Set()) {
+  const configPath = resolveConfigPath(cwd, tsconfig);
+  const loaded = ts.readConfigFile(configPath, ts.sys.readFile);
   if (loaded.error) {
     throw new Error(
       `module-graph-radius: could not read ${tsconfig}: ${ts.flattenDiagnosticMessageText(loaded.error.messageText, "\n")}`
@@ -71,27 +103,50 @@ function readTsconfig(cwd, tsconfig) {
   );
   if (parsed.errors.length > 0) {
     throw new Error(
-      `module-graph-radius: invalid ${tsconfig}: ${parsed.errors.map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n")).join("; ")}`
+      `module-graph-radius: invalid ${tsconfig}: ${parsed.errors.map((d) => ts.flattenDiagnosticMessageText(d.messageText, "\n")).join("; ")}`
     );
   }
-  return parsed;
+  visited.add(configPath);
+  const rootNames = implementationFilesFor(parsed.fileNames);
+  const projects = [{ options: parsed.options, rootNames }];
+  for (const ref of childTsconfigs(
+    dirname(configPath),
+    parsed.projectReferences ?? []
+  )) {
+    if (!visited.has(ref) && existsSync(ref)) {
+      projects.push(
+        ...readTsconfig(dirname(configPath), ref, visited).projects
+      );
+    }
+  }
+  return { options: parsed.options, projects };
 }
 
-function sourceFilesInRepo(program, cwd) {
-  return program
-    .getSourceFiles()
-    .filter(
-      (sourceFile) =>
-        !sourceFile.isDeclarationFile &&
-        isTsSourcePath(sourceFile.fileName) &&
-        !repoPath(cwd, sourceFile.fileName).startsWith("../")
-    )
-    .sort((left, right) =>
-      compareStrings(
-        repoPath(cwd, left.fileName),
-        repoPath(cwd, right.fileName)
-      )
+function sourceFilesInRepo(program, fileNames, cwd) {
+  const byPath = new Map();
+  for (const sourceFile of program.getSourceFiles()) {
+    if (
+      !sourceFile.isDeclarationFile &&
+      isSourcePath(sourceFile.fileName) &&
+      !repoPath(cwd, sourceFile.fileName).startsWith("../")
+    ) {
+      byPath.set(repoPath(cwd, sourceFile.fileName), sourceFile);
+    }
+  }
+  for (const fileName of fileNames) {
+    if (!isSourcePath(fileName)) continue;
+    const rel = repoPath(cwd, fileName);
+    if (rel.startsWith("../") || byPath.has(rel)) continue;
+    const text = ts.sys.readFile(fileName);
+    if (text === undefined) continue;
+    byPath.set(
+      rel,
+      ts.createSourceFile(fileName, text, ts.ScriptTarget.Latest, true)
     );
+  }
+  return [...byPath.entries()]
+    .sort(([left], [right]) => compareStrings(left, right))
+    .map(([, sourceFile]) => sourceFile);
 }
 
 function stringLiteralText(node) {
@@ -127,6 +182,7 @@ function addEdge(graph, from, to) {
 
 function resolveInternalModule({
   cwd,
+  repoRoot,
   specifier,
   sourceFile,
   options,
@@ -146,18 +202,30 @@ function resolveInternalModule({
     }
     return null;
   }
-  if (resolved.isExternalLibraryImport) return null;
-  const path = repoPath(cwd, resolved.resolvedFileName);
-  return sourcePaths.has(path) ? path : null;
+  const target = resolved.resolvedFileName;
+  const files =
+    existsSync(target) && realpathSync(target) !== target
+      ? [target, realpathSync(target)]
+      : [target];
+  for (const file of files) {
+    for (const root of repoRoot ? [cwd, repoRoot] : [cwd]) {
+      const rel = repoPath(root, file);
+      if (sourcePaths.has(rel)) return rel;
+      const sibling = declarationSibling(rel);
+      if (sibling !== null && sourcePaths.has(sibling)) return sibling;
+    }
+  }
+  return null;
 }
 
-function importTargets({ cwd, sourceFile, options, sourcePaths }) {
+function importTargets({ cwd, repoRoot, sourceFile, options, sourcePaths }) {
   const targets = [];
   function visit(node) {
     const specifier = moduleSpecifierFor(node);
     if (specifier !== null) {
       const target = resolveInternalModule({
         cwd,
+        repoRoot,
         specifier,
         sourceFile,
         options,
@@ -198,7 +266,7 @@ function edgeCount(graph) {
 
 function touchedTsFiles(changedFiles) {
   return changedFiles
-    .filter((file) => isTsSourcePath(file.path))
+    .filter((file) => isSourcePath(file.path))
     .map((file) => ({
       path: file.path.replace(/\\/gu, "/"),
       operation: file.operation,
@@ -209,12 +277,7 @@ function touchedTsFiles(changedFiles) {
 
 function touchedEntry({ file, graph, distances, maxTouchedModuleRadius }) {
   if (file.operation === "delete") {
-    return {
-      ...file,
-      distance: null,
-      withinRadius: null,
-      reason: "deleted",
-    };
+    return { ...file, distance: null, withinRadius: null, reason: "deleted" };
   }
   if (!graph.has(file.path)) {
     throw new Error(
@@ -226,12 +289,8 @@ function touchedEntry({ file, graph, distances, maxTouchedModuleRadius }) {
     typeof maxTouchedModuleRadius === "number"
       ? distance !== null && distance <= maxTouchedModuleRadius
       : null;
-  return {
-    ...file,
-    distance,
-    withinRadius,
-    reason: distance === null ? "unreachable-from-entrypoint" : null,
-  };
+  const reason = distance === null ? "unreachable-from-entrypoint" : null;
+  return { ...file, distance, withinRadius, reason };
 }
 
 function withHeadTree({ cwd, head }, inspectTree) {
@@ -241,24 +300,50 @@ function withHeadTree({ cwd, head }, inspectTree) {
   const archivePath = resolve(temp, "head.tar");
   try {
     mkdirSync(treeRoot);
-    gitOrThrow(
-      ["archive", "--format=tar", `--output=${archivePath}`, head],
-      repoRoot
-    );
+    const archiveArgs = [
+      "archive",
+      "--format=tar",
+      `--output=${archivePath}`,
+      head,
+    ];
+    runOrThrow("git", archiveArgs, repoRoot);
     runOrThrow("tar", ["-xf", archivePath, "-C", treeRoot], repoRoot);
-    return inspectTree(treeRoot);
+    const repoModules = resolve(repoRoot, "node_modules");
+    const treeModules = resolve(treeRoot, "node_modules");
+    if (existsSync(repoModules) && !existsSync(treeModules)) {
+      symlinkSync(repoModules, treeModules, "junction");
+    }
+    return inspectTree(treeRoot, repoRoot);
   } finally {
     rmSync(temp, { recursive: true, force: true });
   }
 }
 
-function importGraph(treeRoot, tsconfig) {
+function collectProjectSources(treeRoot, parsed) {
+  const byPath = new Map();
+  const optionsByPath = new Map();
+  for (const { options, rootNames } of parsed.projects) {
+    if (rootNames.length === 0) continue;
+    const projectOptions = { ...options, allowJs: true, noEmit: true };
+    const program = ts.createProgram({ rootNames, options: projectOptions });
+    for (const sf of sourceFilesInRepo(program, rootNames, treeRoot)) {
+      const rel = repoPath(treeRoot, sf.fileName);
+      byPath.set(rel, sf);
+      optionsByPath.set(rel, projectOptions);
+    }
+  }
+  const sourceFiles = [...byPath.entries()]
+    .sort(([left], [right]) => compareStrings(left, right))
+    .map(([, sf]) => sf);
+  return { sourceFiles, optionsByPath };
+}
+
+function importGraph(treeRoot, repoRoot, tsconfig) {
   const parsed = readTsconfig(treeRoot, tsconfig);
-  const program = ts.createProgram({
-    rootNames: parsed.fileNames,
-    options: { ...parsed.options, noEmit: true },
-  });
-  const sourceFiles = sourceFilesInRepo(program, treeRoot);
+  const { sourceFiles, optionsByPath } = collectProjectSources(
+    treeRoot,
+    parsed
+  );
   const graph = new Map();
   const sourcePaths = new Set(
     sourceFiles.map((sourceFile) => repoPath(treeRoot, sourceFile.fileName))
@@ -268,8 +353,9 @@ function importGraph(treeRoot, tsconfig) {
     const from = repoPath(treeRoot, sourceFile.fileName);
     for (const to of importTargets({
       cwd: treeRoot,
+      repoRoot,
       sourceFile,
-      options: parsed.options,
+      options: optionsByPath.get(from) ?? parsed.options,
       sourcePaths,
     })) {
       addEdge(graph, from, to);
@@ -309,8 +395,8 @@ export function collectTouchedModuleGraph({
       "module-graph-radius: --tsconfig is required when scope.allowedEntrypoints is configured"
     );
   }
-  const graph = withHeadTree({ cwd, head }, (treeRoot) =>
-    importGraph(treeRoot, tsconfig)
+  const graph = withHeadTree({ cwd, head }, (treeRoot, repoRoot) =>
+    importGraph(treeRoot, repoRoot, tsconfig)
   );
   const entrypoints = checkedEntrypoints(allowedEntrypoints, graph);
   const distances = shortestDistances(graph, entrypoints);

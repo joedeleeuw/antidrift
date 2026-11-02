@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use antidrift_kernel::line_caps::CappedUnit;
+use antidrift_kernel::line_caps::{CappedUnit, LineCapTier};
 use antidrift_kernel::registries::PolicyRegistries;
 use rustc_hash::{FxHashMap, FxHashSet};
 use tsrslint::rule::Rule;
@@ -16,7 +16,27 @@ pub struct RuleRequest {
 
 pub(crate) struct RequestedRule {
     pub(crate) identity: String,
+    pub(crate) rule_key: String,
+    pub(crate) output_name: String,
+    pub(crate) tier: Option<LineCapTier>,
     pub(crate) rule: &'static dyn Rule,
+}
+
+fn resolve_line_cap_request(name: &str) -> (&str, Option<LineCapTier>) {
+    if let Some(base) = name.strip_suffix("-near")
+        && CappedUnit::ALL
+            .iter()
+            .any(|unit| unit.cap().rule_id == base)
+    {
+        return (base, Some(LineCapTier::Near));
+    }
+    if CappedUnit::ALL
+        .iter()
+        .any(|unit| unit.cap().rule_id == name)
+    {
+        return (name, Some(LineCapTier::Over));
+    }
+    (name, None)
 }
 
 fn rule_identity(name: &str, options: Option<&serde_json::Value>) -> String {
@@ -74,23 +94,41 @@ impl RuleCatalog {
 
     pub(crate) fn resolve(&mut self, request: &RuleRequest) -> Result<RequestedRule, String> {
         let name = request.name.as_str();
-        let default = self.defaults.get(name).copied().ok_or_else(|| {
+        let (base_name, tier) = resolve_line_cap_request(name);
+        let default = self.defaults.get(base_name).copied().ok_or_else(|| {
             format!("{name} is not an antidrift rule; the plugin registers only the rules the addon lists")
         })?;
+        let output_name = name.to_owned();
         let Some(options) = decode_rule_options(name, request.options.as_deref())? else {
             return Ok(RequestedRule {
                 identity: rule_identity(name, None),
+                rule_key: rule_identity(base_name, None),
+                output_name,
+                tier,
                 rule: default,
             });
         };
         let identity = rule_identity(name, Some(&options));
-        if let Some(&rule) = self.configured.get(&identity) {
-            return Ok(RequestedRule { identity, rule });
+        let rule_key = rule_identity(base_name, Some(&options));
+        if let Some(&rule) = self.configured.get(&rule_key) {
+            return Ok(RequestedRule {
+                identity,
+                rule_key,
+                output_name,
+                tier,
+                rule,
+            });
         }
-        let rule = instantiate_rule(name, Some(&options))?
+        let rule = instantiate_rule(base_name, Some(&options))?
             .ok_or_else(|| format!("rule '{name}' is cataloged but no family factory builds it"))?;
-        self.configured.insert(identity.clone(), rule);
-        Ok(RequestedRule { identity, rule })
+        self.configured.insert(rule_key.clone(), rule);
+        Ok(RequestedRule {
+            identity,
+            rule_key,
+            output_name,
+            tier,
+            rule,
+        })
     }
 }
 

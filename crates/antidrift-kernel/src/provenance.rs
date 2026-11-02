@@ -22,80 +22,22 @@ pub enum DeclarationOrigin {
     WorkspaceOther,
 }
 
+#[rustfmt::skip]
 const BUILTIN_OWNER_NAMES: &[&str] = &[
-    "Array",
-    "ReadonlyArray",
-    "Promise",
-    "PromiseLike",
-    "Record",
-    "Partial",
-    "Required",
-    "Readonly",
-    "Pick",
-    "Omit",
-    "Exclude",
-    "Extract",
-    "NonNullable",
-    "ReturnType",
-    "Parameters",
-    "ConstructorParameters",
-    "InstanceType",
-    "Awaited",
-    "Map",
-    "ReadonlyMap",
-    "Set",
-    "ReadonlySet",
-    "WeakMap",
-    "WeakSet",
-    "Date",
-    "RegExp",
-    "Error",
-    "TypeError",
-    "RangeError",
-    "SyntaxError",
-    "URL",
-    "URLSearchParams",
-    "AbortSignal",
-    "AbortController",
-    "Request",
-    "Response",
-    "Headers",
-    "FormData",
-    "Blob",
-    "File",
-    "Uint8Array",
-    "ArrayBuffer",
-    "Object",
-    "Function",
-    "String",
-    "Number",
-    "Boolean",
-    "Symbol",
-    "BigInt",
+    "Array", "ReadonlyArray", "Promise", "PromiseLike", "Record", "Partial", "Required",
+    "Readonly", "Pick", "Omit", "Exclude", "Extract", "NonNullable", "ReturnType", "Parameters",
+    "ConstructorParameters", "InstanceType", "Awaited", "Map", "ReadonlyMap", "Set", "ReadonlySet",
+    "WeakMap", "WeakSet", "Date", "RegExp", "Error", "TypeError", "RangeError", "SyntaxError",
+    "URL", "URLSearchParams", "AbortSignal", "AbortController", "Request", "Response", "Headers",
+    "FormData", "Blob", "File", "Uint8Array", "ArrayBuffer", "Object", "Function", "String",
+    "Number", "Boolean", "Symbol", "BigInt",
 ];
 
+#[rustfmt::skip]
 const EXTRA_NON_BAG_TYPE_NAMES: &[&str] = &[
-    "Buffer",
-    "Checker",
-    "CustomEvent",
-    "DataView",
-    "Document",
-    "Element",
-    "Event",
-    "HTMLElement",
-    "Node",
-    "Program",
-    "ReadableStream",
-    "ReferenceError",
-    "RuleContext",
-    "SharedArrayBuffer",
-    "Signature",
-    "SourceCode",
-    "SourceFile",
-    "TransformStream",
-    "Type",
-    "TypeChecker",
-    "Window",
+    "Buffer", "Checker", "CustomEvent", "DataView", "Document", "Element", "Event", "HTMLElement",
+    "Node", "Program", "ReadableStream", "ReferenceError", "RuleContext", "SharedArrayBuffer",
+    "Signature", "SourceCode", "SourceFile", "TransformStream", "Type", "TypeChecker", "Window",
     "WritableStream",
 ];
 
@@ -393,14 +335,74 @@ pub fn resolve_imported_source_file(
     None
 }
 
+fn canonical_root(path: &str) -> Option<(String, &str)> {
+    let bytes = path.as_bytes();
+    if bytes.len() >= 3 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':' && bytes[2] == b'/' {
+        let drive = char::from(bytes[0].to_ascii_lowercase());
+        return Some((format!("{drive}:/"), &path[3..]));
+    }
+    path.strip_prefix('/').map(|rest| ("/".to_owned(), rest))
+}
+
+fn relative_between_roots(cwd_root: &str, cwd_rest: &str, file_rest: &str) -> String {
+    let cwd_segs: Vec<&str> = cwd_rest.split('/').filter(|seg| !seg.is_empty()).collect();
+    let file_segs: Vec<&str> = file_rest.split('/').filter(|seg| !seg.is_empty()).collect();
+    let use_case = !cfg!(windows) && cwd_root == "/";
+    let common = cwd_segs
+        .iter()
+        .zip(&file_segs)
+        .take_while(|(left, right)| {
+            if use_case {
+                left == right
+            } else {
+                left.eq_ignore_ascii_case(right)
+            }
+        })
+        .count();
+    let mut parts: Vec<&str> = vec![".."; cwd_segs.len() - common];
+    parts.extend_from_slice(&file_segs[common..]);
+    if parts.is_empty() {
+        ".".to_owned()
+    } else {
+        parts.join("/")
+    }
+}
+
 #[must_use]
 pub fn relative_to_cwd(cwd: &str, file_path: &str) -> String {
-    let norm_cwd = format!("{}/", tspath::normalize_slashes(cwd).trim_end_matches('/'));
-    let norm_file = tspath::normalize_slashes(file_path);
-    norm_file
-        .strip_prefix(&norm_cwd)
-        .unwrap_or(&norm_file)
-        .to_owned()
+    let norm_cwd = tspath::normalize_path(cwd);
+    let combined_file = if canonical_root(&tspath::normalize_slashes(file_path)).is_some() {
+        tspath::normalize_path(file_path)
+    } else if canonical_root(&norm_cwd).is_some() {
+        tspath::normalize_path(&tspath::combine_paths(&norm_cwd, &[file_path]))
+    } else {
+        tspath::normalize_path(file_path)
+    };
+    let (Some((cwd_root, cwd_rest)), Some((file_root, file_rest))) =
+        (canonical_root(&norm_cwd), canonical_root(&combined_file))
+    else {
+        let rel_cwd = norm_cwd
+            .strip_prefix("./")
+            .unwrap_or(&norm_cwd)
+            .trim_end_matches('/');
+        let rel_file = combined_file.strip_prefix("./").unwrap_or(&combined_file);
+        if rel_cwd.is_empty() || rel_cwd == "." {
+            return rel_file.trim_start_matches('/').to_owned();
+        }
+        if rel_file == rel_cwd {
+            return ".".to_owned();
+        }
+        return rel_file
+            .strip_prefix(rel_cwd)
+            .and_then(|rest| rest.strip_prefix('/'))
+            .unwrap_or(rel_file)
+            .trim_start_matches('/')
+            .to_owned();
+    };
+    if cwd_root != file_root {
+        return file_rest.trim_start_matches('/').to_owned();
+    }
+    relative_between_roots(&cwd_root, cwd_rest, file_rest)
 }
 
 pub fn is_package_entry_file(file_name: &str) -> Result<bool, crate::error::KernelError> {
