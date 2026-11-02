@@ -147,6 +147,7 @@ export const NATIVE_ARTIFACTS = {
       `target/debug/${LINTER_BINARY_NAME}`,
     ],
     packageSubpath: "",
+    packageFile: LINTER_BINARY_NAME,
   },
   addon: {
     env: "ANTIDRIFT_NAPI_ADDON",
@@ -157,6 +158,7 @@ export const NATIVE_ARTIFACTS = {
         ]
       : [],
     packageSubpath: `/${ADDON_PACKAGE_PATH}`,
+    packageFile: ADDON_PACKAGE_PATH,
   },
 };
 
@@ -168,20 +170,11 @@ function localArtifactCandidates(artifact, cwd) {
 
 function platformArtifactPackage(artifact) {
   const require = createRequire(import.meta.url);
-  try {
-    return require.resolve(
-      `@joedeleeuw/antidrift-linter-${hostLinterPlatform().key}${artifact.packageSubpath}`
-    );
-  } catch (error) {
-    if (
-      !(error instanceof Error) ||
-      !("code" in error) ||
-      error.code !== "MODULE_NOT_FOUND"
-    ) {
-      throw error;
-    }
-    return undefined;
-  }
+  const pkgJson = require.resolve(
+    `@joedeleeuw/antidrift-linter-${hostLinterPlatform().key}/package.json`
+  );
+  const candidate = resolve(dirname(pkgJson), artifact.packageFile);
+  return existsSync(candidate) ? candidate : undefined;
 }
 
 export function resolveNativeArtifact(artifact, cwd) {

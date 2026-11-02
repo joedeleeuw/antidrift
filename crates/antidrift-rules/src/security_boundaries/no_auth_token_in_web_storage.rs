@@ -17,6 +17,20 @@ const LISTENERS: &[Listener] = &[
 ];
 
 fn visit(ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
+    if node.kind() == Kind::BinaryExpression
+        && let Some(env_key) = non_constant_time_secret_env_compare(ctx.file, node)
+    {
+        ctx.report_node(
+            node,
+            RuleMessage::new(
+                "nonConstantTimeSecretCompare",
+                format!(
+                    "Do not compare secret env variable '{env_key}' with '===' or '!=='; use crypto.timingSafeEqual on equal-length buffers to prevent timing side-channels."
+                ),
+            ),
+        );
+        return;
+    }
     let key = match node.kind() {
         Kind::CallExpression => credential_call(ctx.file, node),
         Kind::BinaryExpression => credential_assignment(ctx.file, node),
@@ -31,6 +45,61 @@ fn visit(ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
             ),
         );
     }
+}
+
+fn is_nullish_or_empty_literal(sf: P<SourceFile>, expr: P<Node>) -> bool {
+    let inner = unwrap_expression(expr);
+    inner.kind() == Kind::NullKeyword
+        || (ast::is_identifier(inner) && inner.as_identifier().text() == "undefined")
+        || static_string(sf, inner, &mut Vec::new()).is_some_and(|s| s.is_empty())
+}
+
+fn env_secret_key_from_expr(sf: P<SourceFile>, expr: P<Node>, depth: usize) -> Option<String> {
+    if depth > 4 {
+        return None;
+    }
+    let mut inner = unwrap_expression(expr);
+    if inner.kind() == Kind::CallExpression {
+        let call = inner.as_call_expression();
+        let member = member_expression(call.expression())?;
+        if member_name(sf, member).as_deref() == Some("trim") {
+            inner = unwrap_expression(member_object(member));
+        }
+    }
+    if ast::is_identifier(inner) {
+        let binding = resolve_lexical_binding(inner)?;
+        let init = const_initializer(sf, binding, AliasStability::Const)?;
+        return env_secret_key_from_expr(sf, init, depth + 1);
+    }
+    let member = member_expression(inner)?;
+    let env_obj = member_expression(member_object(member))?;
+    if member_name(sf, env_obj).as_deref() != Some("env") {
+        return None;
+    }
+    let key = member_name(sf, member)?;
+    let upper = key.to_ascii_uppercase();
+    (["KEY", "TOKEN", "SECRET", "CREDENTIAL"]
+        .iter()
+        .any(|marker| upper.contains(marker)))
+    .then_some(key)
+}
+
+fn non_constant_time_secret_env_compare(sf: P<SourceFile>, node: P<Node>) -> Option<String> {
+    let bin = node.as_binary_expression();
+    if !matches!(
+        bin.operator_token().kind(),
+        Kind::EqualsEqualsEqualsToken
+            | Kind::ExclamationEqualsEqualsToken
+            | Kind::EqualsEqualsToken
+            | Kind::ExclamationEqualsToken
+    ) {
+        return None;
+    }
+    if is_nullish_or_empty_literal(sf, bin.left()) || is_nullish_or_empty_literal(sf, bin.right()) {
+        return None;
+    }
+    env_secret_key_from_expr(sf, bin.left(), 0)
+        .or_else(|| env_secret_key_from_expr(sf, bin.right(), 0))
 }
 
 fn credential_assignment(sf: P<SourceFile>, node: P<Node>) -> Option<String> {

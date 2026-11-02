@@ -156,6 +156,20 @@ fn is_delegated_result_call(call: P<Node>) -> bool {
     is_delegated_call_parent(node)
 }
 
+pub(super) fn outer_forwarded_expression(ident: P<Node>) -> P<Node> {
+    let mut current = outer_expression(ident);
+    while let Some(parent) = current.parent() {
+        if ast::is_property_access_expression(parent)
+            && parent.as_property_access_expression().expression() == current
+        {
+            current = outer_expression(parent);
+        } else {
+            break;
+        }
+    }
+    current
+}
+
 fn forwarding_call_for_identifier(node: P<Node>) -> Option<P<Node>> {
     let parent = node.parent()?;
     if is_call_argument(node) {
@@ -164,7 +178,10 @@ fn forwarding_call_for_identifier(node: P<Node>) -> Option<P<Node>> {
     if ast::is_spread_element(parent) && is_call_argument(parent) {
         return parent.parent();
     }
-    if (ast::is_spread_assignment(parent) || ast::is_shorthand_property_assignment(parent))
+    if (ast::is_spread_assignment(parent)
+        || ast::is_shorthand_property_assignment(parent)
+        || (ast::is_property_assignment(parent)
+            && parent.as_property_assignment().initializer() == node))
         && let Some(grandparent) = parent.parent()
         && ast::is_object_literal_expression(grandparent)
         && is_call_argument(grandparent)
@@ -174,7 +191,7 @@ fn forwarding_call_for_identifier(node: P<Node>) -> Option<P<Node>> {
     None
 }
 
-fn forwarding_jsx_tag_name_for_identifier(node: P<Node>) -> Option<P<Node>> {
+pub(super) fn forwarding_jsx_tag_name_for_identifier(node: P<Node>) -> Option<P<Node>> {
     let parent = node.parent()?;
     let jsx_attrs = match parent.kind() {
         Kind::JsxExpression => {
@@ -238,7 +255,7 @@ pub(super) fn forward_target_for_identifier(
     sf: P<SourceFile>,
     checker: &mut Checker,
 ) -> Option<String> {
-    let node = outer_expression(ident);
+    let node = outer_forwarded_expression(ident);
     if let Some(call) = forwarding_call_for_identifier(node) {
         if call_joins_local_variable(call, node, checker) {
             return None;

@@ -3,7 +3,10 @@ use tsrs_ast::{self as ast, Kind, Node, SourceFile, Symbol};
 use tsrs_checker::Checker;
 use tsrs_core::P;
 
-use super::forward_target::{forward_target_for_identifier, is_call_argument, outer_expression};
+use super::forward_target::{
+    forward_target_for_identifier, forwarding_jsx_tag_name_for_identifier, is_call_argument,
+    outer_expression, outer_forwarded_expression,
+};
 use crate::tsrs_kernel;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -148,6 +151,13 @@ fn evaluate_param_pass_through(
     let mut seen_targets = FxHashSet::default();
     for &ref_node in refs {
         if is_write_reference(ref_node) {
+            return None;
+        }
+        let forwarded = outer_forwarded_expression(ref_node);
+        if forwarded != outer_expression(ref_node)
+            && refs.len() < 2
+            && forwarding_jsx_tag_name_for_identifier(forwarded).is_none()
+        {
             return None;
         }
         let target = forward_target_for_identifier(ref_node, sf, checker)?;

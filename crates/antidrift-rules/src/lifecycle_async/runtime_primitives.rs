@@ -1,5 +1,5 @@
 use super::syntax::{
-    enclosing_variable_declaration, global, identifier_member, is_function_like,
+    cooked_text, enclosing_variable_declaration, global, identifier_member, is_function_like,
     is_var_variable_declaration, member, resolve_lexical_binding, unwrap_expression,
     unwrap_parentheses,
 };
@@ -41,8 +41,116 @@ fn visit_async_context_enter_with(ctx: &mut Ctx, _listener: Listener, node: P<No
                     "Do not use AsyncLocalStorage.enterWith(): it mutates the ambient async context frame with no restore point, so background work that resumes there adopts the store. Scope it with run(...) at the boundary instead (see request-scope.ts).",
                 ),
             );
+            return;
         }
     }
+    if is_app_exit_in_signal_handler(node) {
+        ctx.report_node(
+            node,
+            RuleMessage::new(
+                "noAppExitInSignalHandler",
+                "Do not call app.exit() inside a SIGTERM/SIGINT signal handler; it bypasses Electron before-quit and will-quit cleanup. Call app.quit() instead.",
+            ),
+        );
+    } else if is_unguarded_sync_fs_in_logger(node) {
+        ctx.report_node(
+            node,
+            RuleMessage::new(
+                "unguardedSyncFsInLogger",
+                "Do not call appendFileSync/writeFileSync unguarded inside a logger writer or sink; wrap the sync filesystem write in a try/catch so a full disk or EIO error during logging cannot crash the process or block shutdown.",
+            ),
+        );
+    }
+}
+
+fn is_signal_handler_registration(call_node: P<Node>) -> bool {
+    let call = call_node.as_call_expression();
+    let Some((recv, "on" | "once" | "addListener")) = member(call.expression()) else {
+        return false;
+    };
+    if !ast::is_identifier(recv) || recv.as_identifier().text() != "process" {
+        return false;
+    }
+    call.arguments()
+        .nodes()
+        .first()
+        .map(|&arg| unwrap_expression(arg))
+        .filter(|arg| {
+            matches!(
+                arg.kind(),
+                Kind::StringLiteral | Kind::NoSubstitutionTemplateLiteral
+            )
+        })
+        .and_then(cooked_text)
+        .is_some_and(|sig| matches!(sig, "SIGTERM" | "SIGINT" | "SIGHUP"))
+}
+
+fn is_app_exit_in_signal_handler(node: P<Node>) -> bool {
+    let Some((recv, "exit")) = member(node.as_call_expression().expression()) else {
+        return false;
+    };
+    if !ast::is_identifier(recv) || recv.as_identifier().text() != "app" {
+        return false;
+    }
+    let mut curr = node.parent();
+    while let Some(anc) = curr {
+        if anc.kind() == Kind::CallExpression && is_signal_handler_registration(anc) {
+            return true;
+        }
+        curr = anc.parent();
+    }
+    false
+}
+
+fn is_unguarded_sync_fs_in_logger(node: P<Node>) -> bool {
+    let callee = unwrap_expression(node.as_call_expression().expression());
+    let is_sync_write = match callee.kind() {
+        Kind::Identifier => matches!(
+            callee.as_identifier().text(),
+            "appendFileSync" | "writeFileSync"
+        ),
+        _ => member(callee).is_some_and(|(_, m)| matches!(m, "appendFileSync" | "writeFileSync")),
+    };
+    if !is_sync_write {
+        return false;
+    }
+    let mut curr = node.parent();
+    let mut saw_fn = false;
+    while let Some(anc) = curr {
+        if !saw_fn && anc.kind() == Kind::TryStatement {
+            return false;
+        }
+        if is_function_like(anc) {
+            saw_fn = true;
+        }
+        if saw_fn && is_logger_owner_node(anc) {
+            return true;
+        }
+        curr = anc.parent();
+    }
+    false
+}
+
+fn is_logger_owner_node(anc: P<Node>) -> bool {
+    let name = match anc.kind() {
+        Kind::VariableDeclaration | Kind::FunctionDeclaration | Kind::PropertyAssignment => anc
+            .name()
+            .filter(|&n| ast::is_identifier(n))
+            .map(|n| n.as_identifier().text()),
+        Kind::CallExpression => {
+            let expr = unwrap_expression(anc.as_call_expression().expression());
+            if ast::is_identifier(expr) {
+                Some(expr.as_identifier().text())
+            } else {
+                member(expr).map(|(_, m)| m)
+            }
+        }
+        _ => None,
+    };
+    name.is_some_and(|n| {
+        let lower = n.to_lowercase();
+        lower.contains("log") || lower.contains("sink") || lower.contains("transport")
+    })
 }
 
 fn visit_function_replacer(ctx: &mut Ctx, _listener: Listener, node: P<Node>) {

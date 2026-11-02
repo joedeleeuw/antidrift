@@ -355,3 +355,91 @@ pub fn check_decoded_blob_sibling_equality(ctx: &mut Ctx, node: P<Node>) {
         );
     }
 }
+
+fn is_constant_literal_expr(node: P<Node>) -> bool {
+    let inner = tsrs_kernel::unwrap_expression(node);
+    match inner.kind() {
+        Kind::StringLiteral
+        | Kind::NumericLiteral
+        | Kind::NoSubstitutionTemplateLiteral
+        | Kind::TrueKeyword
+        | Kind::FalseKeyword
+        | Kind::NullKeyword => true,
+        Kind::PrefixUnaryExpression => {
+            is_constant_literal_expr(inner.as_prefix_unary_expression().operand())
+        }
+        Kind::BinaryExpression => {
+            let bin = inner.as_binary_expression();
+            is_constant_literal_expr(bin.left()) && is_constant_literal_expr(bin.right())
+        }
+        _ => false,
+    }
+}
+
+fn constant_object_signature(sf: P<SourceFile>, obj: P<Node>) -> Option<String> {
+    if obj
+        .parent()
+        .is_some_and(|p| p.kind() == Kind::ArrayLiteralExpression)
+    {
+        return None;
+    }
+    let mut entries: Vec<String> = obj
+        .as_object_literal_expression()
+        .properties()
+        .nodes()
+        .iter()
+        .filter_map(|&prop| {
+            let pa =
+                (prop.kind() == Kind::PropertyAssignment).then(|| prop.as_property_assignment())?;
+            (pa.name().kind() == Kind::Identifier && is_constant_literal_expr(pa.initializer()))
+                .then(|| {
+                    let k = pa.name().as_identifier().text();
+                    let v = tsrs_kernel::node_text(sf, pa.initializer())
+                        .split_whitespace()
+                        .collect::<Vec<_>>()
+                        .join("");
+                    format!("{k}={v}")
+                })
+        })
+        .collect();
+    if entries.len() < 3 {
+        return None;
+    }
+    entries.sort();
+    Some(entries.join(";"))
+}
+
+fn collect_constant_objects(
+    sf: P<SourceFile>,
+    node: P<Node>,
+    groups: &mut std::collections::BTreeMap<String, Vec<P<Node>>>,
+) {
+    if node.kind() == Kind::ObjectLiteralExpression
+        && let Some(sig) = constant_object_signature(sf, node)
+    {
+        groups.entry(sig).or_default().push(node);
+    }
+    node.for_each_child(&mut |child| {
+        collect_constant_objects(sf, child, groups);
+        false
+    });
+}
+
+pub fn check_repeated_object_literals(ctx: &mut Ctx) {
+    let mut groups = std::collections::BTreeMap::new();
+    collect_constant_objects(ctx.file, ctx.file.as_node(), &mut groups);
+    for nodes in groups.into_values() {
+        if nodes.len() >= 3 {
+            ctx.report_node(
+                nodes[0],
+                RuleMessage::new(
+                    "repeatedObjectLiteral",
+                    format!(
+                        "Identical constant object literal is repeated {} times in this module; extract a shared constant and reuse or spread it.",
+                        nodes.len()
+                    ),
+                ),
+            );
+        }
+    }
+}

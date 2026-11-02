@@ -19,14 +19,18 @@ export const work = realpathSync.native(
   mkdtempSync(join(tmpdir(), "antidrift-consumer-"))
 );
 
+export const SPAWN_LIMITS = {
+  timeout: 300_000,
+  killSignal: "SIGKILL",
+  maxBuffer: 64 * 1024 * 1024,
+};
+
 export function run(cmd, args, cwd) {
   return execFileSync(cmd, args, {
     cwd,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
-    timeout: 300_000,
-    killSignal: "SIGKILL",
-    maxBuffer: 64 * 1024 * 1024,
+    ...SPAWN_LIMITS,
   });
 }
 
@@ -34,14 +38,19 @@ export function runInherit(cmd, args, cwd) {
   return execFileSync(cmd, args, {
     cwd,
     stdio: "inherit",
-    timeout: 300_000,
-    killSignal: "SIGKILL",
-    maxBuffer: 64 * 1024 * 1024,
+    ...SPAWN_LIMITS,
   });
 }
 
 export function runJson(cmd, args, cwd) {
-  return JSON.parse(run(cmd, args, cwd));
+  const completed = spawnSync(cmd, args, {
+    cwd,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    ...SPAWN_LIMITS,
+  });
+  if (completed.error) throw completed.error;
+  return JSON.parse(completed.stdout);
 }
 
 export function file(rel, fileContents) {

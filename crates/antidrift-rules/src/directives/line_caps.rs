@@ -36,6 +36,9 @@ const FUNCTION_LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::Constructor),
     Listener::Enter(Kind::GetAccessor),
     Listener::Enter(Kind::SetAccessor),
+    Listener::Enter(Kind::TryStatement),
+    Listener::Enter(Kind::IfStatement),
+    Listener::Enter(Kind::Block),
 ];
 
 impl Rule for LineCapRule {
@@ -77,7 +80,20 @@ impl RuleVisitor for Visitor {
             }
             return;
         }
-        if node.body().is_none()
+        if matches!(
+            node.kind(),
+            Kind::TryStatement | Kind::IfStatement | Kind::Block
+        ) {
+            if self.unit == CappedUnit::Function
+                && node.parent().is_some_and(|p| p.kind() == Kind::SourceFile)
+            {
+                judge_and_report_node(ctx, self.unit, node, "Top-level block");
+            }
+            return;
+        }
+        if node
+            .body()
+            .is_none_or(|b| is_single_literal_table_body(b, self.unit.cap().warn_above))
             || is_immediately_invoked(node)
             || (self.allow_suites && is_suite_container(node))
         {
@@ -89,23 +105,50 @@ impl RuleVisitor for Visitor {
         if is_component != (self.unit == CappedUnit::Component) {
             return;
         }
-        let (start, end) = ctx.trim(node);
-        let (start, end) = (
-            usize::try_from(start).unwrap_or(0),
-            usize::try_from(end).unwrap_or(0),
-        );
-        let Some(span) = ctx.file.text().get(start..end) else {
-            return;
-        };
         let noun = if is_component {
             "Component"
         } else {
             "Function"
         };
         let subject = react_name.map_or_else(|| noun.to_owned(), |name| format!("{noun} `{name}`"));
-        if let Some(finding) = self.unit.cap().judge(&subject, span) {
-            report_first_line(ctx, start, end, finding);
+        judge_and_report_node(ctx, self.unit, node, &subject);
+    }
+}
+
+fn judge_and_report_node(ctx: &mut Ctx, unit: CappedUnit, node: P<Node>, subject: &str) {
+    let (start, end) = ctx.trim(node);
+    let (start, end) = (
+        usize::try_from(start).unwrap_or(0),
+        usize::try_from(end).unwrap_or(0),
+    );
+    if let Some(span) = ctx.file.text().get(start..end)
+        && let Some(finding) = unit.cap().judge(subject, span)
+    {
+        report_first_line(ctx, start, end, finding);
+    }
+}
+
+fn is_single_literal_table_body(body: P<Node>, max_entries: usize) -> bool {
+    let expr = if body.kind() == Kind::Block {
+        let &[only] = body.as_block().statements().nodes() else {
+            return false;
+        };
+        if only.kind() != Kind::ReturnStatement {
+            return false;
         }
+        let Some(ret_expr) = only.as_return_statement().expression() else {
+            return false;
+        };
+        unwrap_expression(ret_expr)
+    } else {
+        unwrap_expression(body)
+    };
+    match expr.kind() {
+        Kind::ArrayLiteralExpression => {
+            let elems = expr.as_array_literal_expression().elements().nodes();
+            !elems.is_empty() && elems.len() <= max_entries && !body_contains_jsx(expr)
+        }
+        _ => false,
     }
 }
 

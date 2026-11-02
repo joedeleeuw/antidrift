@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,12 +10,8 @@ import {
 } from "./generate-policy-artifacts.mjs";
 
 async function readOrNull(target) {
-  try {
-    return await readFile(target, "utf8");
-  } catch (error) {
-    if (error?.code !== "ENOENT") throw error;
-    return null;
-  }
+  if (!existsSync(target)) return null;
+  return await readFile(target, "utf8");
 }
 
 export async function checkGenerated({

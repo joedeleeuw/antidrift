@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import YAML from "yaml";
@@ -8,14 +8,9 @@ import YAML from "yaml";
 // that exists but is malformed is a real error and is allowed to throw — we don't paper over broken
 // config to keep a lint run green.
 function loadOne(policyDir, name) {
-  let text;
-  try {
-    text = readFileSync(join(policyDir, "registries", `${name}.yaml`), "utf8");
-  } catch (error) {
-    if (error.code === "ENOENT") return {};
-    throw error;
-  }
-  return YAML.parse(text) ?? {};
+  const file = join(policyDir, "registries", `${name}.yaml`);
+  if (!existsSync(file)) return {};
+  return YAML.parse(readFileSync(file, "utf8")) ?? {};
 }
 
 export const REGISTRY_FILES = {

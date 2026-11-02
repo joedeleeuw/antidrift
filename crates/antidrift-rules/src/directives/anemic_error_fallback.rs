@@ -27,12 +27,52 @@ pub(super) fn check_catch_clause_fallback(ctx: &mut Ctx, catch_node: P<Node>) {
     }
     let catch_clause = catch_node.as_catch_clause();
     let block = catch_clause.block();
-    let param_used = catch_clause
+    let param_name = catch_clause
         .variable_declaration()
         .and_then(|decl| decl.name())
-        .is_some_and(|name| pattern_has_references_in_subtree(name, block));
+        .filter(|&n| ast::is_identifier(n))
+        .map(|n| n.as_identifier().text());
+    let param_used = param_name
+        .is_some_and(|name| !collect_identifier_references_in_subtree(block, name).is_empty());
     if !param_used && !subtree_rethrows(block) {
         report_empty_returns_in_block(ctx, block);
+    } else if let Some(error_name) = param_name {
+        report_error_code_or_stdout_returns(ctx, block, error_name);
+    }
+}
+
+fn subtree_reads_error_member(node: P<Node>, error_name: &str, members: &[&str]) -> bool {
+    if is_error_member_read(node, error_name, members) {
+        return true;
+    }
+    let mut found = false;
+    node.for_each_child(&mut |child| {
+        if !found && !is_function_like(child) {
+            found = subtree_reads_error_member(child, error_name, members);
+        }
+        found
+    });
+    found
+}
+
+fn report_error_code_or_stdout_returns(ctx: &mut Ctx, block: P<Node>, error_name: &str) {
+    let filters_code = subtree_reads_error_member(block, error_name, &["code"]);
+    for ret_expr in collect_return_expressions(Some(block)) {
+        if (filters_code && is_absent_sentinel(ret_expr))
+            || subtree_reads_error_member(ret_expr, error_name, &["stdout", "stderr"])
+        {
+            let target = ret_expr
+                .parent()
+                .filter(|p| p.kind() == Kind::ReturnStatement)
+                .unwrap_or(ret_expr);
+            ctx.report_node(
+                target,
+                RuleMessage::new(
+                    "catchErrorCodeOrStdoutFallback",
+                    "Catch block filters on an error code or process output and returns an absent sentinel or parsed stdout instead of rethrowing or returning a typed result.",
+                ),
+            );
+        }
     }
 }
 

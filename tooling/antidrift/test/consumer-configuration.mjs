@@ -86,97 +86,52 @@ export function proveConfiguredRules() {
 }
 
 export function lintOxlint(relFile, config) {
-  try {
-    return runJson(
-      pnpmLaunch.file,
-      [
-        ...pnpmLaunch.prefix,
-        "exec",
-        "oxlint",
-        relFile,
-        "--format",
-        "json",
-        "--config",
-        config,
-        "--tsconfig",
-        "tsconfig.bundler.json",
-      ],
-      work
-    );
-  } catch (error) {
-    if (
-      error &&
-      typeof error === "object" &&
-      "stdout" in error &&
-      typeof error.stdout === "string"
-    ) {
-      return JSON.parse(error.stdout);
-    }
-    throw error;
-  }
+  const args = [
+    ...pnpmLaunch.prefix,
+    "exec",
+    "oxlint",
+    relFile,
+    "--format",
+    "json",
+    "--config",
+    config,
+    "--tsconfig",
+    "tsconfig.bundler.json",
+  ];
+  return runJson(pnpmLaunch.file, args, work);
 }
 
 function lintAntidriftOxlint(relFile, config) {
-  try {
-    return runJson(
-      pnpmLaunch.file,
-      [
-        ...pnpmLaunch.prefix,
-        "exec",
-        "antidrift",
-        "oxlint",
-        relFile,
-        "--",
-        "--format",
-        "json",
-        "--config",
-        config,
-        "--tsconfig",
-        "tsconfig.bundler.json",
-      ],
-      work
-    );
-  } catch (error) {
-    if (
-      error &&
-      typeof error === "object" &&
-      "stdout" in error &&
-      typeof error.stdout === "string"
-    ) {
-      return JSON.parse(error.stdout);
-    }
-    throw error;
-  }
+  const args = [
+    ...pnpmLaunch.prefix,
+    "exec",
+    "antidrift",
+    "oxlint",
+    relFile,
+    "--",
+    "--format",
+    "json",
+    "--config",
+    config,
+    "--tsconfig",
+    "tsconfig.bundler.json",
+  ];
+  return runJson(pnpmLaunch.file, args, work);
 }
 
 export function lintOxlintRepository() {
-  try {
-    return runJson(
-      pnpmLaunch.file,
-      [
-        ...pnpmLaunch.prefix,
-        "exec",
-        "antidrift",
-        "oxlint",
-        "--",
-        "--format",
-        "json",
-        "--config",
-        "oxlint.config.mjs",
-      ],
-      work
-    );
-  } catch (error) {
-    if (
-      error &&
-      typeof error === "object" &&
-      "stdout" in error &&
-      typeof error.stdout === "string"
-    ) {
-      return JSON.parse(error.stdout);
-    }
-    throw error;
-  }
+  const args = [
+    ...pnpmLaunch.prefix,
+    "exec",
+    "antidrift",
+    "oxlint",
+    "--",
+    "--format",
+    "json",
+    "--config",
+    "oxlint.config.mjs",
+  ];
+  return runJson(pnpmLaunch.file, args, work);
 }
 
 function oxlintRuleIds(output) {

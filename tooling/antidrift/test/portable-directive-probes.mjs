@@ -156,4 +156,85 @@ export const directiveCoreHeadlessProbes = [
     `,
     expectedCount: 2,
   },
+  {
+    name: "no-anemic-errors (flags catch filtering on error.code returning undefined and catch returning JSON.parse(error.stdout))",
+    rule: "antidrift/no-anemic-errors",
+    source: `
+      export function resolvePkg(load: () => string) {
+        try {
+          return load();
+        } catch (error) {
+          if ((error as { code?: string }).code !== "MODULE_NOT_FOUND") throw error;
+          return undefined;
+        }
+      }
+      export function runJson(exec: () => string) {
+        try {
+          return JSON.parse(exec());
+        } catch (error) {
+          return JSON.parse((error as { stdout: string }).stdout);
+        }
+      }
+    `,
+    expectedCount: 2,
+  },
+  {
+    name: "no-branch-tree (flags switch with 3+ cases repeating the same multi-step normalized skeleton)",
+    rule: "antidrift/no-branch-tree",
+    source: `
+      export function migratePart(kind: "image" | "video" | "asset", part: Record<string, string>, stats: Record<string, number>, rewrite: (u: string) => string) {
+        switch (kind) {
+          case "image": {
+            if (!part.imageUrl) break;
+            stats.imagePending += 1;
+            part.imageUrl = rewrite(part.imageUrl);
+            break;
+          }
+          case "video": {
+            if (!part.videoUrl) break;
+            stats.videoPending += 1;
+            part.videoUrl = rewrite(part.videoUrl);
+            break;
+          }
+          case "asset": {
+            if (!part.assetUrl) break;
+            stats.assetPending += 1;
+            part.assetUrl = rewrite(part.assetUrl);
+            break;
+          }
+        }
+      }
+    `,
+    expectedCount: 1,
+  },
+  {
+    name: "no-async-context-enter-with (flags app.exit() in SIGTERM handler and unguarded appendFileSync in logger sink)",
+    rule: "antidrift/no-async-context-enter-with",
+    source: `
+      declare const app: { exit: (code?: number) => void; quit: () => void };
+      declare function appendFileSync(path: string, data: string): void;
+      declare function createLogger(opts: { write: (line: string) => void }): void;
+      process.on("SIGTERM", () => {
+        app.exit(0);
+      });
+      createLogger({
+        write(line) {
+          appendFileSync("/tmp/app.log", line);
+        },
+      });
+    `,
+    expectedCount: 2,
+  },
+  {
+    name: "no-auth-token-in-web-storage (flags === and !== against secret env keys)",
+    rule: "antidrift/no-auth-token-in-web-storage",
+    source: `
+      const expected = process.env.HOMER_MACHINE_INGRESS_EDGE_KEY;
+      export function verifyEdge(edgeKey: string) {
+        if (!expected) return false;
+        return edgeKey === expected;
+      }
+    `,
+    expectedCount: 1,
+  },
 ];

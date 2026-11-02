@@ -180,7 +180,7 @@ export const typeContractProbes = [
     expectedCount: 1,
   },
   {
-    name: "no-pass-through-parameters (flags pure forwarding hop while local-variable guard join requireOwner(session, todo) stays clean)",
+    name: "no-pass-through-parameters (flags pure forwarding hop and member-forwarding hop while local-variable guard join stays clean)",
     rule: "antidrift/no-pass-through-parameters",
     file: "tooling/antidrift/src/__probe_passthrough_params.ts",
     source: `
@@ -190,6 +190,9 @@ export const typeContractProbes = [
       export function forwardAudit(actor: string, targetId: string) {
         return writeAudit(actor, targetId);
       }
+      export function forwardBoundary(boundary: { error: string; retry: string }) {
+        return writeAudit(boundary.error, boundary.retry);
+      }
       declare function getTodo(id: string): { id: string; ownerId: string };
       declare function requireOwner(session: { userId: string }, todo: { id: string; ownerId: string }): void;
       export function handleRoute(session: { userId: string }, id: string) {
@@ -198,7 +201,21 @@ export const typeContractProbes = [
         return todo;
       }
     `,
-    expectedCount: 2,
+    expectedCount: 3,
+  },
+  {
+    name: "no-structural-type-fork (flags identical constant object literal repeated 3+ times)",
+    rule: "antidrift/no-structural-type-fork",
+    file: "tooling/antidrift/src/__probe_repeated_obj_lit.ts",
+    source: `
+      declare function spawn(cmd: string, opts: object): void;
+      export function runAll() {
+        spawn("a", { timeout: 300_000, killSignal: "SIGKILL", maxBuffer: 64 * 1024 * 1024 });
+        spawn("b", { timeout: 300_000, killSignal: "SIGKILL", maxBuffer: 64 * 1024 * 1024 });
+        spawn("c", { timeout: 300_000, killSignal: "SIGKILL", maxBuffer: 64 * 1024 * 1024 });
+      }
+    `,
+    expectedCount: 1,
   },
   {
     name: "no-identity-schema-transform (flags Valibot v.pipe(schema, v.transform((x) => x)) identity transform)",

@@ -8,6 +8,7 @@ use tsrs_core::P;
 
 use super::redundant_local_return::{
     check_decoded_blob_sibling_equality, check_redundant_local_return,
+    check_repeated_object_literals,
 };
 use super::structural_fork_analysis::{check_structural_fork_declaration, has_modifier};
 use super::tuple_and_service_shape::{check_redundant_owner_prefix, check_sdk_transport_fork};
@@ -386,6 +387,7 @@ impl RuleVisitor for Visitor {
     fn visit(&mut self, ctx: &mut Ctx, listener: Listener, node: P<Node>) {
         if matches!(listener, Listener::Exit(Kind::EndOfFile)) {
             report_duplicated_field_blocks(ctx, &self.shapes, self.field_blocks);
+            check_repeated_object_literals(ctx);
             return;
         }
         match node.kind() {

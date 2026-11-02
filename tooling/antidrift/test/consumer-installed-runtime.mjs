@@ -3,7 +3,13 @@ import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { basename, dirname, join } from "node:path";
 import { ADDON_PACKAGE_PATH } from "../src/policy/oxlint.mjs";
-import { file, fail, work, pnpmLaunch } from "./consumer-process.mjs";
+import {
+  file,
+  fail,
+  work,
+  pnpmLaunch,
+  SPAWN_LIMITS,
+} from "./consumer-process.mjs";
 
 function runPackedOxlint() {
   const completed = spawnSync(
@@ -23,9 +29,7 @@ function runPackedOxlint() {
     {
       cwd: work,
       encoding: "utf8",
-      timeout: 300_000,
-      killSignal: "SIGKILL",
-      maxBuffer: 64 * 1024 * 1024,
+      ...SPAWN_LIMITS,
     }
   );
   if (completed.error) throw completed.error;
@@ -134,9 +138,7 @@ export function provePackedRust(platformRoot, platformManifest) {
     {
       cwd: work,
       encoding: "utf8",
-      timeout: 300_000,
-      killSignal: "SIGKILL",
-      maxBuffer: 64 * 1024 * 1024,
+      ...SPAWN_LIMITS,
     }
   );
   if (packedRustRun.error) throw packedRustRun.error;

@@ -13,15 +13,16 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::SourceFile),
     Listener::Enter(Kind::IfStatement),
     Listener::Enter(Kind::Block),
+    Listener::Enter(Kind::SwitchStatement),
 ];
 
 pub static DEFAULT_RULE: RuleSpec = RuleSpec::new(RULE_NAME, LISTENERS, visit);
 
 fn visit(ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
-    if node.kind() == Kind::IfStatement {
-        check_subject_coupled_branch_tree(ctx, node);
-    } else {
-        check_negated_discriminant_scatter(ctx, node);
+    match node.kind() {
+        Kind::IfStatement => check_subject_coupled_branch_tree(ctx, node),
+        Kind::SwitchStatement => check_repeated_switch_cases(ctx, node),
+        _ => check_negated_discriminant_scatter(ctx, node),
     }
 }
 
@@ -138,16 +139,14 @@ const IGNORED_ROOTS: &[&str] = &[
 
 fn collect_root_identifiers(node: P<Node>, out: &mut FxHashSet<&'static str>) {
     if ast::is_identifier(node) {
-        let is_prop_name = node.parent().is_some_and(|parent| {
-            parent.kind() == Kind::PropertyAccessExpression
-                && parent.as_property_access_expression().name() == node
-        });
-        let is_callee = node.parent().is_some_and(|parent| {
-            parent.kind() == Kind::CallExpression
-                && parent.as_call_expression().expression() == node
+        let is_prop_or_callee = node.parent().is_some_and(|parent| {
+            (parent.kind() == Kind::PropertyAccessExpression
+                && parent.as_property_access_expression().name() == node)
+                || (parent.kind() == Kind::CallExpression
+                    && parent.as_call_expression().expression() == node)
         });
         let text = node.as_identifier().text();
-        if !is_prop_name && !is_callee && !IGNORED_ROOTS.contains(&text) {
+        if !is_prop_or_callee && !IGNORED_ROOTS.contains(&text) {
             out.insert(text);
         }
     }
@@ -156,24 +155,6 @@ fn collect_root_identifiers(node: P<Node>, out: &mut FxHashSet<&'static str>) {
         false
     });
 }
-
-const IGNORED_CALL_SINKS: &[&str] = &[
-    "console.log",
-    "console.error",
-    "console.warn",
-    "console.info",
-    "console.debug",
-    "logger.info",
-    "logger.warn",
-    "logger.error",
-    "logger.debug",
-    "toast",
-    "toast.error",
-    "toast.success",
-    "toast.info",
-    "toast.warning",
-    "process.exit",
-];
 
 fn is_loop_or_boundary(node: P<Node>) -> bool {
     matches!(
@@ -220,35 +201,33 @@ fn record_expression_statement_sink(
     let inner = unwrap_awaited_expression(expr);
     if inner.kind() == Kind::BinaryExpression {
         let bin = inner.as_binary_expression();
-        if bin.operator_token().kind() == Kind::EqualsToken {
-            let lhs = unwrap_expression(bin.left());
-            if matches!(
+        let lhs = unwrap_expression(bin.left());
+        if bin.operator_token().kind() == Kind::EqualsToken
+            && matches!(
                 lhs.kind(),
                 Kind::Identifier | Kind::PropertyAccessExpression
-            ) {
-                sinks.insert(format!("assign:{}", node_text(sf, lhs).trim()));
-            }
+            )
+        {
+            sinks.insert(format!("assign:{}", node_text(sf, lhs).trim()));
         }
         return;
     }
-    if inner.kind() != Kind::CallExpression {
+    let Some(callee) = (inner.kind() == Kind::CallExpression)
+        .then(|| unwrap_expression(inner.as_call_expression().expression()))
+        .filter(|c| matches!(c.kind(), Kind::Identifier | Kind::PropertyAccessExpression))
+    else {
         return;
-    }
-    let callee = unwrap_expression(inner.as_call_expression().expression());
-    if !matches!(
-        callee.kind(),
-        Kind::Identifier | Kind::PropertyAccessExpression
-    ) {
-        return;
-    }
+    };
     let name = node_text(sf, callee).trim();
-    let is_mutation_helper = name.ends_with(".push")
-        || name.ends_with(".add")
-        || name.ends_with(".set")
-        || name.ends_with(".delete")
+    let is_ignored = name == "toast"
+        || name == "process.exit"
         || name.starts_with("console.")
-        || name.starts_with("logger.");
-    if !IGNORED_CALL_SINKS.contains(&name) && !is_mutation_helper {
+        || name.starts_with("logger.")
+        || name.starts_with("toast.")
+        || [".push", ".add", ".set", ".delete"]
+            .iter()
+            .any(|s| name.ends_with(s));
+    if !is_ignored {
         sinks.insert(format!("call:{name}"));
     }
 }
@@ -375,15 +354,95 @@ fn collect_negated_prop_comparisons(
     }
     let left = unwrap_expression(bin.left());
     let right = unwrap_expression(bin.right());
-    if left.kind() == Kind::PropertyAccessExpression
-        && right.kind() == Kind::StringLiteral
-        && let Some(literal) = cooked_text(right)
-    {
-        out.push((node_text(sf, left).trim().to_owned(), literal));
-    } else if right.kind() == Kind::PropertyAccessExpression
-        && left.kind() == Kind::StringLiteral
-        && let Some(literal) = cooked_text(left)
-    {
-        out.push((node_text(sf, right).trim().to_owned(), literal));
+    let (prop_node, lit_node) = match (left.kind(), right.kind()) {
+        (Kind::PropertyAccessExpression, Kind::StringLiteral) => (left, right),
+        (Kind::StringLiteral, Kind::PropertyAccessExpression) => (right, left),
+        _ => return,
+    };
+    if let Some(literal) = cooked_text(lit_node) {
+        out.push((node_text(sf, prop_node).trim().to_owned(), literal));
+    }
+}
+
+fn append_node_skeleton(node: P<Node>, out: &mut Vec<(&'static str, u16)>) {
+    match node.kind() {
+        Kind::Identifier => {
+            let is_call_name = node.parent().is_some_and(|p| {
+                (p.kind() == Kind::CallExpression && p.as_call_expression().expression() == node)
+                    || (p.kind() == Kind::PropertyAccessExpression
+                        && p.as_property_access_expression().name() == node
+                        && p.parent().is_some_and(|gp| {
+                            gp.kind() == Kind::CallExpression
+                                && gp.as_call_expression().expression() == p
+                        }))
+            });
+            let name = if is_call_name {
+                node.as_identifier().text()
+            } else {
+                ""
+            };
+            out.push((name, 1));
+            return;
+        }
+        Kind::StringLiteral | Kind::NumericLiteral | Kind::NoSubstitutionTemplateLiteral => {
+            out.push(("", 2));
+            return;
+        }
+        Kind::BinaryExpression => {
+            out.push((
+                "bin",
+                node.as_binary_expression().operator_token().kind() as u16,
+            ));
+        }
+        _ => {
+            out.push(("node", node.kind() as u16));
+        }
+    }
+    node.for_each_child(&mut |child| {
+        append_node_skeleton(child, out);
+        false
+    });
+    out.push(("", u16::MAX));
+}
+
+fn check_repeated_switch_cases(ctx: &mut Ctx, node: P<Node>) {
+    let clauses = node
+        .as_switch_statement()
+        .case_block()
+        .as_case_block()
+        .clauses()
+        .nodes();
+    let mut counts: BTreeMap<Vec<(&'static str, u16)>, usize> = BTreeMap::new();
+    for &clause in clauses {
+        if clause.kind() != Kind::CaseClause {
+            continue;
+        }
+        let raw_stmts = clause.as_case_or_default_clause().statements().nodes();
+        let stmts = match raw_stmts {
+            &[only] if only.kind() == Kind::Block => only.as_block().statements().nodes(),
+            other => other,
+        };
+        let effective: Vec<P<Node>> = stmts
+            .iter()
+            .copied()
+            .filter(|s| s.kind() != Kind::BreakStatement)
+            .collect();
+        if effective.len() < 3 {
+            continue;
+        }
+        let mut skel = Vec::new();
+        for stmt in effective {
+            append_node_skeleton(stmt, &mut skel);
+        }
+        *counts.entry(skel).or_insert(0) += 1;
+    }
+    if counts.values().any(|&c| c >= 3) {
+        ctx.report_node(
+            node,
+            RuleMessage::new(
+                "repeatedSwitchCaseSkeleton",
+                "Three or more switch cases repeat the same multi-step statement skeleton; extract a kind-to-metadata table and run the shared algorithm once.",
+            ),
+        );
     }
 }
