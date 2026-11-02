@@ -44,7 +44,7 @@ pub struct FieldEntry {
 pub struct ShapeEntry {
     pub node: P<Node>,
     pub fields: Vec<FieldEntry>,
-    pub keys: FxHashSet<String>,
+    pub keys: Vec<String>,
 }
 
 pub struct NoStructuralTypeFork {
@@ -136,12 +136,13 @@ fn extract_ts_property_field(sf: P<SourceFile>, member: P<Node>) -> Option<Field
 
 fn collect_ts_shape(sf: P<SourceFile>, node: P<Node>, members: &[P<Node>]) -> Option<ShapeEntry> {
     let mut fields = Vec::with_capacity(members.len());
-    let mut keys = FxHashSet::default();
+    let mut keys = Vec::with_capacity(members.len());
     for &member in members {
         let entry = extract_ts_property_field(sf, member)?;
-        if !keys.insert(entry.key.clone()) {
+        let Err(pos) = keys.binary_search(&entry.key) else {
             return None;
-        }
+        };
+        keys.insert(pos, entry.key.clone());
         fields.push(entry);
     }
     Some(ShapeEntry { node, fields, keys })
@@ -193,12 +194,13 @@ fn collect_zod_shape(sf: P<SourceFile>, call_node: P<Node>) -> Option<ShapeEntry
     }
     let props = arg0.as_object_literal_expression().properties().nodes();
     let mut fields = Vec::with_capacity(props.len());
-    let mut keys = FxHashSet::default();
+    let mut keys = Vec::with_capacity(props.len());
     for &prop in props {
         let entry = extract_zod_property_field(sf, prop)?;
-        if !keys.insert(entry.key.clone()) {
+        let Err(pos) = keys.binary_search(&entry.key) else {
             return None;
-        }
+        };
+        keys.insert(pos, entry.key.clone());
         fields.push(entry);
     }
     Some(ShapeEntry {
@@ -208,19 +210,36 @@ fn collect_zod_shape(sf: P<SourceFile>, call_node: P<Node>) -> Option<ShapeEntry
     })
 }
 
+fn sorted_key_intersection(left: &[String], right: &[String]) -> Vec<String> {
+    let mut shared = Vec::new();
+    let (mut i, mut j) = (0, 0);
+    while i < left.len() && j < right.len() {
+        match left[i].cmp(&right[j]) {
+            std::cmp::Ordering::Less => i += 1,
+            std::cmp::Ordering::Greater => j += 1,
+            std::cmp::Ordering::Equal => {
+                shared.push(left[i].clone());
+                i += 1;
+                j += 1;
+            }
+        }
+    }
+    shared
+}
+
 fn evaluate_pair_intersection(
     eligible: &[&ShapeEntry],
     left: &ShapeEntry,
     right: &ShapeEntry,
     cfg: FieldBlockConfig,
-) -> Option<(usize, usize, usize, FxHashSet<String>)> {
-    let shared: FxHashSet<String> = left.keys.intersection(&right.keys).cloned().collect();
+) -> Option<(usize, usize, usize, Vec<String>)> {
+    let shared = sorted_key_intersection(&left.keys, &right.keys);
     if shared.len() < cfg.shared_fields {
         return None;
     }
     let matching_count = eligible
         .iter()
-        .filter(|s| shared.iter().all(|k| s.keys.contains(k)))
+        .filter(|s| shared.iter().all(|k| s.keys.binary_search(k).is_ok()))
         .count();
     let redundant = (matching_count.saturating_sub(1)) * shared.len();
     if matching_count < cfg.shapes || redundant < cfg.redundant_declarations {
@@ -232,8 +251,8 @@ fn evaluate_pair_intersection(
 fn find_best_field_block_cluster(
     eligible: &[&ShapeEntry],
     cfg: FieldBlockConfig,
-) -> Option<(usize, usize, usize, FxHashSet<String>)> {
-    let mut best: Option<(usize, usize, usize, FxHashSet<String>)> = None;
+) -> Option<(usize, usize, usize, Vec<String>)> {
+    let mut best: Option<(usize, usize, usize, Vec<String>)> = None;
     for (idx, &left) in eligible.iter().enumerate() {
         for &right in &eligible[(idx + 1)..] {
             let Some(cand) = evaluate_pair_intersection(eligible, left, right, cfg) else {
@@ -265,14 +284,14 @@ fn report_duplicated_field_blocks(ctx: &mut Ctx, shapes: &[ShapeEntry], cfg: Fie
     };
     let Some(first_shape) = eligible
         .iter()
-        .find(|s| shared.iter().all(|k| s.keys.contains(k)))
+        .find(|s| shared.iter().all(|k| s.keys.binary_search(k).is_ok()))
     else {
         return;
     };
     let display_fields: Vec<&str> = first_shape
         .fields
         .iter()
-        .filter(|f| shared.contains(&f.key))
+        .filter(|f| shared.binary_search(&f.key).is_ok())
         .map(|f| f.display.as_str())
         .collect();
     ctx.report_node(

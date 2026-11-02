@@ -16,6 +16,15 @@ if (!packsArgument || !archivesArgument) {
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const parentPath = resolve(packageRoot, "package.json");
 const parent = JSON.parse(String(readFileSync(parentPath)));
+if (
+  typeof parent.version !== "string" ||
+  typeof parent.optionalDependencies !== "object" ||
+  parent.optionalDependencies === null
+) {
+  throw new Error(
+    `${parentPath} must declare a string version and optionalDependencies mapping`
+  );
+}
 const workspaceManifestPath = resolve(packageRoot, "../../Cargo.toml");
 const cargoMetadata = JSON.parse(
   String(

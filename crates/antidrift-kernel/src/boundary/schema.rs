@@ -1,34 +1,26 @@
 use tsrs_ast::{self as ast, Kind, Node, Symbol, TypeQueryNode};
-use tsrs_checker::Checker;
+use tsrs_checker::{Checker, SignatureKind, Type, TypeFlags};
 use tsrs_core::P;
+use tsrslint::utils::{is_object_type, is_type_flag_set};
 
-use crate::{provenance, tsrs_kernel};
+use crate::provenance;
 
 const ZOD_PARSE_METHODS: &[&str] = &["parse", "parseAsync"];
 const ZOD_VALIDATION_METHODS: &[&str] = &["parse", "parseAsync", "safeParse", "safeParseAsync"];
 const TYPEBOX_VALIDATION_METHODS: &[&str] = &["Decode", "Parse", "Check"];
+#[rustfmt::skip]
 const EFFECT_DECODE_METHODS: &[&str] = &[
-    "decode",
-    "decodeSync",
-    "decodePromise",
-    "decodeOption",
-    "decodeEither",
-    "decodeUnknown",
-    "decodeUnknownSync",
-    "decodeUnknownPromise",
-    "decodeUnknownOption",
-    "decodeUnknownEither",
-    "decodeUnknownEffect",
-    "decodeUnknownExit",
+    "decode", "decodeSync", "decodePromise", "decodeOption", "decodeEither", "decodeUnknown",
+    "decodeUnknownSync", "decodeUnknownPromise", "decodeUnknownOption", "decodeUnknownEither",
+    "decodeUnknownEffect", "decodeUnknownExit",
 ];
+#[rustfmt::skip]
 const SCHEMA_OUTPUT_TYPE_NAMES: &[&str] = &[
-    "infer",
-    "output",
-    "TypeOf",
-    "InferOutput",
-    "Type",
-    "Static",
-    "StaticDecode",
+    "infer", "output", "TypeOf", "InferOutput", "Type", "Static", "StaticDecode",
+];
+#[rustfmt::skip]
+const SCHEMA_CARRIER_PROPS: &[&str] = &[
+    "_output", "_input", "_def", "_zod", "~standard", "parse", "safeParse", "ast", "Type", "kind",
 ];
 
 #[derive(Clone, Debug)]
@@ -46,76 +38,102 @@ pub struct DeclaredSchemaParam {
     pub schema_sym: P<Symbol>,
 }
 
-pub fn symbol_package_path(checker: &mut Checker, sym: Option<P<Symbol>>) -> Option<String> {
-    for decl in provenance::symbol_declarations(checker, sym) {
-        let Some(sf) = ast::get_source_file_of_node(decl) else {
+pub fn is_schema_carrier_type(checker: &mut Checker, ty: P<Type>) -> bool {
+    !is_type_flag_set(ty, TypeFlags::AnyOrUnknown)
+        && is_object_type(ty)
+        && SCHEMA_CARRIER_PROPS
+            .iter()
+            .any(|&prop| checker.get_property_of_type_exported(ty, prop).is_some())
+}
+
+pub fn is_schema_carrier_node(checker: &mut Checker, node: P<Node>) -> bool {
+    let ty = checker.get_type_at_location(node);
+    !is_type_flag_set(ty, TypeFlags::AnyOrUnknown)
+        && is_object_type(ty)
+        && SCHEMA_CARRIER_PROPS
+            .iter()
+            .any(|&prop| checker.get_property_of_type_exported(ty, prop).is_some())
+}
+
+fn is_receiver_decoder_call(
+    checker: &mut Checker,
+    call_node: P<Node>,
+    callee: P<Node>,
+    receiver: P<Node>,
+) -> bool {
+    if ast::is_identifier(receiver)
+        && matches!(
+            receiver.as_identifier().text(),
+            "JSON" | "Date" | "Number" | "URL" | "Object" | "Reflect"
+        )
+    {
+        return false;
+    }
+    let receiver_type = checker.get_type_at_location(receiver);
+    if is_type_flag_set(receiver_type, TypeFlags::AnyOrUnknown) {
+        return false;
+    }
+    let has_carrier = is_schema_carrier_type(checker, receiver_type);
+    let callee_type = checker.get_type_at_location(callee);
+    for &sig in checker.get_signatures_of_type(callee_type, SignatureKind::Call) {
+        let Some(&first_param) = sig.parameters().first() else {
             continue;
         };
-        let file = tsrs_kernel::normalize_path(sf.file_name());
-        if let Some(idx) = file.rfind("/node_modules/") {
-            let start = idx + "/node_modules/".len();
-            if let Some(rest) = file.get(start..)
-                && !rest.is_empty()
-            {
-                return Some(rest.to_owned());
-            }
+        let Some(param_type) = checker.get_type_of_symbol_at_location(first_param, Some(call_node))
+        else {
+            continue;
+        };
+        if !is_type_flag_set(param_type, TypeFlags::AnyOrUnknown) {
+            continue;
+        }
+        let ret_type = checker.get_return_type_of_signature(sig);
+        if is_type_flag_set(ret_type, TypeFlags::Void | TypeFlags::Never) {
+            continue;
+        }
+        if has_carrier || !is_type_flag_set(ret_type, TypeFlags::Any) {
+            return true;
         }
     }
-    None
+    false
 }
 
-#[must_use]
-pub fn package_name_of_path(pkg_path: &str) -> Option<&str> {
-    if pkg_path.is_empty() {
-        return None;
-    }
-    if pkg_path.starts_with('@') {
-        let slash_after_scope = pkg_path.find('/')?;
-        let rest = &pkg_path[slash_after_scope + 1..];
-        if rest.is_empty() {
-            return None;
-        }
-        return Some(match rest.find('/') {
-            Some(second_slash) => &pkg_path[..slash_after_scope + 1 + second_slash],
-            None => pkg_path,
-        });
-    }
-    Some(match pkg_path.find('/') {
-        Some(slash) => &pkg_path[..slash],
-        None => pkg_path,
-    })
-}
-
-fn is_package_symbol(checker: &mut Checker, sym: Option<P<Symbol>>, prefixes: &[&str]) -> bool {
-    let Some(rest) = symbol_package_path(checker, sym) else {
+fn is_schema_first_decoder_call(
+    checker: &mut Checker,
+    call_node: P<Node>,
+    callee: P<Node>,
+    schema_arg: P<Node>,
+) -> bool {
+    if !is_schema_carrier_node(checker, schema_arg) {
         return false;
-    };
-    prefixes.iter().any(|&prefix| {
-        rest == prefix
-            || rest
-                .strip_prefix(prefix)
-                .is_some_and(|suffix| suffix.starts_with('/'))
-    })
-}
-
-pub fn is_zod_method(checker: &mut Checker, name_node: P<Node>) -> bool {
-    let sym = provenance::symbol_at_node(checker, name_node);
-    is_package_symbol(checker, sym, &["zod", "@zod"])
-}
-
-pub fn is_valibot_method(checker: &mut Checker, name_node: P<Node>) -> bool {
-    let sym = provenance::symbol_at_node(checker, name_node);
-    is_package_symbol(checker, sym, &["valibot", "@valibot"])
-}
-
-pub fn is_typebox_method(checker: &mut Checker, name_node: P<Node>) -> bool {
-    let sym = provenance::symbol_at_node(checker, name_node);
-    is_package_symbol(checker, sym, &["@sinclair/typebox", "typebox"])
-}
-
-pub fn is_effect_schema_method(checker: &mut Checker, name_node: P<Node>) -> bool {
-    let sym = provenance::symbol_at_node(checker, name_node);
-    is_package_symbol(checker, sym, &["effect", "@effect/schema"])
+    }
+    let callee_type = checker.get_type_at_location(callee);
+    if is_type_flag_set(callee_type, TypeFlags::AnyOrUnknown) {
+        return false;
+    }
+    for &sig in checker.get_signatures_of_type(callee_type, SignatureKind::Call) {
+        let params = sig.parameters();
+        if params.len() < 2 {
+            continue;
+        }
+        let Some(first_type) = checker.get_type_of_symbol_at_location(params[0], Some(call_node))
+        else {
+            continue;
+        };
+        if is_type_flag_set(
+            first_type,
+            TypeFlags::StringLike | TypeFlags::NumberLike | TypeFlags::BooleanLike,
+        ) {
+            continue;
+        }
+        let Some(second_type) = checker.get_type_of_symbol_at_location(params[1], Some(call_node))
+        else {
+            continue;
+        };
+        if is_type_flag_set(second_type, TypeFlags::AnyOrUnknown) {
+            return true;
+        }
+    }
+    false
 }
 
 fn zod_parse_call_parts(
@@ -137,7 +155,9 @@ fn zod_parse_call_parts(
         return None;
     }
     let method_name = name_node.as_identifier().text();
-    if !methods.contains(&method_name) || !is_zod_method(checker, name_node) {
+    if !methods.contains(&method_name)
+        || !is_receiver_decoder_call(checker, call_node, call.expression(), prop.expression())
+    {
         return None;
     }
     Some(SchemaValidationCall {
@@ -182,7 +202,8 @@ fn effect_decode_call_parts(
         return None;
     }
     let method_name = name_node.as_identifier().text();
-    if !EFFECT_DECODE_METHODS.contains(&method_name) || !is_effect_schema_method(checker, name_node)
+    if !EFFECT_DECODE_METHODS.contains(&method_name)
+        || !is_schema_carrier_node(checker, schema_args[0])
     {
         return None;
     }
@@ -220,17 +241,14 @@ fn schema_first_validation_call_parts(
     if args.len() < 2 {
         return None;
     }
-    let (name_node, method_name) = extract_callee_method_ident(call.expression())?;
+    let (_, method_name) = extract_callee_method_ident(call.expression())?;
     if method_name.is_empty() {
         return None;
     }
     let is_zod_like = ZOD_VALIDATION_METHODS.contains(&method_name);
     let is_typebox = TYPEBOX_VALIDATION_METHODS.contains(&method_name);
-    if !is_zod_like && !is_typebox {
-        return None;
-    }
-    if (is_zod_like && !is_valibot_method(checker, name_node))
-        || (is_typebox && !is_typebox_method(checker, name_node))
+    if (!is_zod_like && !is_typebox)
+        || !is_schema_first_decoder_call(checker, call_node, call.expression(), args[0])
     {
         return None;
     }

@@ -1,5 +1,5 @@
 use antidrift_kernel::rule::{Ctx, Listener, RuleMessage, RuleSpec};
-use antidrift_kernel::{boundary, tsrs_kernel};
+use antidrift_kernel::{boundary, file_role, tsrs_kernel};
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node, NodeFlags};
 use tsrs_core::P;
@@ -28,53 +28,61 @@ pub static NO_UNSAFE_DESERIALIZE: RuleSpec = RuleSpec::new(
     visit_unsafe_deserialize,
 );
 
-fn visit_unsafe_deserialize(ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
+fn unsafe_deserialize_message(ctx: &mut Ctx, node: P<Node>) -> Option<RuleMessage> {
     if boundary::is_json_stringify_roundtrip(ctx.checker, node) {
-        ctx.report_node(
-            node,
-            RuleMessage::new(
-                "valueSerializationRoundtrip",
-                "Do not round-trip in-memory values through `JSON.stringify(...)` and `JSON.parse(...)`; clone with `structuredClone(...)` or key by a structured tuple/value.",
-            ),
-        );
-        return;
+        return Some(RuleMessage::new(
+            "valueSerializationRoundtrip",
+            "Do not round-trip in-memory values through `JSON.stringify(...)` and `JSON.parse(...)`; clone with `structuredClone(...)` or key by a structured tuple/value.",
+        ));
     }
     let target = boundary::parsed_json_target(Some(ctx.program), ctx.checker, node);
     if !target.is_empty() {
-        ctx.report_node(
-            node,
-            RuleMessage::new(
-                "no-unsafe-deserialize",
-                format!(
-                    "Validate parsed JSON against the schema for '{target}', not with an unchecked type annotation or cast."
-                ),
+        return Some(RuleMessage::new(
+            "no-unsafe-deserialize",
+            format!(
+                "Validate parsed JSON against the schema for '{target}', not with an unchecked type annotation or cast."
             ),
-        );
-        return;
+        ));
     }
     if boundary::is_unsafe_json_parse_input(ctx.checker, node) {
-        ctx.report_node(
-            node,
-            RuleMessage::new(
-                "no-unsafe-deserialize",
-                "Do not pass `any` or `unknown` directly into `JSON.parse(...)`; prove or decode the string input first.",
-            ),
-        );
+        return Some(RuleMessage::new(
+            "no-unsafe-deserialize",
+            "Do not pass `any` or `unknown` directly into `JSON.parse(...)`; prove or decode the string input first.",
+        ));
+    }
+    if !file_role::ProjectPath::of(ctx.program, ctx.file.file_name())
+        .has_any_role(file_role::TEST_ROLES)
+        && boundary::has_unguarded_persisted_json_property_access(ctx.checker, node)
+    {
+        return Some(RuleMessage::new(
+            "no-unsafe-deserialize",
+            "Validate parsed persisted/config JSON with a schema or explicit field checks before reading properties on the `JSON.parse(...)` result.",
+        ));
+    }
+    None
+}
+
+fn visit_unsafe_deserialize(ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
+    if !ctx.file.text().contains("JSON") {
+        return;
+    }
+    if let Some(message) = unsafe_deserialize_message(ctx, node) {
+        ctx.report_node(node, message);
     }
 }
 
 fn visit_schema_validator_transcoding(ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
-    if boundary::is_openapi_documentation_call(ctx.checker, node) {
-        return;
-    }
-    if !boundary::is_convex_registrar_call(ctx.checker, node) {
-        return;
-    }
     let Some(&first_arg) = node.as_call_expression().arguments().nodes().first() else {
         return;
     };
     let config_node = tsrs_kernel::unwrap_expression(first_arg);
     if config_node.kind() != Kind::ObjectLiteralExpression {
+        return;
+    }
+    if boundary::is_openapi_documentation_call(ctx.checker, node) {
+        return;
+    }
+    if !boundary::is_convex_registrar_call(ctx.checker, node) {
         return;
     }
     for &prop in config_node

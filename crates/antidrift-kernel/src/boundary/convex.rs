@@ -4,8 +4,6 @@ use tsrs_core::P;
 
 use crate::{provenance, tsrs_kernel};
 
-use super::schema::{package_name_of_path, symbol_package_path};
-
 const CONVEX_REGISTRARS: &[&str] = &[
     "query",
     "mutation",
@@ -15,6 +13,46 @@ const CONVEX_REGISTRARS: &[&str] = &[
     "internalAction",
 ];
 const CONVEX_COMBINATORS: &[&str] = &["array", "optional", "union", "record"];
+
+pub fn symbol_package_path(checker: &mut Checker, sym: Option<P<Symbol>>) -> Option<String> {
+    for decl in provenance::symbol_declarations(checker, sym) {
+        let Some(sf) = ast::get_source_file_of_node(decl) else {
+            continue;
+        };
+        let file = tsrs_kernel::normalize_path(sf.file_name());
+        if let Some(idx) = file.rfind("/node_modules/") {
+            let start = idx + "/node_modules/".len();
+            if let Some(rest) = file.get(start..)
+                && !rest.is_empty()
+            {
+                return Some(rest.to_owned());
+            }
+        }
+    }
+    None
+}
+
+#[must_use]
+pub fn package_name_of_path(pkg_path: &str) -> Option<&str> {
+    if pkg_path.is_empty() {
+        return None;
+    }
+    if pkg_path.starts_with('@') {
+        let slash_after_scope = pkg_path.find('/')?;
+        let rest = &pkg_path[slash_after_scope + 1..];
+        if rest.is_empty() {
+            return None;
+        }
+        return Some(match rest.find('/') {
+            Some(second_slash) => &pkg_path[..slash_after_scope + 1 + second_slash],
+            None => pkg_path,
+        });
+    }
+    Some(match pkg_path.find('/') {
+        Some(slash) => &pkg_path[..slash],
+        None => pkg_path,
+    })
+}
 
 fn symbol_declares_in_convex_path(
     checker: &mut Checker,

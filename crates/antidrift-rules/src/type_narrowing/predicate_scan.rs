@@ -199,17 +199,6 @@ fn check_delegated_predicate_call(
         return;
     }
     let callee = tsrs_kernel::unwrap_expression(call.expression());
-    if ast::is_property_access_expression(callee) {
-        let method_node = callee.as_property_access_expression().name();
-        if matches!(
-            tsrs_kernel::property_name_text(method_node),
-            Some("parse" | "parseAsync" | "safeParse")
-        ) && boundary::is_zod_method(checker, method_node)
-        {
-            state.proven = true;
-            return;
-        }
-    }
     let sym = provenance::symbol_at_node(checker, callee);
     let decls = provenance::symbol_declarations(checker, sym);
     for decl in decls {

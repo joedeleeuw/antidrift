@@ -68,18 +68,24 @@ export const boundaryCoreHeadlessProbes = [
     expectedCount: 2,
   },
   {
-    name: "no-unsafe-deserialize (alias-to-contract and JSON.stringify roundtrip)",
+    name: "no-unsafe-deserialize (alias-to-contract, JSON.stringify roundtrip, and unguarded persisted JSON.parse(String(readFileSync(...))) property access)",
     rule: "antidrift/no-unsafe-deserialize",
     source: `
+      import { readFileSync } from "node:fs";
       type Account = { id: string };
-      export function parseAccount(text: string) {
+      export function parseAccount(text: string, manifestPath: string) {
         const raw = JSON.parse(text);
         const account: Account = raw;
         const cloned = JSON.parse(JSON.stringify(account));
-        return String(account.id) + String(cloned);
+        const unguarded = JSON.parse(String(readFileSync(manifestPath)));
+        const guarded = JSON.parse(String(readFileSync(manifestPath)));
+        if (typeof guarded.version !== "string") {
+          throw new Error("missing version");
+        }
+        return String(account.id) + String(cloned) + String(unguarded.version) + guarded.version;
       }
     `,
-    expectedCount: 2,
+    expectedCount: 3,
   },
   {
     name: "no-identity-schema-transform (direct identity, union transform, and full-object call repack)",

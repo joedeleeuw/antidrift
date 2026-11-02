@@ -131,6 +131,30 @@ impl UnknownInputMustBeDecoded {
         )
     }
 
+    fn is_potential_boundary_call(call_node: P<Node>) -> bool {
+        if boundary::is_json_parse_call(call_node) {
+            return true;
+        }
+        let callee = tsrs_kernel::unwrap_expression(call_node.as_call_expression().expression());
+        callee.kind() == Kind::PropertyAccessExpression
+            && ast::is_identifier(callee.as_property_access_expression().name())
+            && callee
+                .as_property_access_expression()
+                .name()
+                .as_identifier()
+                .text()
+                == "json"
+    }
+
+    fn is_potential_untrusted_source_expr(expr: P<Node>) -> bool {
+        let unwrapped = tsrs_kernel::unwrap_awaited_expression(expr);
+        match unwrapped.kind() {
+            Kind::Identifier => true,
+            Kind::CallExpression => Self::is_potential_boundary_call(unwrapped),
+            _ => false,
+        }
+    }
+
     fn check_type_argument_sink(node: P<Node>, ctx: &mut Ctx) {
         let call = node.as_call_expression();
         let Some(type_args) = call.type_arguments() else {
@@ -139,7 +163,9 @@ impl UnknownInputMustBeDecoded {
         let Some(&first_type_arg) = type_args.nodes().first() else {
             return;
         };
-        if boundary::schema_validation_call_parts(node, ctx.checker).is_some() {
+        if !Self::is_potential_boundary_call(node)
+            || boundary::schema_validation_call_parts(node, ctx.checker).is_some()
+        {
             return;
         }
         let target_type = ctx.checker.get_type_from_type_node_exported(first_type_arg);
@@ -147,11 +173,6 @@ impl UnknownInputMustBeDecoded {
     }
 
     fn check_call_arguments(node: P<Node>, ctx: &mut Ctx) {
-        if node.kind() == Kind::CallExpression
-            && boundary::schema_validation_call_parts(node, ctx.checker).is_some()
-        {
-            return;
-        }
         let args: &[P<Node>] = match node.kind() {
             Kind::CallExpression => node.as_call_expression().arguments().nodes(),
             Kind::NewExpression => {
@@ -162,8 +183,18 @@ impl UnknownInputMustBeDecoded {
             }
             _ => return,
         };
+        if !args.iter().any(|&arg| {
+            !Self::owned_by_cast_chain(arg) && Self::is_potential_untrusted_source_expr(arg)
+        }) {
+            return;
+        }
+        if node.kind() == Kind::CallExpression
+            && boundary::schema_validation_call_parts(node, ctx.checker).is_some()
+        {
+            return;
+        }
         for (idx, &arg) in args.iter().enumerate() {
-            if Self::owned_by_cast_chain(arg) {
+            if Self::owned_by_cast_chain(arg) || !Self::is_potential_untrusted_source_expr(arg) {
                 continue;
             }
             if let Some(target_type) = Self::call_argument_target_type(node, arg, idx, ctx.checker)
@@ -219,7 +250,8 @@ impl UnknownInputMustBeDecoded {
         if matches!(
             unwrapped_once.kind(),
             Kind::AsExpression | Kind::TypeAssertionExpression
-        ) {
+        ) || !Self::is_potential_untrusted_source_expr(expr)
+        {
             return;
         }
         let target_type = ctx.checker.get_type_at_location(node);
@@ -231,7 +263,7 @@ impl UnknownInputMustBeDecoded {
         let (Some(type_node), Some(init)) = (decl.type_(), decl.initializer()) else {
             return;
         };
-        if Self::owned_by_cast_chain(init) {
+        if Self::owned_by_cast_chain(init) || !Self::is_potential_untrusted_source_expr(init) {
             return;
         }
         let target_type = ctx.checker.get_type_from_type_node_exported(type_node);
@@ -244,7 +276,7 @@ impl UnknownInputMustBeDecoded {
             return;
         }
         let right = bin.right();
-        if Self::owned_by_cast_chain(right) {
+        if Self::owned_by_cast_chain(right) || !Self::is_potential_untrusted_source_expr(right) {
             return;
         }
         let target_type = ctx.checker.get_type_at_location(bin.left());
@@ -255,7 +287,7 @@ impl UnknownInputMustBeDecoded {
         let Some(expr) = node.as_return_statement().expression() else {
             return;
         };
-        if Self::owned_by_cast_chain(expr) {
+        if Self::owned_by_cast_chain(expr) || !Self::is_potential_untrusted_source_expr(expr) {
             return;
         };
         let Some(enclosing) = tsrs_kernel::enclosing_function(node) else {

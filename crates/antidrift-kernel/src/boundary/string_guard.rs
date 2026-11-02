@@ -259,3 +259,123 @@ pub(super) fn has_local_string_boundary(call_node: P<Node>, arg_expr: P<Node>) -
     }
     false
 }
+
+fn unwrap_string_coercion(expr: P<Node>) -> P<Node> {
+    let mut curr = tsrs_kernel::unwrap_awaited_expression(expr);
+    while ast::is_call_expression(curr) {
+        let call = curr.as_call_expression();
+        let callee = tsrs_kernel::unwrap_expression(call.expression());
+        let args = call.arguments().nodes();
+        if ast::is_identifier(callee)
+            && callee.as_identifier().text() == "String"
+            && args.len() == 1
+        {
+            curr = tsrs_kernel::unwrap_awaited_expression(args[0]);
+            continue;
+        }
+        if ast::is_property_access_expression(callee) {
+            let prop = callee.as_property_access_expression();
+            if ast::is_identifier(prop.name())
+                && matches!(prop.name().as_identifier().text(), "toString" | "trim")
+            {
+                curr = tsrs_kernel::unwrap_awaited_expression(prop.expression());
+                continue;
+            }
+        }
+        break;
+    }
+    curr
+}
+
+fn is_persisted_read_call(node: P<Node>) -> bool {
+    let unwrapped = unwrap_string_coercion(node);
+    if !ast::is_call_expression(unwrapped) {
+        return false;
+    }
+    let callee = tsrs_kernel::unwrap_expression(unwrapped.as_call_expression().expression());
+    if ast::is_identifier(callee) {
+        return matches!(callee.as_identifier().text(), "readFileSync" | "readFile");
+    }
+    if !ast::is_property_access_expression(callee) {
+        return false;
+    }
+    let prop = callee.as_property_access_expression();
+    if !ast::is_identifier(prop.name()) {
+        return false;
+    }
+    match prop.name().as_identifier().text() {
+        "readFileSync" | "readFile" => true,
+        "getItem" => {
+            let recv = tsrs_kernel::unwrap_expression(prop.expression());
+            ast::is_identifier(recv)
+                && matches!(
+                    recv.as_identifier().text(),
+                    "localStorage" | "sessionStorage"
+                )
+        }
+        _ => false,
+    }
+}
+
+pub(super) fn enclosing_scope_of_node(mut node: P<Node>) -> P<Node> {
+    while let Some(parent) = node.parent() {
+        if matches!(parent.kind(), Kind::Block | Kind::SourceFile) {
+            return parent;
+        }
+        node = parent;
+    }
+    node
+}
+
+fn find_local_var_initializer(scope: P<Node>, target_name: &str) -> Option<P<Node>> {
+    let mut found = None;
+    scope.for_each_child(&mut |child| {
+        if found.is_some() || tsrs_kernel::is_function_like(child) {
+            return found.is_some();
+        }
+        if child.kind() == Kind::VariableDeclaration {
+            let decl = child.as_variable_declaration();
+            if ast::is_identifier(decl.name()) && decl.name().as_identifier().text() == target_name
+            {
+                found = decl.initializer();
+                return true;
+            }
+        }
+        found = find_local_var_initializer(child, target_name);
+        found.is_some()
+    });
+    found
+}
+
+pub(super) fn is_persisted_json_parse_call(call_node: P<Node>) -> bool {
+    let Some(&first_arg) = call_node.as_call_expression().arguments().nodes().first() else {
+        return false;
+    };
+    let unwrapped = unwrap_string_coercion(first_arg);
+    if is_persisted_read_call(unwrapped) {
+        return true;
+    }
+    if ast::is_identifier(unwrapped) {
+        let scope = enclosing_scope_of_node(call_node);
+        if let Some(init) = find_local_var_initializer(scope, unwrapped.as_identifier().text()) {
+            return is_persisted_read_call(init);
+        }
+    }
+    false
+}
+
+pub(super) fn is_member_of_var(node: P<Node>, var_name: &str) -> Option<&'static str> {
+    let unwrapped = tsrs_kernel::unwrap_expression(node);
+    if unwrapped.kind() != Kind::PropertyAccessExpression {
+        return None;
+    }
+    let prop = unwrapped.as_property_access_expression();
+    let recv = tsrs_kernel::unwrap_expression(prop.expression());
+    if !ast::is_identifier(recv)
+        || recv.as_identifier().text() != var_name
+        || !ast::is_identifier(prop.name())
+    {
+        return None;
+    }
+    Some(prop.name().as_identifier().text())
+}

@@ -1,7 +1,7 @@
-use super::syntax::unwrap_expression;
+use super::syntax::{is_env_read_expression, owner, unwrap_expression};
 use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::runtime_lifecycle::{has_mtime_ordering_text, spans_multiple_artifact_tiers};
-use antidrift_kernel::tsrs_kernel::{cooked_text, is_function_like, node_text};
+use antidrift_kernel::tsrs_kernel::{cooked_text, node_text};
 use serde::Deserialize;
 use tsrs_ast::{Kind, Node};
 use tsrs_checker::{Checker, TypeFlags};
@@ -110,13 +110,8 @@ impl RuleVisitor for Visitor {
         let bin = node.as_binary_expression();
         let op = bin.operator_token().kind();
         if op == Kind::QuestionQuestionToken
-            && matches!(
-                unwrap_expression(bin.left()).kind(),
-                Kind::PropertyAccessExpression | Kind::ElementAccessExpression
-            )
             && let Some(sentinel) = string_literal(bin.right())
-            && ["unknown", "n/a", "none", "unavailable", "error", "missing"]
-                .contains(&sentinel.to_lowercase().as_str())
+            && is_sentinel_fallback_pair(node, bin.left(), sentinel)
         {
             ctx.report_node(
                 node,
@@ -328,6 +323,19 @@ fn promise_catch_empty_string_sentinel(call_node: P<Node>) -> Option<P<Node>> {
     }
 }
 
+fn is_sentinel_fallback_pair(node: P<Node>, left: P<Node>, sentinel: &str) -> bool {
+    let is_named_sentinel = ["unknown", "n/a", "none", "unavailable", "error", "missing"]
+        .contains(&sentinel.to_lowercase().as_str());
+    if matches!(
+        unwrap_expression(left).kind(),
+        Kind::PropertyAccessExpression | Kind::ElementAccessExpression
+    ) && is_named_sentinel
+    {
+        return true;
+    }
+    (sentinel.is_empty() || is_named_sentinel) && is_env_read_expression(owner(node), left)
+}
+
 fn is_multi_tier_artifact_find(ctx: &Ctx, call_node: P<Node>) -> bool {
     let call = call_node.as_call_expression();
     let callee = unwrap_expression(call.expression());
@@ -344,7 +352,7 @@ fn is_multi_tier_artifact_find(ctx: &Ctx, call_node: P<Node>) -> bool {
     if !node_text(ctx.file, pred).contains("existsSync") {
         return false;
     }
-    let scope_node = enclosing_scope_node(call_node);
+    let scope_node = owner(call_node);
     if has_mtime_ordering_text(node_text(ctx.file, scope_node)) {
         return false;
     }
@@ -352,16 +360,6 @@ fn is_multi_tier_artifact_find(ctx: &Ctx, call_node: P<Node>) -> bool {
     let mut elements = Vec::new();
     collect_candidate_array_texts(ctx, receiver, scope_node, &mut elements);
     spans_multiple_artifact_tiers(elements.iter().copied())
-}
-
-fn enclosing_scope_node(mut node: P<Node>) -> P<Node> {
-    while let Some(parent) = node.parent() {
-        if is_function_like(parent) || parent.kind() == Kind::SourceFile {
-            return parent;
-        }
-        node = parent;
-    }
-    node
 }
 
 fn collect_candidate_array_texts<'a>(

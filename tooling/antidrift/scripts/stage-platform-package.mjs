@@ -35,20 +35,39 @@ const repoRoot = resolve(packageRoot, "../..");
 const parentManifest = JSON.parse(
   String(readFileSync(resolve(packageRoot, "package.json")))
 );
+if (
+  typeof parentManifest.version !== "string" ||
+  typeof parentManifest.engines !== "object" ||
+  parentManifest.engines === null
+) {
+  throw new Error(
+    `${resolve(packageRoot, "package.json")} must declare version and engines`
+  );
+}
 const manifestPath = resolve(packageRoot, "npm", platformKey, "package.json");
 const manifest = JSON.parse(String(readFileSync(manifestPath)));
-const expectedFields = {
-  name: `@joedeleeuw/antidrift-linter-${platform.key}`,
-  version: parentManifest.version,
-  engines: parentManifest.engines,
-  os: [platform.os],
-  cpu: [platform.cpu],
-  libc: platform.libc && [platform.libc],
-};
-for (const [field, expected] of Object.entries(expectedFields)) {
-  if (!isDeepStrictEqual(manifest[field], expected)) {
+const expectedFields = [
+  ["name", `@joedeleeuw/antidrift-linter-${platform.key}`, manifest.name],
+  ["version", parentManifest.version, manifest.version],
+  ["engines", parentManifest.engines, manifest.engines],
+  ["os", [platform.os], manifest.os],
+  ["cpu", [platform.cpu], manifest.cpu],
+  ["libc", platform.libc && [platform.libc], manifest.libc],
+];
+if (
+  typeof manifest.name !== "string" ||
+  typeof manifest.version !== "string" ||
+  typeof manifest.engines !== "object" ||
+  !Array.isArray(manifest.os) ||
+  !Array.isArray(manifest.cpu) ||
+  (manifest.libc !== undefined && !Array.isArray(manifest.libc))
+) {
+  throw new Error(`Invalid platform manifest fields in ${manifestPath}`);
+}
+for (const [field, expected, actual] of expectedFields) {
+  if (!isDeepStrictEqual(actual, expected)) {
     throw new Error(
-      `${manifestPath} field ${field} is ${JSON.stringify(manifest[field])}; the ${platform.key} row of LINTER_PLATFORMS and ${resolve(packageRoot, "package.json")} require ${JSON.stringify(expected)}`
+      `${manifestPath} field ${field} is ${JSON.stringify(actual)}; the ${platform.key} row of LINTER_PLATFORMS and ${resolve(packageRoot, "package.json")} require ${JSON.stringify(expected)}`
     );
   }
 }

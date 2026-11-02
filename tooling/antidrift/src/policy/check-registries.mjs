@@ -121,11 +121,13 @@ function isKnownDetector(detector, antidriftRuleNames, oxlintDetectors) {
   if (colon <= 0) return false;
   const prefix = detector.slice(0, colon);
   const target = detector.slice(colon + 1);
-  if (prefix === "antidrift")
+  if (prefix === "antidrift") {
     return antidriftRuleNames.has(`antidrift/${target}`);
+  }
   if (prefix === "oxlint") return oxlintDetectors.has(target);
-  if (prefix === "policy")
+  if (prefix === "policy") {
     return typeof POLICY_DETECTORS[target] === "function";
+  }
   return false;
 }
 

@@ -283,7 +283,6 @@ function verifyCliLevelsAndPaths(binaryPath, workspace) {
 }
 
 function verifyBrokenTsconfigFails(binaryPath, repoRoot, workspace) {
-  verifyCliLevelsAndPaths(binaryPath, workspace);
   const brokenDir = join(workspace, "broken-tsconfig");
   mkdirSync(join(brokenDir, "src/deep"), { recursive: true });
   symlinkSync("src/deep", join(brokenDir, "link"));
@@ -295,10 +294,7 @@ function verifyBrokenTsconfigFails(binaryPath, repoRoot, workspace) {
   );
   for (const [cfg, pattern] of [
     ["{ invalid json\n", /Invalid tsconfig/u],
-    [
-      '{ "compilerOptions": { "baseUrl": "." }, "include": ["src"] }\n',
-      /baseUrl/u,
-    ],
+    ['{"compilerOptions":{"baseUrl":"."},"include":["src"]}\n', /baseUrl/u],
   ]) {
     writeFileSync(join(brokenDir, "tsconfig.json"), cfg);
     const run = spawnSync(binaryPath, ["src/index.ts"], {
@@ -308,46 +304,25 @@ function verifyBrokenTsconfigFails(binaryPath, repoRoot, workspace) {
     assert.notEqual(run.status, 0);
     assert.match(`${run.stdout}${run.stderr}`, pattern);
   }
+  const entry = "tooling/antidrift/src/index.mjs";
+  const modified = "tooling/antidrift/src/oxlint-config/index.mjs";
   const graph = collectTouchedModuleGraph({
     cwd: repoRoot,
     head: "HEAD",
     tsconfig: "tsconfig.json",
-    changedFiles: [
-      {
-        path: "tooling/antidrift/src/oxlint-config/index.mjs",
-        operation: "modify",
-      },
-    ],
-    allowedEntrypoints: ["tooling/antidrift/src/index.mjs"],
+    changedFiles: [{ path: modified, operation: "modify" }],
+    allowedEntrypoints: [entry],
     maxTouchedModuleRadius: 2,
   });
-  assert.deepEqual(graph.entrypoints, ["tooling/antidrift/src/index.mjs"]);
+  assert.deepEqual(graph.entrypoints, [entry]);
   assert.equal(graph.touchedFiles[0]?.withinRadius, true);
 }
 
-function verifyRegistryAndRoleSmokes(binaryPath, repoRoot, workspace) {
-  const regDir = join(workspace, "reg-smoke/policy/registries");
-  mkdirSync(regDir, { recursive: true });
-  writeFileSync(join(regDir, "mcp.yaml"), "allowedServers: {}\n");
-  writeFileSync(
-    join(workspace, "reg-smoke/policy/agent-guardrails.yaml"),
-    "clusters:\n  - id: c\n    owner: o\n    rules:\n      - id: r\n        detector: fictionalDetector\n      - id: cross\n        detector: oxlint:boundaries/element-types\n"
-  );
-  const regErrors = [];
-  const ok = checkRegistries({
-    repoRoot,
-    policyDir: join(workspace, "reg-smoke/policy"),
-    report: (msg) => regErrors.push(msg),
-  });
-  assert.equal(ok, false);
-  assert.deepEqual(regErrors, [
-    "policy/registries/mcp.yaml has no registered reader (allowed: architecture, boundaries, domain, gateways, generated, react-native).",
-    "policy/agent-guardrails.yaml rule 'r' detector 'fictionalDetector' is not registered.",
-    "policy/agent-guardrails.yaml rule 'cross' detector 'oxlint:boundaries/element-types' is not registered.",
-  ]);
+function verifyRoleSmoke(binaryPath, workspace) {
   const roleRepo = join(workspace, "role-smoke");
-  for (const sub of ["policy/registries", "core/models", "build"])
+  for (const sub of ["policy/registries", "core/models", "build"]) {
     mkdirSync(join(roleRepo, sub), { recursive: true });
+  }
   writeFileSync(
     join(roleRepo, "policy/registries/architecture.yaml"),
     "layers:\n  models:\n    role: domain\n    roots:\n      - core/models/**\n    mayImport: []\n"
@@ -373,6 +348,28 @@ function verifyRegistryAndRoleSmokes(binaryPath, repoRoot, workspace) {
   assert.deepEqual(inferredFindings(binaryPath, roleRepo, "build"), [
     "1 antidrift/no-structural-type-fork",
     "1 antidrift/no-reexport-only-module",
+  ]);
+}
+
+function verifyRegistrySmokes(repoRoot, workspace) {
+  const regDir = join(workspace, "reg-smoke/policy/registries");
+  mkdirSync(regDir, { recursive: true });
+  writeFileSync(join(regDir, "mcp.yaml"), "allowedServers: {}\n");
+  writeFileSync(
+    join(workspace, "reg-smoke/policy/agent-guardrails.yaml"),
+    "clusters:\n  - id: c\n    owner: o\n    rules:\n      - id: r\n        detector: fictionalDetector\n      - id: cross\n        detector: oxlint:boundaries/element-types\n"
+  );
+  const regErrors = [];
+  const ok = checkRegistries({
+    repoRoot,
+    policyDir: join(workspace, "reg-smoke/policy"),
+    report: (msg) => regErrors.push(msg),
+  });
+  assert.equal(ok, false);
+  assert.deepEqual(regErrors, [
+    "policy/registries/mcp.yaml has no registered reader (allowed: architecture, boundaries, domain, gateways, generated, react-native).",
+    "policy/agent-guardrails.yaml rule 'r' detector 'fictionalDetector' is not registered.",
+    "policy/agent-guardrails.yaml rule 'cross' detector 'oxlint:boundaries/element-types' is not registered.",
   ]);
 }
 
@@ -408,8 +405,10 @@ export function proveInferredTypesSmoke(binaryPath, repoRoot) {
       inferredFindings(binaryPath, appDir, "scripts/probe.mjs"),
       ["3 antidrift/no-unsafe-deserialize"]
     );
+    verifyCliLevelsAndPaths(binaryPath, workspace);
     verifyBrokenTsconfigFails(binaryPath, repoRoot, workspace);
-    verifyRegistryAndRoleSmokes(binaryPath, repoRoot, workspace);
+    verifyRegistrySmokes(repoRoot, workspace);
+    verifyRoleSmoke(binaryPath, workspace);
   } finally {
     rmSync(workspace, { recursive: true, force: true });
   }

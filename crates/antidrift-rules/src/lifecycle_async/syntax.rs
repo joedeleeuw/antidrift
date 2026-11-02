@@ -172,3 +172,107 @@ pub(super) fn root_identifier(expression: P<Node>) -> Option<P<Node>> {
         _ => None,
     }
 }
+
+fn is_env_carrier_object(expr: P<Node>) -> bool {
+    let inner = unwrap_expression(expr);
+    if inner.kind() != Kind::PropertyAccessExpression {
+        return false;
+    }
+    let prop = inner.as_property_access_expression();
+    if !ast::is_identifier(prop.name()) || prop.name().as_identifier().text() != "env" {
+        return false;
+    }
+    let recv = unwrap_expression(prop.expression());
+    if recv.kind() == Kind::MetaProperty {
+        return true;
+    }
+    ast::is_identifier(recv) && matches!(recv.as_identifier().text(), "process" | "Bun" | "Deno")
+}
+
+fn is_direct_env_member_read(expr: P<Node>) -> bool {
+    let mut inner = unwrap_expression(expr);
+    if inner.kind() == Kind::CallExpression {
+        let call = inner.as_call_expression();
+        let callee = unwrap_expression(call.expression());
+        if callee.kind() == Kind::PropertyAccessExpression {
+            let prop = callee.as_property_access_expression();
+            if ast::is_identifier(prop.name()) {
+                match prop.name().as_identifier().text() {
+                    "trim" => inner = unwrap_expression(prop.expression()),
+                    "get" => return is_env_carrier_object(prop.expression()),
+                    _ => return false,
+                }
+            }
+        }
+    }
+    match inner.kind() {
+        Kind::PropertyAccessExpression => {
+            is_env_carrier_object(inner.as_property_access_expression().expression())
+        }
+        Kind::ElementAccessExpression => {
+            is_env_carrier_object(inner.as_element_access_expression().expression())
+        }
+        _ => false,
+    }
+}
+
+fn is_binding_element_for_name(elem: P<Node>, target_name: &str) -> bool {
+    binding_property(elem).is_some_and(|(_, val)| {
+        ast::is_identifier(val) && val.as_identifier().text() == target_name
+    })
+}
+
+fn variable_decl_binds_env(decl_node: P<Node>, target_name: &str) -> bool {
+    if decl_node.kind() != Kind::VariableDeclaration {
+        return false;
+    }
+    let decl = decl_node.as_variable_declaration();
+    let Some(init) = decl.initializer() else {
+        return false;
+    };
+    if ast::is_identifier(decl.name()) && decl.name().as_identifier().text() == target_name {
+        return is_direct_env_member_read(init);
+    }
+    decl.name().kind() == Kind::ObjectBindingPattern
+        && is_env_carrier_object(init)
+        && decl
+            .name()
+            .as_binding_pattern()
+            .elements()
+            .nodes()
+            .iter()
+            .any(|&e| is_binding_element_for_name(e, target_name))
+}
+
+fn declares_env_binding(scope: P<Node>, target_name: &str) -> bool {
+    let mut found = false;
+    scope.for_each_child(&mut |child| {
+        if found || is_function_like(child) {
+            return found;
+        }
+        if variable_decl_binds_env(child, target_name) {
+            found = true;
+            return true;
+        }
+        found = declares_env_binding(child, target_name);
+        found
+    });
+    found
+}
+
+pub(super) fn is_env_read_expression(scope: P<Node>, expr: P<Node>) -> bool {
+    if is_direct_env_member_read(expr) {
+        return true;
+    }
+    let mut inner = unwrap_expression(expr);
+    if inner.kind() == Kind::CallExpression {
+        let callee = unwrap_expression(inner.as_call_expression().expression());
+        if callee.kind() == Kind::PropertyAccessExpression {
+            let prop = callee.as_property_access_expression();
+            if ast::is_identifier(prop.name()) && prop.name().as_identifier().text() == "trim" {
+                inner = unwrap_expression(prop.expression());
+            }
+        }
+    }
+    ast::is_identifier(inner) && declares_env_binding(scope, inner.as_identifier().text())
+}

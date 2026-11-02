@@ -129,4 +129,15 @@ export const directiveCoreHeadlessProbes = [
     `,
     expectedCount: 1,
   },
+  {
+    name: "no-sentinel-absence-fallback (flags ?? empty string on process.env reads while declared table fallback functions stay clean)",
+    rule: "antidrift/no-sentinel-absence-fallback",
+    source: `
+      const { HOMER_HOST_EXECUTION_TOKEN } = process.env;
+      export const directEnv = process.env.HOMER_HOST_EXECUTION_TOKEN ?? "";
+      export const destructuredEnv = HOMER_HOST_EXECUTION_TOKEN ?? "";
+      export const tableConfig = { fallback: () => "127.0.0.1" };
+    `,
+    expectedCount: 2,
+  },
 ];

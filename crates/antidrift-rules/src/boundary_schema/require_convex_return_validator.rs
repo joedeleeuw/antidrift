@@ -83,9 +83,6 @@ impl RuleVisitor for Visitor {
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
-        if !boundary::is_convex_registrar_call(ctx.checker, node) {
-            return;
-        }
         let Some(&first_arg) = node.as_call_expression().arguments().nodes().first() else {
             return;
         };
@@ -95,6 +92,9 @@ impl RuleVisitor for Visitor {
         }
         let inspection = RequireConvexReturnValidator::inspect_registration_config(config_node);
         if !inspection.has_handler {
+            return;
+        }
+        if !boundary::is_convex_registrar_call(ctx.checker, node) {
             return;
         }
         let def_name =

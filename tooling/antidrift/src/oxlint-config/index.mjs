@@ -347,6 +347,15 @@ function governanceRules(restrictedImportPatterns, layers) {
   };
 }
 
+function governancePlugins(layers) {
+  return [
+    ANTIDRIFT_PLUGIN,
+    ...(layers.length > 0
+      ? [{ name: "boundaries", specifier: BOUNDARIES_PLUGIN }]
+      : []),
+  ];
+}
+
 export function createGovernanceOxlintConfig({
   repoRoot = process.cwd(),
   policyDir = "policy",
@@ -364,14 +373,8 @@ export function createGovernanceOxlintConfig({
     ...otherPatterns,
     ...touchableImportPatterns(reactNativePolicy),
   ];
-
   return defineConfig({
-    jsPlugins: [
-      ANTIDRIFT_PLUGIN,
-      ...(layers.length > 0
-        ? [{ name: "boundaries", specifier: BOUNDARIES_PLUGIN }]
-        : []),
-    ],
+    jsPlugins: governancePlugins(layers),
     ...(settings ? { settings } : {}),
     ignorePatterns: [
       ...governanceIgnorePatterns,

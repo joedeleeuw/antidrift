@@ -1,5 +1,4 @@
-use std::borrow::Cow;
-use std::cell::RefCell;
+use std::cell::{OnceCell, RefCell};
 use std::thread::LocalKey;
 
 use antidrift_kernel::directives::split_identifier_words;
@@ -88,7 +87,7 @@ fn plain_declaration_member_names(node: P<Node>) -> Option<(String, Vec<String>)
 
 enum OwnerMembers {
     Declared(Vec<String>),
-    Resolved,
+    Resolved(OnceCell<Option<Vec<String>>>),
 }
 
 struct OwnerDeclaration {
@@ -109,6 +108,31 @@ struct ExportedOwnerIndex {
 
 thread_local! {
     static OWNER_INDEX: ProgramFactSlot<ExportedOwnerIndex> = const { RefCell::new(None) };
+}
+
+fn is_non_object_alias_type_node(type_node: P<Node>) -> bool {
+    matches!(
+        type_node.kind(),
+        Kind::TypeLiteral
+            | Kind::LiteralType
+            | Kind::FunctionType
+            | Kind::ConstructorType
+            | Kind::ArrayType
+            | Kind::TupleType
+            | Kind::TypePredicate
+            | Kind::TypeOperator
+            | Kind::StringKeyword
+            | Kind::NumberKeyword
+            | Kind::BooleanKeyword
+            | Kind::BigIntKeyword
+            | Kind::SymbolKeyword
+            | Kind::VoidKeyword
+            | Kind::UndefinedKeyword
+            | Kind::NullKeyword
+            | Kind::NeverKeyword
+            | Kind::AnyKeyword
+            | Kind::UnknownKeyword
+    )
 }
 
 fn owner_declaration(statement: P<Node>) -> Option<OwnerDeclaration> {
@@ -133,15 +157,31 @@ fn owner_declaration(statement: P<Node>) -> Option<OwnerDeclaration> {
     {
         return None;
     }
+    let type_node = alias.type_()?;
+    if is_non_object_alias_type_node(type_node) {
+        return None;
+    }
     Some(OwnerDeclaration {
         statement,
         name: alias.name().as_identifier().text().to_owned(),
-        members: OwnerMembers::Resolved,
+        members: OwnerMembers::Resolved(OnceCell::new()),
     })
 }
 
+fn origin_priority(origin: DeclarationOrigin) -> u8 {
+    match origin {
+        DeclarationOrigin::Generated => 0,
+        DeclarationOrigin::LocalDomain => 1,
+        DeclarationOrigin::LocalBoundary | DeclarationOrigin::WorkspaceOther => 2,
+        DeclarationOrigin::NodeModules => 3,
+        DeclarationOrigin::SameFile
+        | DeclarationOrigin::DefaultLib
+        | DeclarationOrigin::Unknown => 4,
+    }
+}
+
 fn index_owner_files(program: &Program) -> Vec<OwnerFile> {
-    program
+    let mut files: Vec<OwnerFile> = program
         .get_source_files()
         .iter()
         .filter_map(|&sf| {
@@ -169,7 +209,13 @@ fn index_owner_files(program: &Program) -> Vec<OwnerFile> {
                 declarations,
             })
         })
-        .collect()
+        .collect();
+    files.sort_by(|left, right| {
+        origin_priority(left.origin)
+            .cmp(&origin_priority(right.origin))
+            .then_with(|| left.file.file_name().cmp(right.file.file_name()))
+    });
+    files
 }
 
 impl ProgramFact for ExportedOwnerIndex {
@@ -257,26 +303,30 @@ fn find_owner_in_file(
 ) -> Option<String> {
     let cand_exported = has_modifier(cand_node, ModifierFlags::Export);
     for declaration in &owner_file.declarations {
-        let owner_props: Cow<'_, [String]> = match &declaration.members {
-            OwnerMembers::Declared(members) => Cow::Borrowed(members),
-            OwnerMembers::Resolved => {
-                match resolved_owner_member_names(checker, declaration.statement) {
-                    Some(members) => Cow::Owned(members),
-                    None => continue,
-                }
-            }
-        };
-        if *owner_props != *cand_props {
-            continue;
-        }
         let owner_name = &declaration.name;
         let authority_match = is_accepted_authority
             && (cand_props.len() >= 3
                 || !cand_exported
                 || shares_identifier_stem(cand_name, owner_name));
-        if (authority_match || owner_name == cand_name)
-            && has_exact_same_property_types(checker, cand_node, declaration.statement, cand_props)
-        {
+        if !authority_match && owner_name != cand_name {
+            continue;
+        }
+        let owner_props: &[String] = match &declaration.members {
+            OwnerMembers::Declared(members) => members,
+            OwnerMembers::Resolved(cache) => {
+                let Some(members) = cache
+                    .get_or_init(|| resolved_owner_member_names(checker, declaration.statement))
+                    .as_deref()
+                else {
+                    continue;
+                };
+                members
+            }
+        };
+        if owner_props != cand_props {
+            continue;
+        }
+        if has_exact_same_property_types(checker, cand_node, declaration.statement, cand_props) {
             return Some(owner_name.clone());
         }
     }

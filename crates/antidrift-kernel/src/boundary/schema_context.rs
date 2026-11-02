@@ -6,7 +6,7 @@ use tsrslint::utils::{is_object_type, is_type_flag_set};
 
 use crate::{provenance, shape};
 
-use super::schema::{is_effect_schema_method, is_valibot_method, is_zod_method};
+use super::schema::is_schema_carrier_node;
 
 const THROW_ASSERTION_MATCHERS: &[&str] = &["toThrow", "toThrowError"];
 
@@ -163,34 +163,30 @@ pub fn zod_transform_call_parts(
         if !ast::is_identifier(name_node) || name_node.as_identifier().text() != "transform" {
             return None;
         }
-        if !is_zod_method(checker, name_node)
-            && !is_valibot_method(checker, name_node)
-            && !is_effect_schema_method(checker, name_node)
-        {
-            return None;
-        }
         if let Some(parent) = call_node.parent()
             && ast::is_call_expression(parent)
             && let Some(&first_pipe_arg) = parent.as_call_expression().arguments().nodes().first()
             && first_pipe_arg != call_node
+            && is_schema_carrier_node(checker, first_pipe_arg)
         {
             return Some(ZodTransformCall {
                 receiver: first_pipe_arg,
                 callback: cb,
             });
         }
-        return Some(ZodTransformCall {
-            receiver: prop.expression(),
+        let receiver = prop.expression();
+        return is_schema_carrier_node(checker, receiver).then_some(ZodTransformCall {
+            receiver,
             callback: cb,
         });
     }
     if ast::is_identifier(callee)
         && callee.as_identifier().text() == "transform"
-        && (is_valibot_method(checker, callee) || is_effect_schema_method(checker, callee))
         && let Some(parent) = call_node.parent()
         && ast::is_call_expression(parent)
         && let Some(&first_pipe_arg) = parent.as_call_expression().arguments().nodes().first()
         && first_pipe_arg != call_node
+        && is_schema_carrier_node(checker, first_pipe_arg)
     {
         return Some(ZodTransformCall {
             receiver: first_pipe_arg,
