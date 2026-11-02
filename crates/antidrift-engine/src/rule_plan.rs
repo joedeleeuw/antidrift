@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
-use std::sync::LazyLock;
+use std::sync::{LazyLock, Mutex, OnceLock};
 
 use antidrift_kernel::directives::is_inline_disabled;
 use antidrift_kernel::registries::PolicyRegistries;
-use antidrift_rules::{RuleCatalogEntry, all_entries, lookup_entry};
+use antidrift_rules::{RuleInstance, all_entries, lookup_entry};
 use rustc_hash::FxHashMap;
 use serde_json::json;
 use tsrs_ast::SourceFile;
@@ -17,17 +17,9 @@ use tsrslint::rules;
 
 use crate::rule_scope::{RuleScope, Scoped, split_scope_envelope};
 
-fn scoped_default(entry: &RuleCatalogEntry) -> &'static dyn Rule {
-    Box::leak(Box::new(Scoped::new(
-        RuleScope::DEFAULT,
-        entry.scope_policy,
-        entry.rule,
-    )))
-}
-
 struct ScopedCatalogRule {
     default_enabled: bool,
-    rule: &'static dyn Rule,
+    scoped: Scoped,
 }
 
 static SCOPED_CATALOG: LazyLock<Vec<ScopedCatalogRule>> = LazyLock::new(|| {
@@ -35,20 +27,56 @@ static SCOPED_CATALOG: LazyLock<Vec<ScopedCatalogRule>> = LazyLock::new(|| {
         .into_iter()
         .map(|entry| ScopedCatalogRule {
             default_enabled: entry.default_enabled,
-            rule: scoped_default(entry),
+            scoped: Scoped::new(
+                RuleScope::DEFAULT,
+                entry.scope_policy,
+                RuleInstance::Static(entry.rule),
+            ),
         })
         .collect()
 });
+
+static CONFIGURED_RULE_SLOTS: [OnceLock<Box<dyn Rule>>; 512] = [const { OnceLock::new() }; 512];
+static CONFIGURED_RULES: LazyLock<Mutex<FxHashMap<String, &'static dyn Rule>>> =
+    LazyLock::new(Mutex::default);
 
 fn default_scoped_rules() -> impl Iterator<Item = &'static dyn Rule> {
     SCOPED_CATALOG
         .iter()
         .filter(|entry| entry.default_enabled)
-        .map(|entry| entry.rule)
+        .map(|entry| &entry.scoped as &'static dyn Rule)
 }
 
 pub(crate) fn all_scoped_rules() -> impl Iterator<Item = &'static dyn Rule> {
-    SCOPED_CATALOG.iter().map(|entry| entry.rule)
+    SCOPED_CATALOG
+        .iter()
+        .map(|entry| &entry.scoped as &'static dyn Rule)
+}
+
+fn intern_configured_rule(
+    key: String,
+    build: impl FnOnce() -> Result<Box<dyn Rule>, String>,
+) -> Result<&'static dyn Rule, String> {
+    if let Some(&cached) = CONFIGURED_RULES
+        .lock()
+        .map_err(|err| format!("configured rule cache lock poisoned: {err}"))?
+        .get(&key)
+    {
+        return Ok(cached);
+    }
+    let constructed = build()?;
+    let mut guard = CONFIGURED_RULES
+        .lock()
+        .map_err(|err| format!("configured rule cache lock poisoned: {err}"))?;
+    if let Some(&cached) = guard.get(&key) {
+        return Ok(cached);
+    }
+    let slot = CONFIGURED_RULE_SLOTS
+        .get(guard.len())
+        .ok_or_else(|| "configured rule cache capacity exceeded".to_owned())?;
+    let stored: &'static dyn Rule = &**slot.get_or_init(|| constructed);
+    guard.insert(key, stored);
+    Ok(stored)
 }
 
 pub(crate) fn instantiate_rule(
@@ -56,18 +84,30 @@ pub(crate) fn instantiate_rule(
     options: Option<&serde_json::Value>,
 ) -> Result<Option<&'static dyn Rule>, String> {
     let Some(entry) = lookup_entry(name) else {
-        let created = rules::create_rule(name, options)?;
-        return Ok(Some(Box::leak(created)));
+        let key = format!(
+            "{name}\u{0}{}",
+            options.map(ToString::to_string).unwrap_or_default()
+        );
+        return intern_configured_rule(key, || rules::create_rule(name, options)).map(Some);
     };
     let rule_name = entry.rule.name();
     let split = split_scope_envelope(rule_name, options)?;
-    let scope = RuleScope::from_scope_options(rule_name, &split.scope)?;
-    let rule = entry.instantiate(split.rule_options.as_ref())?;
-    Ok(Some(Box::leak(Box::new(Scoped::new(
-        scope,
-        entry.scope_policy,
-        rule,
-    )))))
+    if split.scope.is_unscoped() && split.rule_options.is_none() {
+        return Ok(SCOPED_CATALOG
+            .iter()
+            .find(|candidate| candidate.scoped.name() == rule_name)
+            .map(|candidate| &candidate.scoped as &'static dyn Rule));
+    }
+    let key = format!(
+        "{rule_name}\u{0}{}",
+        options.map(ToString::to_string).unwrap_or_default()
+    );
+    intern_configured_rule(key, || {
+        let scope = RuleScope::from_scope_options(rule_name, &split.scope)?;
+        let rule = entry.instantiate(split.rule_options.as_ref())?;
+        Ok(Box::new(Scoped::new(scope, entry.scope_policy, rule)))
+    })
+    .map(Some)
 }
 
 pub(crate) struct ConfigRulePlan {

@@ -44,6 +44,13 @@ pub enum KernelError {
         #[source]
         source: globset::Error,
     },
+    #[error(
+        "invalid options for {rule_name}: this rule takes no options besides files and excludeFiles (got {unexpected})"
+    )]
+    UnknownRuleOptions {
+        rule_name: String,
+        unexpected: String,
+    },
 }
 
 impl From<KernelError> for String {

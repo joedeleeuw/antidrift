@@ -95,6 +95,10 @@ const provenanceSource = [
   "    serde_json::from_str(text).ok()",
   "}",
   'pub fn hop_user() -> Result<usize, String> { hop_wrapper("x") }',
+  "pub fn bad_dynamic_leak(s: String) -> &'static str { Box::leak(s.into_boxed_str()) }",
+  "pub trait DeadMarker { fn id(&self) -> u8; }",
+  "impl DeadMarker for Holder { fn id(&self) -> u8 { 1 } }",
+  "impl DeadMarker for ProjectMeta { fn id(&self) -> u8 { 2 } }",
   "#[cfg(all(test))]\nmod inline_tests {}",
   "",
 ];

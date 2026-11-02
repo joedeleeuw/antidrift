@@ -4,7 +4,10 @@ use proc_macro2::Span;
 use rustc_hash::FxHashSet;
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
-use syn::{Arm, Expr, ExprClosure, ExprIf, ExprMethodCall, ImplItemFn, ItemFn, Local, Pat, Stmt};
+use syn::{
+    Arm, Expr, ExprCall, ExprClosure, ExprIf, ExprMethodCall, GenericArgument, ImplItemFn, ItemFn,
+    ItemStatic, ItemType, Local, Pat, PathArguments, ReturnType, Stmt, TraitItemFn, Type,
+};
 
 pub(super) fn check_error_handling(
     rel_path: &str,
@@ -13,6 +16,7 @@ pub(super) fn check_error_handling(
 ) {
     ErrorHandlingVisitor {
         rel_path,
+        in_static_initializer: false,
         error_bindings: FxHashSet::default(),
         error_string_bindings: FxHashSet::default(),
         diagnostics,
@@ -22,6 +26,7 @@ pub(super) fn check_error_handling(
 
 struct ErrorHandlingVisitor<'a> {
     rel_path: &'a str,
+    in_static_initializer: bool,
     error_bindings: FxHashSet<String>,
     error_string_bindings: FxHashSet<String>,
     diagnostics: &'a mut Vec<RustDiagnostic>,
@@ -39,11 +44,33 @@ impl ErrorHandlingVisitor<'_> {
 
     fn visit_fn_scope(&mut self, body: impl FnOnce(&mut Self)) {
         let prev = (
+            self.in_static_initializer,
             std::mem::take(&mut self.error_bindings),
             std::mem::take(&mut self.error_string_bindings),
         );
+        self.in_static_initializer = false;
         body(self);
-        (self.error_bindings, self.error_string_bindings) = prev;
+        (
+            self.in_static_initializer,
+            self.error_bindings,
+            self.error_string_bindings,
+        ) = prev;
+    }
+
+    fn check_return_type(&mut self, output: &ReturnType) {
+        if let ReturnType::Type(_, ty) = output {
+            self.check_string_error_type(ty);
+        }
+    }
+
+    fn check_string_error_type(&mut self, ty: &Type) {
+        if let Some(span) = string_error_span(ty) {
+            self.push(
+                span,
+                "rust/no-string-error-type",
+                "Result error type is 'String'; use a typed domain error enum so callers and boundaries can match failure variants.",
+            );
+        }
     }
 
     fn check_error_string_branch(&mut self, expr: &Expr) {
@@ -58,12 +85,57 @@ impl ErrorHandlingVisitor<'_> {
 }
 
 impl<'ast> Visit<'ast> for ErrorHandlingVisitor<'_> {
+    fn visit_item_static(&mut self, node: &'ast ItemStatic) {
+        let prev = self.in_static_initializer;
+        self.in_static_initializer = true;
+        visit::visit_item_static(self, node);
+        self.in_static_initializer = prev;
+    }
+
     fn visit_item_fn(&mut self, node: &'ast ItemFn) {
+        self.check_return_type(&node.sig.output);
         self.visit_fn_scope(|this| visit::visit_item_fn(this, node));
     }
 
     fn visit_impl_item_fn(&mut self, node: &'ast ImplItemFn) {
+        self.check_return_type(&node.sig.output);
         self.visit_fn_scope(|this| visit::visit_impl_item_fn(this, node));
+    }
+
+    fn visit_trait_item_fn(&mut self, node: &'ast TraitItemFn) {
+        self.check_return_type(&node.sig.output);
+        self.visit_fn_scope(|this| visit::visit_trait_item_fn(this, node));
+    }
+
+    fn visit_item_type(&mut self, node: &'ast ItemType) {
+        self.check_string_error_type(&node.ty);
+        visit::visit_item_type(self, node);
+    }
+
+    fn visit_expr_call(&mut self, node: &'ast ExprCall) {
+        if call_path_ends_with(node, &["LazyLock", "new"]) {
+            let prev = self.in_static_initializer;
+            self.in_static_initializer = true;
+            visit::visit_expr_call(self, node);
+            self.in_static_initializer = prev;
+            return;
+        }
+        if !self.in_static_initializer {
+            if call_path_ends_with(node, &["Box", "leak"]) {
+                self.push(
+                    node.func.span(),
+                    "rust/no-unbounded-leak",
+                    "Dynamic 'Box::leak' leaks memory on every call; move the allocation into a static, LazyLock, or OnceLock initializer or use owned storage.",
+                );
+            } else if call_path_ends_with(node, &["mem", "forget"]) {
+                self.push(
+                    node.func.span(),
+                    "rust/no-unbounded-leak",
+                    "'mem::forget' suppresses drop outside a static initializer; manage ownership explicitly or use a static, LazyLock, or OnceLock.",
+                );
+            }
+        }
+        visit::visit_expr_call(self, node);
     }
 
     fn visit_arm(&mut self, node: &'ast Arm) {
@@ -119,8 +191,62 @@ impl<'ast> Visit<'ast> for ErrorHandlingVisitor<'_> {
                 "'.map_err(...)' converts the source error to a bare string without adding boundary context; wrap in a typed error or include the operation/input that failed.",
             );
         }
+        if node.method == "get_or_init" || node.method == "get_or_try_init" {
+            self.visit_expr(&node.receiver);
+            let prev = self.in_static_initializer;
+            self.in_static_initializer = true;
+            for arg in &node.args {
+                self.visit_expr(arg);
+            }
+            self.in_static_initializer = prev;
+            return;
+        }
         visit::visit_expr_method_call(self, node);
     }
+}
+
+fn string_error_span(ty: &Type) -> Option<Span> {
+    let Type::Path(type_path) = ty else {
+        return None;
+    };
+    if type_path.qself.is_some() {
+        return None;
+    }
+    let last = type_path.path.segments.last()?;
+    if last.ident != "Result" {
+        return None;
+    }
+    if !type_path
+        .path
+        .segments
+        .iter()
+        .take(type_path.path.segments.len() - 1)
+        .all(|seg| matches!(seg.ident.to_string().as_str(), "std" | "core" | "result"))
+    {
+        return None;
+    }
+    let PathArguments::AngleBracketed(args) = &last.arguments else {
+        return None;
+    };
+    if args.args.len() != 2 {
+        return None;
+    }
+    let GenericArgument::Type(Type::Path(err_path)) = &args.args[1] else {
+        return None;
+    };
+    if err_path.qself.is_some() {
+        return None;
+    }
+    let err_last = err_path.path.segments.last()?;
+    (err_last.ident == "String"
+        && err_last.arguments.is_none()
+        && err_path
+            .path
+            .segments
+            .iter()
+            .take(err_path.path.segments.len() - 1)
+            .all(|seg| matches!(seg.ident.to_string().as_str(), "std" | "alloc" | "string")))
+    .then(|| err_last.ident.span())
 }
 
 fn peel_closure_expr(expr: &Expr) -> &Expr {

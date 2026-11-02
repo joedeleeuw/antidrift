@@ -86,7 +86,7 @@ pub fn decode_rule_options<T: DeserializeOwned + Default>(
     })
 }
 
-pub fn reject_unknown_options(rule_name: &str, options: Option<&Value>) -> Result<(), String> {
+pub fn reject_unknown_options(rule_name: &str, options: Option<&Value>) -> Result<(), KernelError> {
     let Some(target) = first_option_object(options) else {
         return Ok(());
     };
@@ -95,12 +95,12 @@ pub fn reject_unknown_options(rule_name: &str, options: Option<&Value>) -> Resul
         Value::Object(fields) => fields.keys().map(String::as_str).collect(),
         _ => Vec::new(),
     };
-    Err(format!(
-        "invalid options for {rule_name}: this rule takes no options besides files and excludeFiles (got {})",
-        if keys.is_empty() {
+    Err(KernelError::UnknownRuleOptions {
+        rule_name: rule_name.to_owned(),
+        unexpected: if keys.is_empty() {
             target.to_string()
         } else {
             keys.join(", ")
-        }
-    ))
+        },
+    })
 }

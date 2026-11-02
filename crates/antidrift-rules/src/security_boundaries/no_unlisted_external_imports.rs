@@ -31,7 +31,7 @@ impl Default for DependencyOptions {
 }
 
 pub struct NoUnlistedExternalImports {
-    internal_prefixes: Vec<&'static str>,
+    internal_prefixes: Vec<String>,
     ancestor_dev_dependencies: bool,
 }
 
@@ -44,24 +44,25 @@ impl crate::ConfigurableRule for NoUnlistedExternalImports {
     type Options = DependencyOptions;
 
     fn from_options(parsed: Self::Options) -> Result<Self, String> {
-        let internal_prefixes = parsed
-            .internal_prefixes
-            .into_iter()
-            .map(|prefix| -> &'static str { Box::leak(prefix.into_boxed_str()) })
-            .collect();
         Ok(Self {
-            internal_prefixes,
+            internal_prefixes: parsed.internal_prefixes,
             ancestor_dev_dependencies: parsed.ancestor_dev_dependencies,
         })
     }
 }
 
+const DEFAULT_INTERNAL_PREFIXES: &[&str] = &["@/", "~/"];
+
 impl NoUnlistedExternalImports {
-    fn prefixes(&self) -> &[&str] {
+    fn has_internal_prefix(&self, source: &str) -> bool {
         if self.internal_prefixes.is_empty() {
-            &["@/", "~/"]
+            DEFAULT_INTERNAL_PREFIXES
+                .iter()
+                .any(|prefix| source.starts_with(prefix))
         } else {
-            &self.internal_prefixes
+            self.internal_prefixes
+                .iter()
+                .any(|prefix| source.starts_with(prefix.as_str()))
         }
     }
 }
@@ -115,12 +116,7 @@ impl RuleVisitor for Visitor {
         let Some(import) = extract_module_import(node) else {
             return;
         };
-        if self
-            .rule
-            .prefixes()
-            .iter()
-            .any(|prefix| import.source.starts_with(prefix))
-        {
+        if self.rule.has_internal_prefix(import.source) {
             return;
         }
         match contract.unlisted(&import) {

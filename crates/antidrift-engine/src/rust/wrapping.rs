@@ -121,6 +121,7 @@ pub(super) fn check_wrapping_functions(
 ) {
     let mut candidates = Vec::new();
     let mut audit = ReferenceAudit::default();
+    let mut trait_audit = TraitAudit::default();
     let parsed = rs_files
         .iter()
         .filter_map(|file| parsed_files.get(file).map(|ast| (file, ast)))
@@ -134,7 +135,10 @@ pub(super) fn check_wrapping_functions(
         };
         collector.visit_file(ast);
         audit.collect_imports(&scope, &ast.items);
+        trait_audit.current_file.clone_from(file);
+        trait_audit.visit_file(ast);
     }
+    trait_audit.report(workspace_root, diagnostics);
     for (file, ast) in &parsed {
         audit.scope = file_scope(file);
         audit.visit_file(ast);
@@ -315,4 +319,97 @@ fn detect_passthrough_wrapper(item_fn: &ItemFn) -> Option<String> {
         .last()
         .is_some_and(|l| l.as_bytes().first().is_some_and(u8::is_ascii_uppercase)))
     .then(|| segments.join("::"))
+}
+
+struct TraitCandidate {
+    file: PathBuf,
+    line: usize,
+    name: String,
+}
+
+#[derive(Default)]
+struct TraitAudit {
+    current_file: PathBuf,
+    candidates: Vec<TraitCandidate>,
+    impl_counts: FxHashMap<String, usize>,
+    consumed: FxHashSet<String>,
+}
+
+impl TraitAudit {
+    fn record_qualified_or_prefix(&mut self, qself: Option<&syn::QSelf>, path: &syn::Path) {
+        if let Some(qself) = qself
+            && qself.position > 0
+            && let Some(seg) = path.segments.get(qself.position - 1)
+        {
+            self.consumed.insert(seg.ident.to_string());
+        } else if path.segments.len() >= 2 {
+            for seg in path.segments.iter().take(path.segments.len() - 1) {
+                self.consumed.insert(seg.ident.to_string());
+            }
+        }
+    }
+
+    fn report(self, workspace_root: &Path, diagnostics: &mut Vec<RustDiagnostic>) {
+        for candidate in self.candidates {
+            let count = self.impl_counts.get(&candidate.name).copied().unwrap_or(0);
+            if count >= 2 && !self.consumed.contains(&candidate.name) {
+                diagnostics.push(RustDiagnostic::error(
+                    relative_display(workspace_root, &candidate.file),
+                    candidate.line,
+                    "rust/no-hollow-module",
+                    format!(
+                        "Trait '{}' is implemented {count} times in this crate but never consumed via 'dyn {}', 'impl {}', or a '{}:' bound; delete self-certifying marker traits or consume the trait at the boundary.",
+                        candidate.name, candidate.name, candidate.name, candidate.name
+                    ),
+                ));
+            }
+        }
+    }
+}
+
+impl<'ast> Visit<'ast> for TraitAudit {
+    fn visit_item_trait(&mut self, node: &'ast syn::ItemTrait) {
+        let has_default_body = node
+            .items
+            .iter()
+            .any(|item| matches!(item, syn::TraitItem::Fn(method) if method.default.is_some()));
+        if !has_default_body {
+            self.candidates.push(TraitCandidate {
+                file: self.current_file.clone(),
+                line: node.ident.span().start().line.max(1),
+                name: node.ident.to_string(),
+            });
+        }
+        visit::visit_item_trait(self, node);
+    }
+
+    fn visit_item_impl(&mut self, node: &'ast syn::ItemImpl) {
+        if let Some((_, trait_path, _)) = &node.trait_
+            && let Some(seg) = trait_path.segments.last()
+        {
+            *self.impl_counts.entry(seg.ident.to_string()).or_default() += 1;
+        }
+        self.visit_generics(&node.generics);
+        self.visit_type(&node.self_ty);
+        for item in &node.items {
+            self.visit_impl_item(item);
+        }
+    }
+
+    fn visit_trait_bound(&mut self, node: &'ast syn::TraitBound) {
+        if let Some(seg) = node.path.segments.last() {
+            self.consumed.insert(seg.ident.to_string());
+        }
+        visit::visit_trait_bound(self, node);
+    }
+
+    fn visit_expr_path(&mut self, node: &'ast syn::ExprPath) {
+        self.record_qualified_or_prefix(node.qself.as_ref(), &node.path);
+        visit::visit_expr_path(self, node);
+    }
+
+    fn visit_type_path(&mut self, node: &'ast syn::TypePath) {
+        self.record_qualified_or_prefix(node.qself.as_ref(), &node.path);
+        visit::visit_type_path(self, node);
+    }
 }

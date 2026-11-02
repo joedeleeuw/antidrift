@@ -203,3 +203,144 @@ export function cfgSuppressionAndMacroModuleSmoke(linter) {
     );
   });
 }
+
+const ROUND_ONE_COUNTEREXAMPLES = [
+  {
+    name: "orphan-macro",
+    rule: "rust/no-orphan-module",
+    manifestExtra:
+      '\n[package.metadata.antidrift]\nmodule-macros = ["declare_custom_mod"]\n',
+    files: {
+      "src/lib.rs":
+        "macro_rules! noop { ($id:ident) => {}; }\nnoop!(orphan);\n",
+      "src/orphan.rs": "pub fn orphan() {}\n",
+    },
+    expected: ["src/orphan.rs:1 rust/no-orphan-module error"],
+  },
+  {
+    name: "cfg-unrelated-stmt",
+    rule: "rust/no-let-underscore-suppression",
+    files: {
+      "src/lib.rs":
+        "pub fn handle(input: usize) -> usize {\n    let _ = input;\n    #[cfg(unix)]\n    let platform = 1;\n    #[cfg(not(unix))]\n    let platform = 0;\n    platform\n}\n",
+    },
+    expected: ["src/lib.rs:2 rust/no-let-underscore-suppression error"],
+  },
+  {
+    name: "err-local-fallback",
+    rule: "rust/no-silent-result-discard",
+    files: {
+      "src/lib.rs":
+        "pub fn parse_text(input: &str) -> String {\n    match input.parse::<u32>() {\n        Ok(n) => n.to_string(),\n        Err(_) => {\n            let fallback = String::new();\n            fallback\n        }\n    }\n}\n",
+    },
+    expected: ["src/lib.rs:4 rust/no-silent-result-discard error"],
+  },
+  {
+    name: "async-block-command-wait",
+    rule: "rust/no-blocking-in-async",
+    files: {
+      "src/lib.rs":
+        'pub async fn run() -> std::io::Result<()> {\n    async {\n        let status = std::process::Command::new("sh").status()?;\n        let _ = status.success();\n        Ok(())\n    }\n    .await\n}\n',
+    },
+    expected: ["src/lib.rs:3 rust/no-blocking-in-async error"],
+  },
+  {
+    name: "struct-value-field-probe",
+    rule: "rust/no-untyped-config-probe",
+    files: {
+      "src/lib.rs":
+        "pub struct Settings {\n    pub raw: serde_json::Value,\n}\npub fn is_enabled(settings: &Settings) -> Option<bool> {\n    settings.raw.as_bool()\n}\n",
+    },
+    expected: ["src/lib.rs:5 rust/no-untyped-config-probe error"],
+  },
+  {
+    name: "type-alias-clone-rebuild",
+    rule: "rust/no-contract-appeasement-projection",
+    files: {
+      "src/lib.rs":
+        "pub struct Owner {\n    pub a: String,\n    pub b: String,\n    pub c: String,\n}\npub type Alias = Owner;\npub fn rebuild(input: &Alias) -> Owner {\n    Owner {\n        a: input.a.clone(),\n        b: input.b.clone(),\n        c: input.c.clone(),\n    }\n}\n",
+    },
+    expected: ["src/lib.rs:8 rust/no-contract-appeasement-projection error"],
+  },
+  {
+    name: "private-mod-pub-struct-constant-field",
+    rule: "rust/no-constant-return-field",
+    files: {
+      "src/lib.rs":
+        "mod inner {\n    pub struct Entry {\n        pub ok: bool,\n        pub name: String,\n    }\n    pub fn first(name: String) -> Entry {\n        Entry { ok: true, name }\n    }\n    pub fn second(name: String) -> Entry {\n        Entry { ok: true, name }\n    }\n}\npub fn count(name: String) -> usize {\n    inner::first(name.clone()).name.len() + inner::second(name).name.len()\n}\n",
+    },
+    expected: ["src/lib.rs:3 rust/no-constant-return-field error"],
+  },
+  {
+    name: "sibling-value-ref-hop",
+    rule: "rust/no-wrapping-functions",
+    files: {
+      "src/lib.rs":
+        "pub mod one {\n    pub fn target(x: usize) -> usize { x + 1 }\n    pub fn hop(x: usize) -> usize { target(x) }\n}\npub mod two {\n    pub const hop: usize = 7;\n}\npub fn caller(x: usize) -> usize {\n    one::hop(x) + two::hop\n}\n",
+    },
+    expected: ["src/lib.rs:3 rust/no-wrapping-functions error"],
+  },
+  {
+    name: "serde-remote-without-strict",
+    rule: "rust/require-strict-serde",
+    files: {
+      "src/lib.rs":
+        'pub struct External {\n    pub a: String,\n}\n#[derive(serde::Deserialize)]\n#[serde(remote = "External")]\npub struct ExternalDef {\n    pub a: String,\n}\n',
+    },
+    expected: ["src/lib.rs:6 rust/require-strict-serde error"],
+  },
+  {
+    name: "cfg-any-test-unix-anemic",
+    rule: "rust/no-anemic-errors",
+    files: {
+      "src/lib.rs":
+        "#[cfg(any(test, unix))]\npub fn parse_num(text: &str) -> Result<u32, std::num::ParseIntError> {\n    let _ = text.parse::<u32>().map_err(|err| err.to_string());\n    text.parse::<u32>()\n}\n",
+    },
+    expected: ["src/lib.rs:3 rust/no-anemic-errors error"],
+  },
+  {
+    name: "unbounded-leak-vs-static",
+    rule: "rust/no-unbounded-leak",
+    files: {
+      "src/lib.rs":
+        "use std::sync::{LazyLock, OnceLock};\nstatic ALLOWED_STATIC: LazyLock<&'static str> = LazyLock::new(|| Box::leak(String::from(\"ok\").into_boxed_str()));\nstatic ALLOWED_ONCE: OnceLock<&'static str> = OnceLock::new();\npub fn allowed_once() -> &'static str {\n    ALLOWED_ONCE.get_or_init(|| Box::leak(String::from(\"once\").into_boxed_str()))\n}\npub fn bad_leak(input: String) -> &'static str {\n    let _ = *ALLOWED_STATIC;\n    Box::leak(input.into_boxed_str())\n}\npub fn bad_forget(input: String) {\n    std::mem::forget(input);\n}\n",
+    },
+    expected: [
+      "src/lib.rs:12 rust/no-unbounded-leak error",
+      "src/lib.rs:9 rust/no-unbounded-leak error",
+    ],
+  },
+  {
+    name: "unconsumed-multi-impl-trait",
+    rule: "rust/no-hollow-module",
+    files: {
+      "src/lib.rs":
+        'pub trait UnconsumedMarker {\n    fn tag(&self) -> &\'static str;\n}\npub trait ConsumedTrait {\n    fn label(&self) -> &\'static str;\n}\npub struct Alpha;\npub struct Beta;\nimpl UnconsumedMarker for Alpha { fn tag(&self) -> &\'static str { "a" } }\nimpl UnconsumedMarker for Beta { fn tag(&self) -> &\'static str { "b" } }\nimpl ConsumedTrait for Alpha { fn label(&self) -> &\'static str { "a" } }\nimpl ConsumedTrait for Beta { fn label(&self) -> &\'static str { "b" } }\npub fn use_consumed(item: &dyn ConsumedTrait) -> &\'static str {\n    item.label()\n}\n',
+    },
+    expected: ["src/lib.rs:1 rust/no-hollow-module error"],
+  },
+];
+
+export function roundOnePrecisionCounterexamplesSmoke(linter) {
+  for (const scenario of ROUND_ONE_COUNTEREXAMPLES) {
+    withTempDir(`antidrift-rust-r1-${scenario.name}-`, (root) => {
+      writeCrate(
+        root,
+        scenario.name.replaceAll("-", "_"),
+        scenario.manifestExtra ?? ""
+      );
+      for (const [relative, content] of Object.entries(scenario.files)) {
+        mkdirSync(dirname(join(root, relative)), { recursive: true });
+        writeFileSync(join(root, relative), content);
+      }
+      const matched = linter
+        .findings(root)
+        .filter((line) => line.includes(scenario.rule));
+      assert.deepEqual(
+        matched,
+        scenario.expected,
+        `Counterexample '${scenario.name}' must report ${JSON.stringify(scenario.expected)}, got ${JSON.stringify(matched)}`
+      );
+    });
+  }
+}

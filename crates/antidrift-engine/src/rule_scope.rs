@@ -1,9 +1,9 @@
 use antidrift_kernel::file_role::ProjectPath;
 use antidrift_kernel::rule::{
-    Ctx as KernelCtx, EmittedDiagnostic, Listener as KernelListener, Rule as KernelRule,
-    RuleVisitor as KernelVisitor,
+    Ctx as KernelCtx, EmittedDiagnostic, Listener as KernelListener, RuleVisitor as KernelVisitor,
 };
 use antidrift_kernel::scope_policy::ScopePolicy;
+use antidrift_rules::RuleInstance;
 use globset::{GlobBuilder, GlobSet, GlobSetBuilder};
 use serde::Deserialize;
 use serde_json::Value;
@@ -19,6 +19,12 @@ use tsrslint::rule::{
 pub(crate) struct ScopeOptions {
     pub(crate) files: Option<Vec<String>>,
     pub(crate) exclude_files: Vec<String>,
+}
+
+impl ScopeOptions {
+    pub(crate) fn is_unscoped(&self) -> bool {
+        self.files.is_none() && self.exclude_files.is_empty()
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -203,15 +209,11 @@ impl HostVisitor for AdaptedVisitor {
 pub(crate) struct Scoped {
     scope: RuleScope,
     policy: ScopePolicy,
-    rule: &'static dyn KernelRule,
+    rule: RuleInstance,
 }
 
 impl Scoped {
-    pub(crate) const fn new(
-        scope: RuleScope,
-        policy: ScopePolicy,
-        rule: &'static dyn KernelRule,
-    ) -> Self {
+    pub(crate) const fn new(scope: RuleScope, policy: ScopePolicy, rule: RuleInstance) -> Self {
         Self {
             scope,
             policy,
@@ -236,7 +238,7 @@ impl Scoped {
 
 impl HostRule for Scoped {
     fn name(&self) -> &'static str {
-        self.rule.name()
+        self.rule.as_rule().name()
     }
 
     fn create_visitor(&'static self, host: &mut HostCtx) -> Box<dyn HostVisitor> {
@@ -244,7 +246,7 @@ impl HostRule for Scoped {
             return Box::new(EmptyHostVisitor);
         }
         let mut ctx = KernelCtx::new(host.checker, host.program, host.file, host.fix);
-        let mut inner = self.rule.create_visitor(&mut ctx);
+        let mut inner = self.rule.as_rule().create_visitor(&mut ctx);
         let mut listeners = Vec::with_capacity(inner.listeners().len());
         let mut enter_source_file = false;
         for &listener in inner.listeners() {

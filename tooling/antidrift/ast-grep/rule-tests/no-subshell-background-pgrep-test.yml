@@ -1,0 +1,28 @@
+id: no-subshell-background-pgrep
+valid:
+  - |
+    codex exec "brief" > codex.log 2>&1 &
+    launcher_pid=$!
+    trap 'kill "$launcher_pid" 2>/dev/null || true' EXIT
+  - |
+    kimi -p "brief" < /dev/null > kimi.log 2>&1 &
+    launcher_pid=$!
+    child_pid="$(pgrep -P "$launcher_pid")"
+  - |
+    (cd "$worktree" && pnpm test)
+  - |
+    pgrep -f "some-daemon"
+invalid:
+  - |
+    (codex exec "brief" > codex.log 2>&1 &)
+    pid="$(pgrep -f "codex exec")"
+  - |
+    (kimi -p "brief" > kimi.log 2>&1 &)
+    pgrep -f kimi
+  - |
+    (
+      nohup my-worker --port 8080 &
+    )
+    while pgrep --full "my-worker" >/dev/null; do
+      sleep 1
+    done

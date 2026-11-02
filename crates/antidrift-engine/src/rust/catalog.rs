@@ -13,16 +13,14 @@ pub(super) enum RuleKind {
 pub(super) struct RuleRow {
     pub(super) id: &'static str,
     pub(super) kind: RuleKind,
+    pub(super) default_level: Severity,
     pub(super) scope_policy: ScopePolicy,
     pub(super) guidance: &'static str,
 }
 
 impl RuleRow {
     pub(super) const fn default_level(&self) -> Severity {
-        match self.kind {
-            RuleKind::General => Severity::Error,
-            RuleKind::HouseStyle => Severity::Off,
-        }
+        self.default_level
     }
 }
 
@@ -70,6 +68,21 @@ const fn general(id: &'static str, scope_policy: ScopePolicy, guidance: &'static
     RuleRow {
         id,
         kind: RuleKind::General,
+        default_level: Severity::Error,
+        scope_policy,
+        guidance,
+    }
+}
+
+const fn general_warn(
+    id: &'static str,
+    scope_policy: ScopePolicy,
+    guidance: &'static str,
+) -> RuleRow {
+    RuleRow {
+        id,
+        kind: RuleKind::General,
+        default_level: Severity::Warn,
         scope_policy,
         guidance,
     }
@@ -79,6 +92,7 @@ const fn house_style(id: &'static str, guidance: &'static str) -> RuleRow {
     RuleRow {
         id,
         kind: RuleKind::HouseStyle,
+        default_level: Severity::Off,
         scope_policy: ScopePolicy::Everywhere,
         guidance,
     }
@@ -164,6 +178,16 @@ pub(super) const RULES: &[RuleRow] = &[
         "rust/no-anemic-errors",
         ScopePolicy::AuthoredSource,
         "Use typed domain error enums with source context instead of Result<_, String>, bare Err(\"...\") literals, or context-free .map_err(|e| e.to_string()).",
+    ),
+    general_warn(
+        "rust/no-string-error-type",
+        ScopePolicy::AuthoredSource,
+        "Use a typed domain error enum instead of Result<_, String> in function signatures, trait methods, and type aliases.",
+    ),
+    general(
+        "rust/no-unbounded-leak",
+        ScopePolicy::AuthoredSource,
+        "Do not call Box::leak or mem::forget outside a static, LazyLock, or OnceLock initializer.",
     ),
     general(
         "rust/no-silent-result-discard",

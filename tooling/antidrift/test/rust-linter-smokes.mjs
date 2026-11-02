@@ -14,6 +14,7 @@ import {
 import {
   cfgSuppressionAndMacroModuleSmoke,
   enumTwinSmoke,
+  roundOnePrecisionCounterexamplesSmoke,
   shadowedFallbackSmoke,
   wrapperResolutionSmoke,
 } from "./rust-linter-resolution-smokes.mjs";
@@ -27,6 +28,8 @@ const HOUSE_STYLE_RULE_IDS = [
   "rust/no-boolean-map",
   "rust/no-orphan-module",
   "rust/no-anemic-errors",
+  "rust/no-string-error-type",
+  "rust/no-unbounded-leak",
   "rust/no-compat-names",
   "rust/no-wrapping-functions",
   "rust/no-let-underscore-suppression",
@@ -64,6 +67,8 @@ const HOUSE_STYLE_MESSAGES = [
   "Module layer 'provenance' (rank 0) cannot import higher layer 'boundary' (rank 3)",
   "'Listener::Enter' is forbidden here: Listener::Enter(Kind::SourceFile) never fires in tsrslint.",
   "'hop_wrapper' is a hop to 'legacy_adapter': inlining it at its 1 call site(s)",
+  "Dynamic 'Box::leak' leaks memory on every call",
+  "Trait 'DeadMarker' is implemented 2 times in this crate but never consumed",
 ];
 
 function houseStyleShapeAsserts(diags) {
@@ -161,4 +166,5 @@ export function runRustLinterSmokes({ binaryPath, repoRoot }) {
   enumTwinSmoke(linter);
   wrapperResolutionSmoke(linter);
   cfgSuppressionAndMacroModuleSmoke(linter);
+  roundOnePrecisionCounterexamplesSmoke(linter);
 }

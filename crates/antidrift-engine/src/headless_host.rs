@@ -1,6 +1,6 @@
 use std::collections::hash_map::Entry;
-use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use rustc_hash::{FxHashMap, FxHashSet};
 use tsrs_ast::{SourceFile, SourceFileParseOptions};
@@ -43,7 +43,7 @@ impl tsrs_tsoptions::ExtendedConfigCache for ProgramExtCache {
 
 struct SharedDeclarationsHost {
     inner: Arc<dyn CompilerHost>,
-    cache: &'static DeclarationCache,
+    cache: Arc<DeclarationCache>,
 }
 
 impl CompilerHost for SharedDeclarationsHost {
@@ -117,7 +117,7 @@ pub(crate) fn build_shared_host(
     dir: &str,
     fs: &Arc<dyn FS>,
     ext_cache: &'static ExtendedConfigCache,
-    declarations: &'static DeclarationCache,
+    declarations: &Arc<DeclarationCache>,
 ) -> Arc<dyn CompilerHost> {
     let inner = new_compiler_host(
         dir,
@@ -129,7 +129,7 @@ pub(crate) fn build_shared_host(
     );
     Arc::new(SharedDeclarationsHost {
         inner,
-        cache: declarations,
+        cache: Arc::clone(declarations),
     })
 }
 
@@ -207,7 +207,7 @@ struct ProgramFactory {
     cwd: String,
     fs: Arc<dyn FS>,
     ext_cache: &'static ExtendedConfigCache,
-    declarations: &'static DeclarationCache,
+    declarations: Arc<DeclarationCache>,
     resolver: TsConfigResolver,
 }
 
@@ -224,7 +224,7 @@ impl ProgramFactory {
             .map(|diag| tsconfig_error_diagnostic(*diag, config_file_name))
             .collect();
         let compiler_host =
-            build_shared_host(&self.cwd, &self.fs, self.ext_cache, self.declarations);
+            build_shared_host(&self.cwd, &self.fs, self.ext_cache, &self.declarations);
         let mut popts = ProgramOptions::new(config, compiler_host);
         popts.use_source_of_project_reference = true;
         popts.single_threaded = Tristate::False;
@@ -273,7 +273,7 @@ impl ProgramFactory {
 
     fn inferred(&self, unmatched: &[String]) -> &'static Program {
         let compiler_host =
-            build_shared_host(&self.cwd, &self.fs, self.ext_cache, self.declarations);
+            build_shared_host(&self.cwd, &self.fs, self.ext_cache, &self.declarations);
         let mut options = inferred_compiler_options();
         options.type_roots = Some(inferred_type_roots(&self.cwd, unmatched, self.fs.as_ref()));
         let config = P::new(tsrs_tsoptions::new_parsed_command_line(
@@ -329,6 +329,10 @@ impl ProgramFactory {
     }
 }
 
+static HOST_SLOTS: [OnceLock<(ParseHost, ExtendedConfigCache)>; 256] =
+    [const { OnceLock::new() }; 256];
+static NEXT_HOST_SLOT: AtomicUsize = AtomicUsize::new(0);
+
 pub(crate) struct ProgramBuilderEnv {
     factory: ProgramFactory,
     configured: FxHashMap<String, CachedProgram>,
@@ -336,20 +340,21 @@ pub(crate) struct ProgramBuilderEnv {
 
 impl ProgramBuilderEnv {
     pub(crate) fn new(fs: Arc<dyn FS>, cwd: &str) -> Self {
-        let host: &'static ParseHost = Box::leak(Box::new(ParseHost {
-            fs: Arc::clone(&fs),
-            cwd: cwd.to_owned(),
-        }));
-        let ext_cache: &'static ExtendedConfigCache = Box::leak(Box::default());
-        let declarations: &'static DeclarationCache = Box::leak(Box::default());
-        let resolver = TsConfigResolver::new(host, ext_cache);
+        let idx = NEXT_HOST_SLOT.fetch_add(1, Ordering::Relaxed) % HOST_SLOTS.len();
+        let (host, ext_cache) = HOST_SLOTS[idx].get_or_init(|| {
+            let host = ParseHost {
+                fs: Arc::clone(&fs),
+                cwd: cwd.to_owned(),
+            };
+            (host, ExtendedConfigCache::default())
+        });
         Self {
             factory: ProgramFactory {
                 cwd: cwd.to_owned(),
                 fs,
                 ext_cache,
-                declarations,
-                resolver,
+                declarations: Arc::default(),
+                resolver: TsConfigResolver::new(host, ext_cache),
             },
             configured: FxHashMap::default(),
         }

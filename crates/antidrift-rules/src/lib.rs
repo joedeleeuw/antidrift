@@ -72,6 +72,21 @@ impl CatalogRule {
     }
 }
 
+pub enum RuleInstance {
+    Static(&'static dyn Rule),
+    Owned(Box<dyn Rule>),
+}
+
+impl RuleInstance {
+    #[must_use]
+    pub fn as_rule(&self) -> &dyn Rule {
+        match self {
+            Self::Static(rule) => *rule,
+            Self::Owned(rule) => &**rule,
+        }
+    }
+}
+
 pub struct RuleCatalogEntry {
     pub rule: &'static dyn Rule,
     pub scope_policy: ScopePolicy,
@@ -81,18 +96,15 @@ pub struct RuleCatalogEntry {
 }
 
 impl RuleCatalogEntry {
-    pub fn instantiate(
-        &self,
-        options: Option<&serde_json::Value>,
-    ) -> Result<&'static dyn Rule, String> {
+    pub fn instantiate(&self, options: Option<&serde_json::Value>) -> Result<RuleInstance, String> {
         let rule_name = self.rule.name();
         match (self.factory, options) {
-            (_, None) => Ok(self.rule),
+            (_, None) => Ok(RuleInstance::Static(self.rule)),
             (None, Some(_)) => {
                 reject_unknown_options(rule_name, options)?;
-                Ok(self.rule)
+                Ok(RuleInstance::Static(self.rule))
             }
-            (Some(factory), Some(_)) => Ok(Box::leak(factory(rule_name, options)?)),
+            (Some(factory), Some(_)) => Ok(RuleInstance::Owned(factory(rule_name, options)?)),
         }
     }
 }
