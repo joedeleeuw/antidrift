@@ -118,105 +118,34 @@ function checkReducerMutuallyExclusiveFlags(fnNode, context) {
   }
 }
 
-function classifyCollectionCall(cur, collectionFields) {
-  if (
-    cur.type !== "CallExpression" ||
-    cur.callee?.type !== "MemberExpression" ||
-    cur.callee.computed ||
-    cur.callee.property?.type !== "Identifier"
-  ) {
-    return null;
-  }
-  const method = cur.callee.property.name;
-  const obj = cur.callee.object;
-  const field =
-    obj?.type === "MemberExpression" &&
-    obj.object?.type === "ThisExpression" &&
-    obj.property?.type === "Identifier" &&
-    collectionFields.has(obj.property.name)
-      ? obj.property.name
-      : null;
-  return { method, field };
-}
-
-function recordCollectionCall(
-  cur,
-  callInfo,
-  inAsyncContinuation,
-  isGuardedMethod,
-  clearedFields,
-  unguardedAsyncWrites
-) {
-  if (!callInfo.field) return;
-  if (callInfo.method === "clear" || callInfo.method === "delete") {
-    clearedFields.add(callInfo.field);
-    return;
-  }
-  if (
-    (callInfo.method === "set" || callInfo.method === "add") &&
-    inAsyncContinuation &&
-    !isGuardedMethod
-  ) {
-    unguardedAsyncWrites.push({ field: callInfo.field, node: cur });
-  }
-}
-
-function checkClassStaleAsyncHydration(classNode, context) {
-  const collectionFields = new Set();
-  for (const item of classNode.body?.body ?? []) {
+function storeHasSnapshotReadInScope(fnNode, storeName) {
+  let found = false;
+  function visit(cur) {
+    if (found || !cur || typeof cur !== "object") return;
     if (
-      item.type === "PropertyDefinition" &&
-      item.key?.type === "Identifier" &&
-      item.value?.type === "NewExpression" &&
-      item.value.callee?.type === "Identifier" &&
-      (item.value.callee.name === "Map" || item.value.callee.name === "Set")
+      cur.type === "MemberExpression" &&
+      !cur.computed &&
+      cur.object?.type === "Identifier" &&
+      cur.object.name === storeName &&
+      cur.property?.type === "Identifier" &&
+      /^(?:getSnapshot|subscribe|failure|error|status|state|snapshot)$/iu.test(
+        cur.property.name
+      )
     ) {
-      collectionFields.add(item.key.name);
+      found = true;
+      return;
     }
-  }
-  if (collectionFields.size === 0) return;
-  const clearedFields = new Set();
-  const unguardedAsyncWrites = [];
-
-  for (const item of classNode.body?.body ?? []) {
-    if (item.type !== "MethodDefinition") continue;
-    const isGuardedMethod = isAbortOrGenerationGuardNode(item.value?.body);
-    function scan(cur, inAsyncContinuation) {
-      if (!cur || typeof cur !== "object") return;
-      const callInfo = classifyCollectionCall(cur, collectionFields);
-      if (callInfo) {
-        recordCollectionCall(
-          cur,
-          callInfo,
-          inAsyncContinuation,
-          isGuardedMethod,
-          clearedFields,
-          unguardedAsyncWrites
-        );
-        if (callInfo.method === "then" && isFunctionLike(cur.arguments[0])) {
-          scan(cur.arguments[0].body, true);
-          return;
-        }
-      }
-      for (const [k, v] of Object.entries(cur)) {
-        if (k === "parent" || k === "range" || k === "loc") continue;
-        if (Array.isArray(v)) {
-          for (const child of v) scan(child, inAsyncContinuation);
-        } else if (v && typeof v === "object") {
-          scan(v, inAsyncContinuation);
-        }
+    for (const [k, v] of Object.entries(cur)) {
+      if (k === "parent" || k === "range" || k === "loc") continue;
+      if (Array.isArray(v)) {
+        for (const item of v) visit(item);
+      } else if (v && typeof v === "object") {
+        visit(v);
       }
     }
-    scan(item.value?.body, false);
   }
-  for (const write of unguardedAsyncWrites) {
-    if (clearedFields.has(write.field)) {
-      context.report({
-        node: write.node,
-        message: `Async hydration write to 'this.${write.field}' can overwrite a synchronous clear/delete without a generation or abort guard.`,
-      });
-    }
-  }
+  visit(fnNode);
+  return found;
 }
 
 export default {
@@ -257,6 +186,7 @@ export default {
         errorSetterCalledInCatch: new Set(),
         resourceSetterCalled: new Set(),
         childCrossFlagTransitions: false,
+        childTrueSetters: new Set(),
       });
     }
 
@@ -267,15 +197,18 @@ export default {
       const hasCrossFlag = [...frame.booleanSetterToggledTrue].some((t) =>
         [...frame.booleanSetterToggledFalse].some((f) => f !== t)
       );
-      if (
-        parentFrame &&
-        (hasCrossFlag || frame.booleanSetterToggledFalse.size >= 2)
-      ) {
-        parentFrame.childCrossFlagTransitions = true;
+      if (parentFrame) {
+        for (const t of frame.booleanSetterToggledTrue) {
+          parentFrame.childTrueSetters.add(t);
+        }
+        if (hasCrossFlag) {
+          parentFrame.childCrossFlagTransitions = true;
+        }
       }
       if (
         frame.booleanFlagsDeclared.size >= 3 &&
-        frame.childCrossFlagTransitions
+        frame.childCrossFlagTransitions &&
+        frame.childTrueSetters.size >= 2
       ) {
         context.report({
           node: frame.node,
@@ -309,6 +242,31 @@ export default {
       return false;
     }
 
+    function checkDualChannelCall(node) {
+      const outerFn = fnStack[0]?.node;
+      if (
+        !outerFn ||
+        node.callee?.type !== "MemberExpression" ||
+        node.callee.computed ||
+        node.callee.object?.type !== "Identifier" ||
+        node.callee.property?.type !== "Identifier" ||
+        !DUAL_CHANNEL_METHODS.has(node.callee.property.name) ||
+        !storeHasSnapshotReadInScope(outerFn, node.callee.object.name)
+      ) {
+        return;
+      }
+      for (const arg of node.arguments) {
+        if (arg.type !== "Identifier") continue;
+        const v = findVariable(sourceCode, arg);
+        if (v && setterVariables.has(v)) {
+          context.report({
+            node: arg,
+            message: `React state setter '${arg.name}' is passed into store method '${node.callee.property.name}', creating dual-channel state ownership; read the fact from the store snapshot instead.`,
+          });
+        }
+      }
+    }
+
     return {
       FunctionDeclaration: enterFunction,
       "FunctionDeclaration:exit": exitFunction,
@@ -316,12 +274,6 @@ export default {
       "FunctionExpression:exit": exitFunction,
       ArrowFunctionExpression: enterFunction,
       "ArrowFunctionExpression:exit": exitFunction,
-      ClassDeclaration(node) {
-        checkClassStaleAsyncHydration(node, context);
-      },
-      ClassExpression(node) {
-        checkClassStaleAsyncHydration(node, context);
-      },
       VariableDeclarator(node) {
         if (
           node.id?.type === "ArrayPattern" &&
@@ -351,23 +303,7 @@ export default {
         if (frame) frame.hasCatch = true;
       },
       CallExpression(node) {
-        if (
-          node.callee?.type === "MemberExpression" &&
-          !node.callee.computed &&
-          node.callee.property?.type === "Identifier" &&
-          DUAL_CHANNEL_METHODS.has(node.callee.property.name)
-        ) {
-          for (const arg of node.arguments) {
-            if (arg.type !== "Identifier") continue;
-            const v = findVariable(sourceCode, arg);
-            if (v && setterVariables.has(v)) {
-              context.report({
-                node: arg,
-                message: `React state setter '${arg.name}' is passed into store method '${node.callee.property.name}', creating dual-channel state ownership; read the fact from the store snapshot instead.`,
-              });
-            }
-          }
-        }
+        checkDualChannelCall(node);
         const frame = fnStack.at(-1);
         if (!frame || node.callee?.type !== "Identifier") return;
         const variable = findVariable(sourceCode, node.callee);

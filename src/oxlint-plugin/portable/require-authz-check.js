@@ -9,6 +9,8 @@ const REQUEST_PARAM_ROOTS = new Set([
 ]);
 const IPC_REGISTRARS = new Set(["handle", "on", "once"]);
 const PRIVILEGED_MODULES = new Set([
+  "BrowserWindow",
+  "desktopCapturer",
   "shell",
   "dialog",
   "session",
@@ -21,6 +23,9 @@ const PRIVILEGED_MODULES = new Set([
 const PRIVILEGED_CALLS = new Set([
   "openExternal",
   "openPath",
+  "clearStorageData",
+  "clearCache",
+  "getSources",
   "exec",
   "execFile",
   "execSync",
@@ -31,6 +36,11 @@ const PRIVILEGED_CALLS = new Set([
   "rmSync",
   "unlink",
   "fetch",
+]);
+const SAFE_LOOKUP_METHODS = new Set([
+  "fromWebContents",
+  "fromId",
+  "getFocusedWindow",
 ]);
 const GUARD_HELPER_PREFIX =
   /^(?:assert|verify|validate|require|check|ensure)/iu;
@@ -100,27 +110,44 @@ function terminatesControlFlow(stmt) {
   return false;
 }
 
-function isDominatingSenderGuard(stmt, eventParamName, authzSet) {
-  if (
-    stmt.type === "IfStatement" &&
-    referencesSenderOrFrame(stmt.test, eventParamName) &&
-    terminatesControlFlow(stmt.consequent)
-  ) {
-    return true;
-  }
+function isGuardCallStatement(stmt, eventParamName, authzSet) {
   if (stmt.type !== "ExpressionStatement") return false;
   const rawExpr = stmt.expression;
   const expr = rawExpr?.type === "AwaitExpression" ? rawExpr.argument : rawExpr;
-  if (expr?.type === "CallExpression") {
-    const name = calleeName(expr.callee);
-    const isGuardName =
-      name && (GUARD_HELPER_PREFIX.test(name) || authzSet.has(name));
-    const passesEventOrSender = expr.arguments.some(
-      (arg) =>
-        (arg.type === "Identifier" && arg.name === eventParamName) ||
-        referencesSenderOrFrame(arg, eventParamName)
-    );
-    return Boolean(isGuardName && passesEventOrSender);
+  if (expr?.type !== "CallExpression") return false;
+  const name = calleeName(expr.callee);
+  const isGuardName =
+    name && (GUARD_HELPER_PREFIX.test(name) || authzSet.has(name));
+  const passesEventOrSender = expr.arguments.some(
+    (arg) =>
+      (arg.type === "Identifier" && arg.name === eventParamName) ||
+      referencesSenderOrFrame(arg, eventParamName)
+  );
+  return Boolean(isGuardName && passesEventOrSender);
+}
+
+function hasPrivilegedReceiver(expr) {
+  let cur = expr;
+  while (cur) {
+    if (cur.type === "Identifier" && PRIVILEGED_MODULES.has(cur.name)) {
+      return true;
+    }
+    if (cur.type === "MemberExpression") {
+      if (
+        !cur.computed &&
+        cur.property?.type === "Identifier" &&
+        PRIVILEGED_MODULES.has(cur.property.name)
+      ) {
+        return true;
+      }
+      cur = cur.object;
+      continue;
+    }
+    if (cur.type === "CallExpression") {
+      cur = cur.callee;
+      continue;
+    }
+    break;
   }
   return false;
 }
@@ -136,11 +163,10 @@ function isPrivilegedCallNode(cur) {
     !callee.computed &&
     callee.property?.type === "Identifier"
   ) {
-    const objName =
-      callee.object?.type === "Identifier" ? callee.object.name : null;
+    const propName = callee.property.name;
+    if (SAFE_LOOKUP_METHODS.has(propName)) return false;
     return (
-      PRIVILEGED_CALLS.has(callee.property.name) ||
-      Boolean(objName && PRIVILEGED_MODULES.has(objName))
+      PRIVILEGED_CALLS.has(propName) || hasPrivilegedReceiver(callee.object)
     );
   }
   return false;
@@ -165,6 +191,40 @@ function findPrivilegedCall(node) {
   }
   visit(node);
   return found;
+}
+
+function classifyIfSenderGuard(stmt, eventName) {
+  if (!eventName || !referencesSenderOrFrame(stmt.test, eventName)) {
+    return null;
+  }
+  if (terminatesControlFlow(stmt.consequent) && !stmt.alternate) {
+    return "early-exit";
+  }
+  const isPositiveCheck =
+    stmt.test.type !== "UnaryExpression" || stmt.test.operator !== "!";
+  return isPositiveCheck && !stmt.alternate ? "positive-branch" : null;
+}
+
+function findUnguardedIpcEffect(stmts, eventName, authzSet) {
+  for (const stmt of stmts) {
+    if (stmt.type === "IfStatement") {
+      const testEffect = findPrivilegedCall(stmt.test);
+      if (testEffect) return testEffect;
+      const guardKind = classifyIfSenderGuard(stmt, eventName);
+      if (guardKind === "early-exit") {
+        return findPrivilegedCall(stmt.consequent);
+      }
+      if (guardKind === "positive-branch") {
+        continue;
+      }
+    }
+    if (eventName && isGuardCallStatement(stmt, eventName, authzSet)) {
+      return findPrivilegedCall(stmt);
+    }
+    const priv = findPrivilegedCall(stmt);
+    if (priv) return priv;
+  }
+  return null;
 }
 
 export default {
@@ -261,21 +321,17 @@ export default {
           }
           return;
         }
-        let guarded = false;
-        for (const stmt of handler.body.body) {
-          if (eventName && isDominatingSenderGuard(stmt, eventName, authzSet)) {
-            guarded = true;
-            break;
-          }
-          const priv = findPrivilegedCall(stmt);
-          if (priv && !guarded) {
-            context.report({
-              node: priv,
-              message:
-                "Privileged Electron IPC handler must validate trusted `event.sender` or `event.senderFrame` before executing host effects.",
-            });
-            return;
-          }
+        const unguarded = findUnguardedIpcEffect(
+          handler.body.body,
+          eventName,
+          authzSet
+        );
+        if (unguarded) {
+          context.report({
+            node: unguarded,
+            message:
+              "Privileged Electron IPC handler must validate trusted `event.sender` or `event.senderFrame` before executing host effects.",
+          });
         }
       },
     };

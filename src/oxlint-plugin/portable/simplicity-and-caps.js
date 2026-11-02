@@ -164,21 +164,39 @@ export const reactMaxComponentPropsRule = {
       return false;
     }
 
-    function countTypeMembers(typeNode, seen = new Set()) {
-      if (!typeNode) return 0;
+    function collectTypePropertyNames(
+      typeNode,
+      names = new Set(),
+      seen = new Set()
+    ) {
+      if (!typeNode) return names;
       if (typeNode.type === "TSTypeLiteral") {
-        return typeNode.members.filter((m) => m.type === "TSPropertySignature")
-          .length;
+        for (const m of typeNode.members) {
+          if (
+            m.type === "TSPropertySignature" &&
+            m.key?.type === "Identifier"
+          ) {
+            names.add(m.key.name);
+          }
+        }
+        return names;
       }
       if (typeNode.type === "TSInterfaceBody") {
-        return typeNode.body.filter((m) => m.type === "TSPropertySignature")
-          .length;
+        for (const m of typeNode.body) {
+          if (
+            m.type === "TSPropertySignature" &&
+            m.key?.type === "Identifier"
+          ) {
+            names.add(m.key.name);
+          }
+        }
+        return names;
       }
       if (typeNode.type === "TSIntersectionType") {
-        return typeNode.types.reduce(
-          (sum, part) => sum + countTypeMembers(part, seen),
-          0
-        );
+        for (const part of typeNode.types) {
+          collectTypePropertyNames(part, names, seen);
+        }
+        return names;
       }
       if (
         typeNode.type === "TSTypeReference" &&
@@ -186,12 +204,17 @@ export const reactMaxComponentPropsRule = {
         !seen.has(typeNode.typeName.name)
       ) {
         seen.add(typeNode.typeName.name);
-        return countTypeMembers(
+        collectTypePropertyNames(
           typeDeclarations.get(typeNode.typeName.name),
+          names,
           seen
         );
       }
-      return 0;
+      return names;
+    }
+
+    function countTypeMembers(typeNode) {
+      return collectTypePropertyNames(typeNode).size;
     }
 
     function checkComponent(node) {
