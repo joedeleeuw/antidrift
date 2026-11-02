@@ -54,10 +54,6 @@
       "types": "./src/oxlint-config/index.d.ts",
       "import": "./src/oxlint-config/index.js"
     },
-    "./brand": {
-      "types": "./src/brand/index.d.mts",
-      "import": "./src/brand/index.mjs"
-    },
     "./package.json": "./package.json"
   },
   "files": [
@@ -71,9 +67,6 @@
     "lint": "oxlint -c oxlint.config.mts src scripts oxlint.config.mts",
     "smoke": "node scripts/verify-smoke.mjs",
     "check": "pnpm typecheck && pnpm lint && pnpm smoke",
-    "check:ci": "pnpm check",
-    "verify:release": "pnpm check",
-    "policy:verify-session": "pnpm check",
     "prepare": "simple-git-hooks"
   },
   "devDependencies": {
@@ -99,6 +92,6 @@
   },
   "simple-git-hooks": {
     "pre-commit": "pnpm exec lint-staged --no-stash",
-    "pre-push": "pnpm policy:verify-session"
+    "pre-push": "pnpm check"
   }
 }

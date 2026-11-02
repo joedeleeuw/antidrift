@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   publish:
-    if: github.event_name == 'release' && startsWith(github.event.release.tag_name, 'antidrift-v')
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'antidrift-v'))
     runs-on: ubuntu-latest
     environment: npm-publish
     permissions:
@@ -22,9 +22,10 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 26
-          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
       - run: pnpm install --frozen-lockfile
       - name: Verify release tag matches package version
+        if: github.event_name == 'release'
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
@@ -34,7 +35,8 @@ jobs:
             echo "release tag ${RELEASE_TAG} must match ${EXPECTED_TAG}" >&2
             exit 1
           fi
-      - run: pnpm verify:release
-      - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - run: pnpm check
+      - name: Pack and publish package
+        run: |
+          TARBALL="$(pnpm pack --pack-destination "$RUNNER_TEMP" | tail -n 1)"
+          npm publish "$TARBALL" --provenance --access public
