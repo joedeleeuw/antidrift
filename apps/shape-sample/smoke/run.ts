@@ -5,6 +5,7 @@ import { decodeAddTodoResult } from "../src/generated/wire";
 import { callMethod, setTransport } from "../src/runtime/client";
 import { expectObject, expectString } from "../src/runtime/decode";
 import { createHandler } from "../src/runtime/server";
+import { sinkCount, watchTodos } from "../src/server/store";
 
 import type { Session } from "../src/shared/session";
 
@@ -208,6 +209,80 @@ step("route GET /todos/[id] serves JSON and refuses other owners", async () => {
   viewer = ada;
   const missing = await handle(new Request("http://app.local/nothing/here"));
   check(missing.status === 404, `expected 404, got ${missing.status}`);
+});
+
+step(
+  "watchTodos cancel removes abort listener so later abort stays clean",
+  async () => {
+    const controller = new AbortController();
+    const stream = watchTodos(controller.signal);
+    check(
+      sinkCount() === 1,
+      `expected 1 sink after watchTodos, got ${sinkCount()}`
+    );
+    const reader = stream.getReader();
+    await reader.cancel();
+    check(
+      sinkCount() === 0,
+      `expected 0 sinks after cancel, got ${sinkCount()}`
+    );
+    controller.abort();
+    check(
+      sinkCount() === 0,
+      `expected 0 sinks after abort, got ${sinkCount()}`
+    );
+  }
+);
+
+step(
+  "idle follow resolves when signal aborts and detaches the store sink",
+  async () => {
+    const list = createTodoList("list_1", { userId: ada.userId });
+    const controller = new AbortController();
+    const seen = new Promise<void>((resolve) => {
+      const stop = list.onChange(() => {
+        stop();
+        resolve();
+      });
+    });
+    const following = list.follow(controller.signal);
+    await seen;
+    check(
+      sinkCount() === 1,
+      `expected 1 sink while following, got ${sinkCount()}`
+    );
+    controller.abort();
+    await following;
+    check(
+      sinkCount() === 0,
+      `expected 0 sinks after follow abort, got ${sinkCount()}`
+    );
+  }
+);
+
+step("aborting a publication request detaches the store sink", async () => {
+  const controller = new AbortController();
+  const response = await handle(
+    new Request("http://app.local/_pub/todosByList", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(["list_1"]),
+      signal: controller.signal,
+    })
+  );
+  const reader = response.body?.getReader();
+  check(reader !== undefined, "expected publication response body");
+  await reader?.read();
+  check(
+    sinkCount() === 1,
+    `expected 1 sink during publication, got ${sinkCount()}`
+  );
+  controller.abort();
+  await reader?.read();
+  check(
+    sinkCount() === 0,
+    `expected 0 sinks after request abort, got ${sinkCount()}`
+  );
 });
 
 async function runSteps(pending: readonly Step[]): Promise<number> {

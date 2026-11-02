@@ -194,11 +194,6 @@ export function renderPolicyArtifacts(policy, rustRules = []) {
   );
 
   artifacts.set(
-    ".github/copilot-instructions.md",
-    `# Copilot Instructions\n\n${POLICY_HEADER}\n\nFollow repository architecture boundaries, avoid type escape hatches, and use public package APIs.\n`
-  );
-
-  artifacts.set(
     ".claude/settings.json",
     JSON.stringify({ hooks: AGENT_HOOKS }, null, 2) + "\n"
   );

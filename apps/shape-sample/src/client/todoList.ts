@@ -61,11 +61,21 @@ export function createTodoList(listId: string, viewer: { userId: string }) {
       }
     },
     async follow(signal: AbortSignal): Promise<void> {
-      for await (const patch of todosByList(listId)) {
-        state.apply(patch);
-        if (signal.aborted) {
-          return;
+      if (signal.aborted) {
+        return;
+      }
+      const patches = todosByList(listId);
+      const onAbort = (): void => {
+        void patches.return(undefined);
+      };
+      signal.addEventListener("abort", onAbort, { once: true });
+      try {
+        for await (const patch of patches) {
+          state.apply(patch);
         }
+      } finally {
+        signal.removeEventListener("abort", onAbort);
+        await patches.return(undefined);
       }
     },
   };

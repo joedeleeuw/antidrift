@@ -164,8 +164,9 @@ export function createHandler(
           return errorResponse(new Error(`unknown publication ${pub[1]}`), 404);
         }
         const controller = new AbortController();
+        const signal = AbortSignal.any([request.signal, controller.signal]);
         return streamGenerator(
-          invoke(await decodeArgs(request), session, controller.signal),
+          invoke(await decodeArgs(request), session, signal),
           controller
         );
       }

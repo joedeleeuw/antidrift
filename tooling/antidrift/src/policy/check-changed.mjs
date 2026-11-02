@@ -1,8 +1,25 @@
+import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { protectedPolicyFiles } from "./lib/generated-targets.mjs";
-import { changedFiles } from "./lib/git.mjs";
+import { protectedPolicyFiles } from "./hooks/block-generated-policy-edits.mjs";
 import { runOxlint } from "./oxlint.mjs";
+
+/** @param {string[]} args */
+function git(args) {
+  const result = spawnSync("git", args, { encoding: "utf8" });
+  if (result.status !== 0) return "";
+  return result.stdout.trim();
+}
+
+function changedFiles() {
+  const outputs = [
+    git(["diff", "--name-only", "--diff-filter=ACMRTUXB", "HEAD"]),
+    git(["diff", "--name-only", "--diff-filter=ACMRTUXB", "--cached"]),
+  ];
+  return [
+    ...new Set(outputs.flatMap((output) => output.split("\n")).filter(Boolean)),
+  ];
+}
 
 export function checkChanged() {
   const changed = changedFiles();

@@ -1,6 +1,8 @@
 import type { Session } from "./session";
 
-export type TodoStatus = "open" | "done";
+export const todoStatuses = ["open", "done"] as const;
+
+export type TodoStatus = (typeof todoStatuses)[number];
 
 export type Todo = {
   id: string;

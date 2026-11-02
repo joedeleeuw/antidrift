@@ -1,7 +1,6 @@
 serverBoundaryGlobs:
-  - packages/api/src/routes/**/*.ts # Route handlers must perform auth, schema validation, and ownership checks.
-  - packages/api/src/actions/**/*.ts # Server actions must perform auth, schema validation, and ownership checks.
+  - apps/shape-sample/src/routes/**/*.ts
 
 requiredCalls:
   authorization:
-    - authorize # Establishes action permission.
+    - requireOwner

@@ -17,7 +17,6 @@ meta:
   generatedTargets: # These files are regenerated from this source to prevent tool-specific drift.
     - AGENTS.md # Codex and other agents consume this as repo-local guidance.
     - CLAUDE.md # Claude consumes this as persistent project context.
-    - .github/copilot-instructions.md # Copilot consumes repository instructions.
     - .codex/hooks.json # Codex uses this for deterministic lifecycle enforcement.
     - .claude/settings.json # Claude uses this for deterministic lifecycle enforcement.
   never:

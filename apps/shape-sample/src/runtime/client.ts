@@ -45,12 +45,12 @@ export async function callMethod<T>(
   return decodeResult(await response.json(), `${name}.result`);
 }
 
-export async function* subscribePub<T>(
+async function* readPub<T>(
   name: string,
   args: readonly unknown[],
-  decodeYield: Decoder<T>
+  decodeYield: Decoder<T>,
+  subscription: AbortController
 ): AsyncGenerator<T> {
-  const subscription = new AbortController();
   const response = await transport(
     wireRequest("pub", name, args, subscription.signal)
   );
@@ -76,4 +76,19 @@ export async function* subscribePub<T>(
   } finally {
     subscription.abort();
   }
+}
+
+export function subscribePub<T>(
+  name: string,
+  args: readonly unknown[],
+  decodeYield: Decoder<T>
+): AsyncGenerator<T> {
+  const subscription = new AbortController();
+  const generator = readPub(name, args, decodeYield, subscription);
+  const close = generator.return.bind(generator);
+  generator.return = (value) => {
+    subscription.abort();
+    return close(value);
+  };
+  return generator;
 }

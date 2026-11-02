@@ -57,33 +57,35 @@ export function setTodoStatus(id: string, status: TodoStatus): Promise<Todo> {
   });
 }
 
+export function sinkCount(): number {
+  return sinks.size;
+}
+
 export function watchTodos(signal: AbortSignal): ReadableStream<TodoPatch> {
-  const sink: { current?: PatchSink } = {};
-  const detach = (): void => {
-    if (sink.current !== undefined) {
-      sinks.delete(sink.current);
-    }
-  };
+  let cleanup = (): void => {};
   return new ReadableStream<TodoPatch>({
     start(controller) {
       if (signal.aborted) {
         controller.close();
         return;
       }
-      sink.current = (patch) => {
+      const sink: PatchSink = (patch) => {
         controller.enqueue(patch);
       };
-      sinks.add(sink.current);
-      signal.addEventListener(
-        "abort",
-        () => {
-          detach();
-          controller.close();
-        },
-        { once: true }
-      );
+      const onAbort = (): void => {
+        cleanup();
+        controller.close();
+      };
+      cleanup = () => {
+        sinks.delete(sink);
+        signal.removeEventListener("abort", onAbort);
+      };
+      sinks.add(sink);
+      signal.addEventListener("abort", onAbort, { once: true });
     },
-    cancel: detach,
+    cancel() {
+      cleanup();
+    },
   });
 }
 

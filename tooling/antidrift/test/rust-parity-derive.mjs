@@ -271,7 +271,10 @@ function verifyShapeSampleRuntime(repoRoot) {
     "ok   publication withholds other owners' patches",
     "ok   client view model renders the optimistic patch, then the server's",
     "ok   route GET /todos/[id] serves JSON and refuses other owners",
-    "7/7 steps passed",
+    "ok   watchTodos cancel removes abort listener so later abort stays clean",
+    "ok   idle follow resolves when signal aborts and detaches the store sink",
+    "ok   aborting a publication request detaches the store sink",
+    "10/10 steps passed",
   ]);
 }
 

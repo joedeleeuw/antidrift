@@ -1,7 +1,18 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { protectedPolicyFiles } from "../lib/generated-targets.mjs";
+export const protectedPolicyFiles = [
+  "AGENTS.md",
+  "CLAUDE.md",
+  ".claude/settings.json",
+  ".codex/hooks.json",
+  "policy/agent-guardrails.yaml",
+  "oxlint.config.mts",
+  "tsconfig.base.json",
+  "tsconfig.json",
+  ".github/workflows/check.yml",
+  "pnpm-workspace.yaml",
+];
 
 function protectedTarget(filePath) {
   if (!filePath) return null;

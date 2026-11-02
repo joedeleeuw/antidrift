@@ -4,13 +4,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "files": ["oxlint.config.mts"],
-  "references": [
-    { "path": "./packages/domain" },
-    { "path": "./packages/contracts" },
-    { "path": "./packages/ui" },
-    { "path": "./packages/gateways" },
-    { "path": "./packages/api" },
-    { "path": "./apps/web" }
-  ]
+  "files": ["oxlint.config.mts"]
 }

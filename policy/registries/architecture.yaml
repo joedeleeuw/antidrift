@@ -1,26 +1,32 @@
 layers:
-  app:
-    roots: ["apps/*/src/**"] # App code may compose UI, domain, and contracts but not server internals.
-    mayImport: ["ui", "domain", "contracts"]
-  ui:
-    roots: ["packages/ui/src/**"] # UI components should remain presentational and token-driven.
-    mayImport: ["domain"]
-  domain:
+  shared:
     role: domain
-    roots: ["packages/domain/src/**"] # Domain code must not depend on infrastructure.
-    mayImport: []
-  contracts:
-    role: domain
-    roots: ["packages/contracts/src/**"] # Contracts may reference domain primitives only.
-    mayImport: ["domain"]
-  api:
+    roots: ["apps/shape-sample/src/shared/**"]
+    mayImport: ["shared"]
+  runtime:
+    roots: ["apps/shape-sample/src/runtime/**"]
+    mayImport: ["runtime", "shared"]
+  generated:
+    roots: ["apps/shape-sample/src/generated/**"]
+    mayImport: ["generated", "runtime", "shared", "methods", "pubs", "routes"]
+  server:
+    roots: ["apps/shape-sample/src/server/**"]
+    mayImport: ["server", "shared"]
+  methods:
     role: boundary
-    roots: ["packages/api/src/**"] # Server boundaries may compose domain, contracts, and gateways.
-    mayImport: ["domain", "contracts", "gateways"]
-  gateways:
+    roots: ["apps/shape-sample/src/methods/**"]
+    mayImport: ["methods", "server", "shared"]
+  pubs:
     role: boundary
-    roots: ["packages/gateways/src/**"] # Gateways own direct external SDK/client integrations.
-    mayImport: ["domain", "contracts"]
+    roots: ["apps/shape-sample/src/pubs/**"]
+    mayImport: ["pubs", "server", "shared"]
+  routes:
+    role: boundary
+    roots: ["apps/shape-sample/src/routes/**"]
+    mayImport: ["routes", "server", "shared"]
+  client:
+    roots: ["apps/shape-sample/src/client/**"]
+    mayImport: ["client", "generated", "shared"]
   tooling:
-    roots: ["tooling/**"] # Tooling packages remain self-contained.
+    roots: ["tooling/**"]
     mayImport: ["tooling"]
