@@ -257,3 +257,101 @@ pub fn check_redundant_local_return(ctx: &mut Ctx, node: P<Node>) {
         );
     }
 }
+
+fn prop_access_pair(node: P<Node>) -> Option<(P<Node>, &'static str)> {
+    let inner = tsrs_kernel::unwrap_expression(node);
+    if inner.kind() != Kind::PropertyAccessExpression {
+        return None;
+    }
+    let pa = inner.as_property_access_expression();
+    let name = pa.name();
+    (name.kind() == Kind::Identifier).then(|| {
+        (
+            tsrs_kernel::unwrap_expression(pa.expression()),
+            name.as_identifier().text(),
+        )
+    })
+}
+
+fn call_decoded_doc_field(call_node: P<Node>, doc_name: &str) -> Option<&'static str> {
+    let inner = tsrs_kernel::unwrap_expression(call_node);
+    if inner.kind() != Kind::CallExpression {
+        return None;
+    }
+    let &arg = inner.as_call_expression().arguments().nodes().first()?;
+    let (recv, field) = prop_access_pair(arg)?;
+    (recv.kind() == Kind::Identifier && recv.as_identifier().text() == doc_name).then_some(field)
+}
+
+fn find_var_init(root: P<Node>, target: &str) -> Option<P<Node>> {
+    if root.kind() == Kind::VariableDeclaration {
+        let decl = root.as_variable_declaration();
+        if decl.name().kind() == Kind::Identifier && decl.name().as_identifier().text() == target {
+            return decl.initializer();
+        }
+    }
+    let mut found = None;
+    root.for_each_child(&mut |child| {
+        if found.is_none() {
+            found = find_var_init(child, target);
+        }
+        found.is_some()
+    });
+    found
+}
+
+fn resolve_decoded_blob_field(
+    scope: P<Node>,
+    candidate_recv: P<Node>,
+    doc_recv: P<Node>,
+    shared_field: &str,
+) -> Option<(&'static str, &'static str)> {
+    if doc_recv.kind() != Kind::Identifier {
+        return None;
+    }
+    let doc_name = doc_recv.as_identifier().text();
+    let blob_field = if candidate_recv.kind() == Kind::CallExpression {
+        call_decoded_doc_field(candidate_recv, doc_name)?
+    } else if candidate_recv.kind() == Kind::Identifier {
+        let init = find_var_init(scope, candidate_recv.as_identifier().text())?;
+        call_decoded_doc_field(init, doc_name)?
+    } else {
+        return None;
+    };
+    (blob_field != shared_field).then_some((doc_name, blob_field))
+}
+
+pub fn check_decoded_blob_sibling_equality(ctx: &mut Ctx, node: P<Node>) {
+    let bin = node.as_binary_expression();
+    if !matches!(
+        bin.operator_token().kind(),
+        Kind::EqualsEqualsEqualsToken
+            | Kind::ExclamationEqualsEqualsToken
+            | Kind::EqualsEqualsToken
+            | Kind::ExclamationEqualsToken
+    ) {
+        return;
+    }
+    let (Some((left_recv, left_field)), Some((right_recv, right_field))) =
+        (prop_access_pair(bin.left()), prop_access_pair(bin.right()))
+    else {
+        return;
+    };
+    if left_field != right_field {
+        return;
+    }
+    let scope = tsrs_kernel::enclosing_function(node).unwrap_or_else(|| ctx.file.as_node());
+    let matched = resolve_decoded_blob_field(scope, left_recv, right_recv, left_field)
+        .or_else(|| resolve_decoded_blob_field(scope, right_recv, left_recv, left_field));
+    if let Some((doc_name, blob_field)) = matched {
+        ctx.report_node(
+            node,
+            RuleMessage::new(
+                "decodedBlobSiblingEquality",
+                format!(
+                    "Decoded blob field '{left_field}' is compared against sibling property '{doc_name}.{left_field}' on the same record; keep one canonical owner instead of duplicating columns beside '{doc_name}.{blob_field}'."
+                ),
+            ),
+        );
+    }
+}

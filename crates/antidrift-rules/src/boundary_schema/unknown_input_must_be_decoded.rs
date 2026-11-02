@@ -120,6 +120,15 @@ impl UnknownInputMustBeDecoded {
                 ),
             );
         }
+        if Self::is_discarded_decode_call(node, ctx) {
+            ctx.report_node(
+                node,
+                RuleMessage::new(
+                    "unknown-input-must-be-decoded",
+                    "Do not call a decoder as a statement while forwarding the raw input to persistence or return; bind and forward the decoded value instead.",
+                ),
+            );
+        }
         Self::check_type_argument_sink(node, ctx);
         Self::check_call_arguments(node, ctx);
     }

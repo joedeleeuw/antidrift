@@ -112,4 +112,30 @@ export const boundaryCoreHeadlessProbes = [
     `,
     expectedCount: 1,
   },
+  {
+    name: "unknown-input-must-be-decoded (flags statement decode when raw input flows to db.insert or return)",
+    rule: "antidrift/unknown-input-must-be-decoded",
+    source: `
+      import { z } from "zod";
+      const snapSchema = z.object({ id: z.string() });
+      export async function saveTurn(db: { insert: (t: string, v: unknown) => Promise<void> }, input: { modelSnapshot: unknown }) {
+        snapSchema.parse(input.modelSnapshot);
+        await db.insert("turns", { modelSnapshot: input.modelSnapshot });
+      }
+    `,
+    expectedCount: 1,
+  },
+  {
+    name: "no-structural-type-fork (flags decoded blob property compared with sibling column and widened SDK chunk contract)",
+    rule: "antidrift/no-structural-type-fork",
+    source: `
+      import { z } from "zod";
+      export type UiChunk = { id: string; finishReason: string };
+      export function verifyDoc(doc: { id: string; targetJson: string }) {
+        const parsed = JSON.parse(doc.targetJson);
+        return parsed.id === doc.id;
+      }
+    `,
+    expectedCount: 2,
+  },
 ];

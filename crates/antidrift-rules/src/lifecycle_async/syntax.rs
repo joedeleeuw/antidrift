@@ -5,10 +5,10 @@ pub(super) use antidrift_kernel::local_binding::{
     resolve_lexical_binding,
 };
 pub(super) use antidrift_kernel::tsrs_kernel::{
-    Span, call_expression_of, cooked_text, identifier_of, is_function_like, unwrap_expression,
-    unwrap_parentheses,
+    Span, call_expression_of, cooked_text, identifier_of, is_function_like, node_text,
+    unwrap_expression, unwrap_parentheses,
 };
-use tsrs_ast::{self as ast, Kind, Node};
+use tsrs_ast::{self as ast, Kind, Node, SourceFile};
 use tsrs_core::P;
 
 pub(super) fn member(expression: P<Node>) -> Option<(P<Node>, &'static str)> {
@@ -94,32 +94,31 @@ pub(super) fn object_property(prop: P<Node>) -> Option<(P<Node>, P<Node>, bool)>
 }
 
 pub(super) fn binding_property(elem: P<Node>) -> Option<(&'static str, P<Node>)> {
-    if elem.kind() != Kind::BindingElement {
-        return None;
-    }
-    let binding = elem.as_binding_element();
-    if binding.dot_dot_dot_token().is_some() {
-        return None;
-    }
+    let binding = (elem.kind() == Kind::BindingElement)
+        .then(|| elem.as_binding_element())
+        .filter(|b| b.dot_dot_dot_token().is_none())?;
     let value = binding.name()?;
-    let key_node = binding.property_name().unwrap_or(value);
-    let key = property_name(key_node)?;
-    Some((key, value))
+    Some((
+        property_name(binding.property_name().unwrap_or(value))?,
+        value,
+    ))
 }
 
 pub(super) fn property(expression: P<Node>, name: &str) -> Option<P<Node>> {
     let inner = unwrap_expression(expression);
-    if inner.kind() != Kind::ObjectLiteralExpression {
-        return None;
-    }
-    for &prop in inner.as_object_literal_expression().properties().nodes() {
-        if let Some((key, value, _)) = object_property(prop)
-            && property_name(key) == Some(name)
-        {
-            return Some(value);
-        }
-    }
-    None
+    (inner.kind() == Kind::ObjectLiteralExpression)
+        .then(|| {
+            inner
+                .as_object_literal_expression()
+                .properties()
+                .nodes()
+                .iter()
+                .find_map(|&prop| {
+                    let (key, value, _) = object_property(prop)?;
+                    (property_name(key) == Some(name)).then_some(value)
+                })
+        })
+        .flatten()
 }
 
 pub(super) fn global(expression: P<Node>, name: &str) -> bool {
@@ -183,17 +182,15 @@ fn is_env_carrier_object(expr: P<Node>) -> bool {
         return false;
     }
     let recv = unwrap_expression(prop.expression());
-    if recv.kind() == Kind::MetaProperty {
-        return true;
-    }
-    ast::is_identifier(recv) && matches!(recv.as_identifier().text(), "process" | "Bun" | "Deno")
+    recv.kind() == Kind::MetaProperty
+        || (ast::is_identifier(recv)
+            && matches!(recv.as_identifier().text(), "process" | "Bun" | "Deno"))
 }
 
 fn is_direct_env_member_read(expr: P<Node>) -> bool {
     let mut inner = unwrap_expression(expr);
     if inner.kind() == Kind::CallExpression {
-        let call = inner.as_call_expression();
-        let callee = unwrap_expression(call.expression());
+        let callee = unwrap_expression(inner.as_call_expression().expression());
         if callee.kind() == Kind::PropertyAccessExpression {
             let prop = callee.as_property_access_expression();
             if ast::is_identifier(prop.name()) {
@@ -216,17 +213,12 @@ fn is_direct_env_member_read(expr: P<Node>) -> bool {
     }
 }
 
-fn is_binding_element_for_name(elem: P<Node>, target_name: &str) -> bool {
-    binding_property(elem).is_some_and(|(_, val)| {
-        ast::is_identifier(val) && val.as_identifier().text() == target_name
-    })
-}
-
 fn variable_decl_binds_env(decl_node: P<Node>, target_name: &str) -> bool {
-    if decl_node.kind() != Kind::VariableDeclaration {
+    let Some(decl) = (decl_node.kind() == Kind::VariableDeclaration)
+        .then(|| decl_node.as_variable_declaration())
+    else {
         return false;
-    }
-    let decl = decl_node.as_variable_declaration();
+    };
     let Some(init) = decl.initializer() else {
         return false;
     };
@@ -241,20 +233,20 @@ fn variable_decl_binds_env(decl_node: P<Node>, target_name: &str) -> bool {
             .elements()
             .nodes()
             .iter()
-            .any(|&e| is_binding_element_for_name(e, target_name))
+            .any(|&e| {
+                binding_property(e).is_some_and(|(_, val)| {
+                    ast::is_identifier(val) && val.as_identifier().text() == target_name
+                })
+            })
 }
 
 fn declares_env_binding(scope: P<Node>, target_name: &str) -> bool {
     let mut found = false;
     scope.for_each_child(&mut |child| {
-        if found || is_function_like(child) {
-            return found;
+        if !found && !is_function_like(child) {
+            found = variable_decl_binds_env(child, target_name)
+                || declares_env_binding(child, target_name);
         }
-        if variable_decl_binds_env(child, target_name) {
-            found = true;
-            return true;
-        }
-        found = declares_env_binding(child, target_name);
         found
     });
     found
@@ -275,4 +267,153 @@ pub(super) fn is_env_read_expression(scope: P<Node>, expr: P<Node>) -> bool {
         }
     }
     ast::is_identifier(inner) && declares_env_binding(scope, inner.as_identifier().text())
+}
+
+fn is_runtime_lookup_key(arg: P<Node>) -> bool {
+    if is_direct_env_member_read(arg) {
+        return true;
+    }
+    if arg.kind() == Kind::PropertyAccessExpression {
+        let prop = arg.as_property_access_expression();
+        let recv = unwrap_expression(prop.expression());
+        return ast::is_identifier(recv)
+            && recv.as_identifier().text() == "process"
+            && ast::is_identifier(prop.name())
+            && matches!(prop.name().as_identifier().text(), "platform" | "arch");
+    }
+    false
+}
+
+fn has_record_presence_guard(sf: P<SourceFile>, node: P<Node>, rec_name: &str) -> bool {
+    let mut curr = node.parent();
+    while let Some(anc) = curr {
+        let guard_cond = match anc.kind() {
+            Kind::ConditionalExpression => Some(anc.as_conditional_expression().condition()),
+            Kind::IfStatement => Some(anc.as_if_statement().expression()),
+            _ => None,
+        };
+        if guard_cond.is_some_and(|c| node_text(sf, c).contains(rec_name)) {
+            return true;
+        }
+        if is_function_like(anc) || anc.kind() == Kind::SourceFile {
+            let start = usize::try_from(Span::of(sf, anc).start).unwrap_or(0);
+            let end = usize::try_from(Span::of(sf, node).start).unwrap_or(0);
+            let before = sf.text().get(start..end).unwrap_or("");
+            return before.contains(&format!("in {rec_name}"))
+                || before.contains(&format!("hasOwn({rec_name}"))
+                || before.contains(&format!("!{rec_name}["));
+        }
+        curr = anc.parent();
+    }
+    false
+}
+
+pub(super) fn unguarded_template_record_lookup(
+    sf: P<SourceFile>,
+    template_node: P<Node>,
+) -> Option<P<Node>> {
+    for &span in template_node
+        .as_template_expression()
+        .template_spans()
+        .nodes()
+    {
+        let expr = unwrap_expression(span.as_template_span().expression());
+        if expr.kind() != Kind::ElementAccessExpression {
+            continue;
+        }
+        let ea = expr.as_element_access_expression();
+        let recv = unwrap_expression(ea.expression());
+        let arg = unwrap_expression(ea.argument_expression());
+        if ast::is_identifier(recv)
+            && is_runtime_lookup_key(arg)
+            && !has_record_presence_guard(sf, template_node, recv.as_identifier().text())
+        {
+            return Some(expr);
+        }
+    }
+    None
+}
+
+fn platform_bucket(lit: &str) -> Option<&'static str> {
+    match lit {
+        "glibc" | "gnu" | "musl" => Some("libc"),
+        "linux" | "darwin" | "win32" | "freebsd" => Some("os"),
+        "x64" | "arm64" | "ia32" | "x86_64" | "aarch64" => Some("arch"),
+        _ => None,
+    }
+}
+
+fn is_platform_probe_condition(sf: P<SourceFile>, cond: P<Node>) -> bool {
+    let text = node_text(sf, cond);
+    [
+        "process.platform",
+        "process.arch",
+        "glibcVersion",
+        "process.report",
+        "os.platform",
+        "os.arch",
+    ]
+    .iter()
+    .any(|marker| text.contains(marker))
+}
+
+fn string_literal_text(node: P<Node>) -> Option<&'static str> {
+    let expr = unwrap_expression(node);
+    matches!(
+        expr.kind(),
+        Kind::StringLiteral | Kind::NoSubstitutionTemplateLiteral
+    )
+    .then(|| cooked_text(expr))
+    .flatten()
+}
+
+fn single_return_string_literal(stmt: P<Node>) -> Option<&'static str> {
+    let ret = match stmt.kind() {
+        Kind::Block => match stmt.as_block().statements().nodes() {
+            &[only] => only,
+            _ => return None,
+        },
+        _ => stmt,
+    };
+    (ret.kind() == Kind::ReturnStatement)
+        .then(|| ret.as_return_statement().expression())
+        .flatten()
+        .and_then(string_literal_text)
+}
+
+fn same_platform_pair(a: &str, b: &str) -> bool {
+    a != b && platform_bucket(a).is_some() && platform_bucket(a) == platform_bucket(b)
+}
+
+pub(super) fn two_branch_platform_selector(sf: P<SourceFile>, node: P<Node>) -> Option<P<Node>> {
+    if node.kind() == Kind::ConditionalExpression {
+        let cond = (node
+            .parent()
+            .is_none_or(|p| p.kind() != Kind::ConditionalExpression))
+        .then(|| node.as_conditional_expression())
+        .filter(|c| is_platform_probe_condition(sf, c.condition()))?;
+        return same_platform_pair(
+            string_literal_text(cond.when_true())?,
+            string_literal_text(cond.when_false())?,
+        )
+        .then_some(node);
+    }
+    let if_stmt = (node.kind() == Kind::IfStatement)
+        .then(|| node.as_if_statement())
+        .filter(|s| is_platform_probe_condition(sf, s.expression()))?;
+    let then_lit = single_return_string_literal(if_stmt.then_statement())?;
+    if let Some(else_stmt) = if_stmt.else_statement() {
+        return same_platform_pair(then_lit, single_return_string_literal(else_stmt)?)
+            .then_some(node);
+    }
+    let stmts = node
+        .parent()
+        .filter(|p| p.kind() == Kind::Block)?
+        .as_block()
+        .statements()
+        .nodes();
+    (stmts.len() == 2
+        && stmts[0] == node
+        && same_platform_pair(then_lit, single_return_string_literal(stmts[1])?))
+    .then_some(node)
 }

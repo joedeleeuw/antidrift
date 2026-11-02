@@ -129,6 +129,11 @@ export const ADDON_LIBRARY_NAMES = {
   win32: "antidrift_napi.dll",
 };
 
+const ADDON_LIBRARY_NAME =
+  process.platform in ADDON_LIBRARY_NAMES
+    ? ADDON_LIBRARY_NAMES[process.platform]
+    : undefined;
+
 const LINTER_BINARY_NAME =
   process.platform === "win32" ? "antidrift-linter.exe" : "antidrift-linter";
 
@@ -145,10 +150,12 @@ export const NATIVE_ARTIFACTS = {
   },
   addon: {
     env: "ANTIDRIFT_NAPI_ADDON",
-    builds: [
-      `target/release/${ADDON_LIBRARY_NAMES[process.platform]}`,
-      `target/debug/${ADDON_LIBRARY_NAMES[process.platform]}`,
-    ],
+    builds: ADDON_LIBRARY_NAME
+      ? [
+          `target/release/${ADDON_LIBRARY_NAME}`,
+          `target/debug/${ADDON_LIBRARY_NAME}`,
+        ]
+      : [],
     packageSubpath: `/${ADDON_PACKAGE_PATH}`,
   },
 };

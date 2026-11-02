@@ -140,4 +140,20 @@ export const directiveCoreHeadlessProbes = [
     `,
     expectedCount: 2,
   },
+  {
+    name: "no-sentinel-absence-fallback (flags unguarded Record[process.platform] in template literal and two-branch platform selector)",
+    rule: "antidrift/no-sentinel-absence-fallback",
+    source: `
+      const ADDONS: Record<string, string> = { linux: "a.so", darwin: "a.dylib" };
+      export const badPath = \`target/release/\${ADDONS[process.platform]}\`;
+      export const goodPath = process.platform in ADDONS ? \`target/release/\${ADDONS[process.platform]}\` : "";
+      export function detectLibc(report: { header: { glibcVersionRuntime?: string } }) {
+        if (report.header.glibcVersionRuntime) {
+          return "glibc";
+        }
+        return "musl";
+      }
+    `,
+    expectedCount: 2,
+  },
 ];

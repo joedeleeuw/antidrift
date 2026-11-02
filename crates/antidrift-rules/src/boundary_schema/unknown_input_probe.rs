@@ -1,5 +1,6 @@
-use antidrift_kernel::{provenance, shape, tsrs_kernel};
-use tsrs_ast::{self as ast, Kind, Node, Symbol};
+use antidrift_kernel::rule::Ctx;
+use antidrift_kernel::{boundary, provenance, shape, tsrs_kernel};
+use tsrs_ast::{self as ast, Kind, Node, SourceFile, Symbol};
 use tsrs_checker::{Checker, TypeFlags};
 use tsrs_core::P;
 use tsrslint::utils::is_type_flag_set;
@@ -151,15 +152,10 @@ impl UnknownInputMustBeDecoded {
 
     fn second_tuple_binding_identifier(pattern: P<Node>) -> Option<P<Node>> {
         let &second = pattern.as_binding_pattern().elements().nodes().get(1)?;
-        if second.kind() != Kind::BindingElement {
-            return None;
-        }
-        let elem = second.as_binding_element();
-        if elem.dot_dot_dot_token().is_some() {
-            return None;
-        }
-        let name = elem.name()?;
-        ast::is_identifier(name).then_some(name)
+        let elem = (second.kind() == Kind::BindingElement)
+            .then(|| second.as_binding_element())
+            .filter(|e| e.dot_dot_dot_token().is_none())?;
+        elem.name().filter(|&n| ast::is_identifier(n))
     }
 
     fn is_broad_entry_value(
@@ -168,15 +164,14 @@ impl UnknownInputMustBeDecoded {
         checker: &mut Checker,
     ) -> bool {
         let val_type = checker.get_type_at_location(value_ident);
-        if is_type_flag_set(val_type, TypeFlags::AnyOrUnknown)
+        is_type_flag_set(val_type, TypeFlags::AnyOrUnknown)
             || shape::non_nullish_type_parts(val_type)
                 .into_iter()
                 .any(|part| is_type_flag_set(part, TypeFlags::AnyOrUnknown))
-        {
-            return true;
-        }
-        let subj_type = checker.get_type_at_location(entries_arg);
-        is_type_flag_set(subj_type, TypeFlags::AnyOrUnknown)
+            || is_type_flag_set(
+                checker.get_type_at_location(entries_arg),
+                TypeFlags::AnyOrUnknown,
+            )
     }
 
     fn count_shape_probes(
@@ -185,7 +180,11 @@ impl UnknownInputMustBeDecoded {
         value_sym: P<Symbol>,
         count: &mut usize,
     ) {
-        if Self::is_shape_probe_node(node, checker, value_sym) {
+        if match node.kind() {
+            Kind::BinaryExpression => Self::is_binary_shape_probe(node, checker, value_sym),
+            Kind::CallExpression => Self::is_call_shape_probe(node, checker, value_sym),
+            _ => false,
+        } {
             *count += 1;
         }
         node.for_each_child(&mut |child| {
@@ -196,49 +195,30 @@ impl UnknownInputMustBeDecoded {
         });
     }
 
-    fn is_shape_probe_node(node: P<Node>, checker: &mut Checker, value_sym: P<Symbol>) -> bool {
-        match node.kind() {
-            Kind::BinaryExpression => Self::is_binary_shape_probe(node, checker, value_sym),
-            Kind::CallExpression => Self::is_call_shape_probe(node, checker, value_sym),
-            _ => false,
-        }
-    }
-
     fn is_binary_shape_probe(node: P<Node>, checker: &mut Checker, value_sym: P<Symbol>) -> bool {
         let bin = node.as_binary_expression();
         let op = bin.operator_token().kind();
         let left = tsrs_kernel::unwrap_expression(bin.left());
         let right = tsrs_kernel::unwrap_expression(bin.right());
-        if op == Kind::InKeyword {
-            return Self::is_symbol_ident(right, checker, value_sym);
-        }
-        if op == Kind::InstanceOfKeyword {
-            return Self::is_symbol_ident(left, checker, value_sym);
-        }
-        matches!(
-            op,
+        match op {
+            Kind::InKeyword => Self::is_symbol_ident(right, checker, value_sym),
+            Kind::InstanceOfKeyword => Self::is_symbol_ident(left, checker, value_sym),
             Kind::EqualsEqualsEqualsToken
-                | Kind::ExclamationEqualsEqualsToken
-                | Kind::EqualsEqualsToken
-                | Kind::ExclamationEqualsToken
-        ) && (Self::is_typeof_or_nullish_check(left, right, checker, value_sym)
-            || Self::is_typeof_or_nullish_check(right, left, checker, value_sym))
+            | Kind::ExclamationEqualsEqualsToken
+            | Kind::EqualsEqualsToken
+            | Kind::ExclamationEqualsToken => {
+                Self::is_typeof_or_nullish_check(left, right, checker, value_sym)
+                    || Self::is_typeof_or_nullish_check(right, left, checker, value_sym)
+            }
+            _ => false,
+        }
     }
 
     fn is_call_shape_probe(node: P<Node>, checker: &mut Checker, value_sym: P<Symbol>) -> bool {
         let call = node.as_call_expression();
-        let Some(&first_arg) = call.arguments().nodes().first() else {
-            return false;
-        };
-        if !Self::is_symbol_ident(
-            tsrs_kernel::unwrap_expression(first_arg),
-            checker,
-            value_sym,
-        ) {
-            return false;
-        }
-        let callee = tsrs_kernel::unwrap_expression(call.expression());
-        Self::is_array_is_array_or_has_own(callee)
+        call.arguments().nodes().first().is_some_and(|&arg| {
+            Self::is_symbol_ident(tsrs_kernel::unwrap_expression(arg), checker, value_sym)
+        }) && Self::is_array_is_array_or_has_own(tsrs_kernel::unwrap_expression(call.expression()))
     }
 
     fn is_typeof_or_nullish_check(
@@ -273,5 +253,162 @@ impl UnknownInputMustBeDecoded {
 
     fn is_symbol_ident(node: P<Node>, checker: &mut Checker, target_sym: P<Symbol>) -> bool {
         ast::is_identifier(node) && provenance::symbol_at_node(checker, node) == Some(target_sym)
+    }
+
+    pub(super) fn is_discarded_decode_call(node: P<Node>, ctx: &mut Ctx) -> bool {
+        let Some(stmt) = Self::enclosing_expression_statement(node) else {
+            return false;
+        };
+        let (Some(scope), Some(arg_node)) = (
+            tsrs_kernel::enclosing_function(node),
+            Self::discarded_decode_arg(node, ctx),
+        ) else {
+            return false;
+        };
+        let targets = Self::raw_arg_targets(ctx.file, arg_node);
+        !targets.is_empty() && Self::flows_to_sink_after(ctx.file, scope, stmt.end(), &targets)
+    }
+
+    fn enclosing_expression_statement(node: P<Node>) -> Option<P<Node>> {
+        let mut curr = node;
+        while let Some(parent) = curr.parent() {
+            if !matches!(
+                parent.kind(),
+                Kind::ParenthesizedExpression | Kind::AwaitExpression
+            ) {
+                return (parent.kind() == Kind::ExpressionStatement).then_some(parent);
+            }
+            curr = parent;
+        }
+        None
+    }
+
+    fn discarded_decode_arg(node: P<Node>, ctx: &mut Ctx) -> Option<P<Node>> {
+        if let Some(parts) = boundary::schema_validation_call_parts(node, ctx.checker) {
+            let text = tsrs_kernel::node_text(ctx.file, parts.schema_node);
+            return (parts.returns_schema_output
+                && !text.contains(".passthrough(")
+                && !text.contains(".strict("))
+            .then_some(parts.arg_node);
+        }
+        let call = node.as_call_expression();
+        let &[only_arg] = call.arguments().nodes() else {
+            return None;
+        };
+        let callee = tsrs_kernel::unwrap_expression(call.expression());
+        let name = match callee.kind() {
+            Kind::Identifier => callee.as_identifier().text(),
+            Kind::PropertyAccessExpression => {
+                let prop = callee.as_property_access_expression().name();
+                ast::is_identifier(prop).then(|| prop.as_identifier().text())?
+            }
+            _ => return None,
+        };
+        let is_named = name.starts_with("decode")
+            || name.starts_with("parse")
+            || name.ends_with("FromSnapshot")
+            || name.ends_with("FromJson");
+        let ret_type = is_named.then(|| ctx.checker.get_type_at_location(node))?;
+        (!is_type_flag_set(
+            ret_type,
+            TypeFlags::Void | TypeFlags::Undefined | TypeFlags::BooleanLike,
+        ))
+        .then_some(only_arg)
+    }
+
+    fn raw_arg_targets(sf: P<SourceFile>, arg_node: P<Node>) -> Vec<&'static str> {
+        let inner = tsrs_kernel::unwrap_expression(arg_node);
+        if matches!(
+            inner.kind(),
+            Kind::Identifier | Kind::PropertyAccessExpression
+        ) {
+            let text = tsrs_kernel::node_text(sf, inner).trim();
+            return (!text.is_empty()).then_some(vec![text]).unwrap_or_default();
+        }
+        if inner.kind() != Kind::ObjectLiteralExpression {
+            return Vec::new();
+        }
+        inner
+            .as_object_literal_expression()
+            .properties()
+            .nodes()
+            .iter()
+            .filter_map(|&p| {
+                let init = (p.kind() == Kind::PropertyAssignment).then(|| {
+                    tsrs_kernel::unwrap_expression(p.as_property_assignment().initializer())
+                })?;
+                matches!(
+                    init.kind(),
+                    Kind::Identifier | Kind::PropertyAccessExpression
+                )
+                .then(|| tsrs_kernel::node_text(sf, init).trim())
+                .filter(|t| !t.is_empty())
+            })
+            .collect()
+    }
+
+    fn is_db_mutation_call(node: P<Node>) -> bool {
+        let Some(callee) = (node.kind() == Kind::CallExpression)
+            .then(|| tsrs_kernel::unwrap_expression(node.as_call_expression().expression()))
+            .filter(|c| c.kind() == Kind::PropertyAccessExpression)
+        else {
+            return false;
+        };
+        let prop = callee.as_property_access_expression();
+        if !ast::is_identifier(prop.name())
+            || !matches!(prop.name().as_identifier().text(), "insert" | "patch")
+        {
+            return false;
+        }
+        let recv = tsrs_kernel::unwrap_expression(prop.expression());
+        (ast::is_identifier(recv) && recv.as_identifier().text() == "db")
+            || (recv.kind() == Kind::PropertyAccessExpression
+                && ast::is_identifier(recv.as_property_access_expression().name())
+                && recv
+                    .as_property_access_expression()
+                    .name()
+                    .as_identifier()
+                    .text()
+                    == "db")
+    }
+
+    fn node_contains_target(sf: P<SourceFile>, node: P<Node>, targets: &[&str]) -> bool {
+        if matches!(
+            node.kind(),
+            Kind::Identifier | Kind::PropertyAccessExpression
+        ) && targets.contains(&tsrs_kernel::node_text(sf, node).trim())
+        {
+            return true;
+        }
+        let mut found = false;
+        node.for_each_child(&mut |child| {
+            if !found && !tsrs_kernel::is_function_like(child) {
+                found = Self::node_contains_target(sf, child, targets);
+            }
+            found
+        });
+        found
+    }
+
+    fn flows_to_sink_after(
+        sf: P<SourceFile>,
+        node: P<Node>,
+        after_pos: tsrs_core::TextPos,
+        targets: &[&str],
+    ) -> bool {
+        if node.pos() >= after_pos
+            && (node.kind() == Kind::ReturnStatement || Self::is_db_mutation_call(node))
+            && Self::node_contains_target(sf, node, targets)
+        {
+            return true;
+        }
+        let mut found = false;
+        node.for_each_child(&mut |child| {
+            if !found && !tsrs_kernel::is_function_like(child) && child.end() > after_pos {
+                found = Self::flows_to_sink_after(sf, child, after_pos, targets);
+            }
+            found
+        });
+        found
     }
 }

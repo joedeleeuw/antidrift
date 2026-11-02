@@ -6,9 +6,11 @@ use serde::Deserialize;
 use tsrs_ast::{Kind, ModifierFlags, Node, SourceFile};
 use tsrs_core::P;
 
-use super::redundant_local_return::check_redundant_local_return;
+use super::redundant_local_return::{
+    check_decoded_blob_sibling_equality, check_redundant_local_return,
+};
 use super::structural_fork_analysis::{check_structural_fork_declaration, has_modifier};
-use super::tuple_and_service_shape::check_redundant_owner_prefix;
+use super::tuple_and_service_shape::{check_redundant_owner_prefix, check_sdk_transport_fork};
 
 const RULE_NAME: &str = "antidrift/no-structural-type-fork";
 
@@ -365,13 +367,14 @@ impl Visitor {
     }
 }
 
-const LISTENERS: [Listener; 7] = [
+const LISTENERS: [Listener; 8] = [
     Listener::Enter(Kind::InterfaceDeclaration),
     Listener::Enter(Kind::TypeAliasDeclaration),
     Listener::Enter(Kind::TypeLiteral),
     Listener::Enter(Kind::CallExpression),
     Listener::Enter(Kind::FunctionDeclaration),
     Listener::Enter(Kind::VariableDeclaration),
+    Listener::Enter(Kind::BinaryExpression),
     Listener::Exit(Kind::EndOfFile),
 ];
 
@@ -390,10 +393,12 @@ impl RuleVisitor for Visitor {
                 self.record_interface_shape(ctx, node);
                 check_structural_fork_declaration(ctx, node);
                 check_redundant_owner_prefix(ctx, node);
+                check_sdk_transport_fork(ctx, node);
             }
             Kind::TypeAliasDeclaration => {
                 check_structural_fork_declaration(ctx, node);
                 check_redundant_owner_prefix(ctx, node);
+                check_sdk_transport_fork(ctx, node);
             }
             Kind::TypeLiteral => {
                 self.record_type_literal_shape(ctx, node);
@@ -405,6 +410,10 @@ impl RuleVisitor for Visitor {
             }
             Kind::FunctionDeclaration | Kind::VariableDeclaration => {
                 check_redundant_local_return(ctx, node);
+                check_sdk_transport_fork(ctx, node);
+            }
+            Kind::BinaryExpression => {
+                check_decoded_blob_sibling_equality(ctx, node);
             }
             _ => {}
         }

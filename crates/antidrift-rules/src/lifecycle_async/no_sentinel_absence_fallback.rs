@@ -1,4 +1,7 @@
-use super::syntax::{is_env_read_expression, owner, unwrap_expression};
+use super::syntax::{
+    is_env_read_expression, owner, two_branch_platform_selector, unguarded_template_record_lookup,
+    unwrap_expression,
+};
 use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
 use antidrift_kernel::runtime_lifecycle::{has_mtime_ordering_text, spans_multiple_artifact_tiers};
 use antidrift_kernel::tsrs_kernel::{cooked_text, node_text};
@@ -46,6 +49,9 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::BinaryExpression),
     Listener::Enter(Kind::CatchClause),
     Listener::Enter(Kind::CallExpression),
+    Listener::Enter(Kind::TemplateExpression),
+    Listener::Enter(Kind::ConditionalExpression),
+    Listener::Enter(Kind::IfStatement),
 ];
 
 impl Rule for NoSentinelAbsenceFallback {
@@ -70,74 +76,102 @@ impl RuleVisitor for Visitor {
     }
 
     fn visit(&mut self, ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
-        if node.kind() == Kind::CatchClause {
-            if let Some(empty_ret) = catch_clause_empty_string_sentinel(node) {
-                ctx.report_node(
-                    empty_ret,
-                    RuleMessage::new(
-                        "catchSentinelReturn",
-                        "This catch branch collapses a failure or missing-resource error into \"\", erasing the distinction between absence and an empty string. Return null/undefined or a typed result union instead.",
-                    ),
-                );
+        match node.kind() {
+            Kind::CatchClause => {
+                if let Some(empty_ret) = catch_clause_empty_string_sentinel(node) {
+                    ctx.report_node(
+                        empty_ret,
+                        RuleMessage::new(
+                            "catchSentinelReturn",
+                            "This catch branch collapses a failure or missing-resource error into \"\", erasing the distinction between absence and an empty string. Return null/undefined or a typed result union instead.",
+                        ),
+                    );
+                }
             }
-            return;
-        }
-        if node.kind() == Kind::CallExpression {
-            if let Some(empty_ret) = promise_catch_empty_string_sentinel(node) {
-                ctx.report_node(
-                    empty_ret,
-                    RuleMessage::new(
-                        "catchSentinelReturn",
-                        "This .catch() handler collapses a rejected promise into \"\", erasing the distinction between absence and an empty string. Return null/undefined or a typed result union instead.",
-                    ),
-                );
-                return;
+            Kind::CallExpression => check_call_expression(ctx, node),
+            Kind::TemplateExpression => {
+                if let Some(lookup) = unguarded_template_record_lookup(ctx.file, node) {
+                    ctx.report_node(
+                        lookup,
+                        RuleMessage::new(
+                            "unguardedTemplateRecordLookup",
+                            "This template literal interpolates `Record[key]` on an unguarded runtime key, producing `\"undefined\"` when the key is absent; verify key presence before interpolating.",
+                        ),
+                    );
+                }
             }
-            if is_multi_tier_artifact_find(ctx, node) {
-                ctx.report_node(
-                    node,
-                    RuleMessage::new(
-                        "multiTierArtifactFallback",
-                        "First-match existsSync lookup spans multiple build output tiers (debug/release/dist) without comparing mtime; sort existing local candidates by mtimeMs descending so stale build tiers do not shadow newer builds.",
-                    ),
-                );
+            Kind::ConditionalExpression | Kind::IfStatement => {
+                if let Some(selector) = two_branch_platform_selector(ctx.file, node) {
+                    ctx.report_node(
+                        selector,
+                        RuleMessage::new(
+                            "twoBranchPlatformSelector",
+                            "This platform selector maps the absence of one platform marker directly to another platform; positively verify each supported platform and fail loudly on unknown hosts.",
+                        ),
+                    );
+                }
             }
-            return;
+            Kind::BinaryExpression if self.member_sentinels => check_binary_expression(ctx, node),
+            _ => {}
         }
-        if !self.member_sentinels || is_direct_jsx_text_expression(node) {
-            return;
-        }
-        let bin = node.as_binary_expression();
-        let op = bin.operator_token().kind();
-        if op == Kind::QuestionQuestionToken
-            && let Some(sentinel) = string_literal(bin.right())
-            && is_sentinel_fallback_pair(node, bin.left(), sentinel)
-        {
-            ctx.report_node(
-                node,
-                RuleMessage::new(
-                    "sentinelAbsenceFallback",
-                    format!(
-                        "This fallback hides a missing member behind \"{sentinel}\". Keep the missing value distinct from a reported value."
-                    ),
+    }
+}
+
+fn check_call_expression(ctx: &mut Ctx, node: P<Node>) {
+    if let Some(empty_ret) = promise_catch_empty_string_sentinel(node) {
+        ctx.report_node(
+            empty_ret,
+            RuleMessage::new(
+                "catchSentinelReturn",
+                "This .catch() handler collapses a rejected promise into \"\", erasing the distinction between absence and an empty string. Return null/undefined or a typed result union instead.",
+            ),
+        );
+        return;
+    }
+    if is_multi_tier_artifact_find(ctx, node) {
+        ctx.report_node(
+            node,
+            RuleMessage::new(
+                "multiTierArtifactFallback",
+                "First-match existsSync lookup spans multiple build output tiers (debug/release/dist) without comparing mtime; sort existing local candidates by mtimeMs descending so stale build tiers do not shadow newer builds.",
+            ),
+        );
+    }
+}
+
+fn check_binary_expression(ctx: &mut Ctx, node: P<Node>) {
+    if is_direct_jsx_text_expression(node) {
+        return;
+    }
+    let bin = node.as_binary_expression();
+    let op = bin.operator_token().kind();
+    if op == Kind::QuestionQuestionToken
+        && let Some(sentinel) = string_literal(bin.right())
+        && is_sentinel_fallback_pair(node, bin.left(), sentinel)
+    {
+        ctx.report_node(
+            node,
+            RuleMessage::new(
+                "sentinelAbsenceFallback",
+                format!(
+                    "This fallback hides a missing member behind \"{sentinel}\". Keep the missing value distinct from a reported value."
                 ),
-            );
-            return;
-        }
-        if let Some((subject, sentinel)) =
-            dual_empty_sentinel_guard(ctx, bin.left(), op, bin.right())
-            && has_object_string_nullish_union(ctx.checker, subject)
-        {
-            ctx.report_node(
-                node,
-                RuleMessage::new(
-                    "dualEmptySentinel",
-                    format!(
-                        "This check collapses nullishness and string sentinel \"{sentinel}\" on the same union. Model absence once instead of mixing undefined/null with \"{sentinel}\"."
-                    ),
+            ),
+        );
+        return;
+    }
+    if let Some((subject, sentinel)) = dual_empty_sentinel_guard(ctx, bin.left(), op, bin.right())
+        && has_object_string_nullish_union(ctx.checker, subject)
+    {
+        ctx.report_node(
+            node,
+            RuleMessage::new(
+                "dualEmptySentinel",
+                format!(
+                    "This check collapses nullishness and string sentinel \"{sentinel}\" on the same union. Model absence once instead of mixing undefined/null with \"{sentinel}\"."
                 ),
-            );
-        }
+            ),
+        );
     }
 }
 

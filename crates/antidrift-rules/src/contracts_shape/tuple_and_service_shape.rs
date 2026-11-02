@@ -141,35 +141,14 @@ fn build_service_constructor_import_message(
     )
 }
 
-fn collect_named_import_bindings(named: P<Node>, bindings: &mut Vec<ImportBinding>) {
-    if named.kind() != Kind::NamedImports {
-        return;
-    }
-    for &elem in named.as_named_imports().elements().nodes() {
-        if elem.kind() != Kind::ImportSpecifier {
-            continue;
-        }
-        let spec = elem.as_import_specifier();
-        if !spec.is_type_only() {
-            bindings.push(ImportBinding {
-                report_target: elem,
-                local_identifier: spec.name(),
-            });
-        }
-    }
-}
-
 fn collect_import_bindings(import_clause: Option<P<Node>>) -> Vec<ImportBinding> {
-    let Some(clause_node) = import_clause else {
+    let Some(clause) = import_clause
+        .filter(|c| c.kind() == Kind::ImportClause)
+        .map(|c| c.as_import_clause())
+        .filter(|c| c.phase_modifier() != Kind::TypeKeyword)
+    else {
         return Vec::new();
     };
-    if clause_node.kind() != Kind::ImportClause {
-        return Vec::new();
-    }
-    let clause = clause_node.as_import_clause();
-    if clause.phase_modifier() == Kind::TypeKeyword {
-        return Vec::new();
-    }
     let mut bindings = Vec::new();
     if let Some(name) = clause.name() {
         bindings.push(ImportBinding {
@@ -177,21 +156,29 @@ fn collect_import_bindings(import_clause: Option<P<Node>>) -> Vec<ImportBinding>
             local_identifier: name,
         });
     }
-    if let Some(named) = clause.named_bindings() {
-        collect_named_import_bindings(named, &mut bindings);
+    if let Some(named) = clause
+        .named_bindings()
+        .filter(|n| n.kind() == Kind::NamedImports)
+    {
+        for &elem in named.as_named_imports().elements().nodes() {
+            if elem.kind() == Kind::ImportSpecifier && !elem.as_import_specifier().is_type_only() {
+                bindings.push(ImportBinding {
+                    report_target: elem,
+                    local_identifier: elem.as_import_specifier().name(),
+                });
+            }
+        }
     }
     bindings
 }
 
 fn is_valid_service_target_file(ctx: &Ctx, target_file: P<SourceFile>) -> bool {
-    if target_file == ctx.file || file_role::is_declaration_file(target_file.file_name()) {
-        return false;
-    }
-    let origin = provenance::classify_source_file_origin(ctx.program, target_file, Some(ctx.file));
-    !matches!(
-        origin,
-        provenance::DeclarationOrigin::DefaultLib | provenance::DeclarationOrigin::NodeModules
-    )
+    target_file != ctx.file
+        && !file_role::is_declaration_file(target_file.file_name())
+        && !matches!(
+            provenance::classify_source_file_origin(ctx.program, target_file, Some(ctx.file)),
+            provenance::DeclarationOrigin::DefaultLib | provenance::DeclarationOrigin::NodeModules
+        )
 }
 
 fn check_import_binding(
@@ -201,32 +188,30 @@ fn check_import_binding(
     prov: &boundary::ServiceProvenance,
     binding: &ImportBinding,
 ) {
-    if binding.local_identifier.kind() != Kind::Identifier {
-        return;
-    }
-    let Some(raw_sym) = ctx
-        .checker
-        .get_symbol_at_location_exported(binding.local_identifier)
+    let Some(raw_sym) = (binding.local_identifier.kind() == Kind::Identifier)
+        .then(|| {
+            ctx.checker
+                .get_symbol_at_location_exported(binding.local_identifier)
+        })
+        .flatten()
     else {
         return;
     };
     let target_sym = provenance::resolve_aliased_symbol(ctx.checker, raw_sym);
-    if !prov.constructor_symbols.contains(&target_sym) {
-        return;
+    if prov.constructor_symbols.contains(&target_sym)
+        && !boundary::is_only_used_in_layer_construction(
+            ctx.checker,
+            ctx.file,
+            Some(import),
+            binding.local_identifier,
+        )
+    {
+        let imported_name = binding.local_identifier.as_identifier().text();
+        ctx.report_node(
+            binding.report_target,
+            build_service_constructor_import_message(module_text, imported_name),
+        );
     }
-    if boundary::is_only_used_in_layer_construction(
-        ctx.checker,
-        ctx.file,
-        Some(import),
-        binding.local_identifier,
-    ) {
-        return;
-    }
-    let imported_name = binding.local_identifier.as_identifier().text();
-    ctx.report_node(
-        binding.report_target,
-        build_service_constructor_import_message(module_text, imported_name),
-    );
 }
 
 fn resolve_module_symbol(ctx: &mut Ctx, module_specifier: P<Node>) -> Option<P<Symbol>> {
@@ -319,6 +304,114 @@ pub(super) fn check_redundant_owner_prefix(ctx: &mut Ctx, node: P<Node>) {
                 format!(
                     "Type '{type_name}' prefixes all {} fields with '{stem}'; drop the redundant owner prefix from field names.",
                     members.len()
+                ),
+            ),
+        );
+    }
+}
+
+fn is_protocol_type_name(name: &str) -> bool {
+    ["Chunk", "Message", "Envelope", "StreamEvent", "Part"]
+        .iter()
+        .any(|suffix| name.ends_with(suffix))
+}
+
+fn has_widened_finish_reason_member(members: &[P<Node>]) -> bool {
+    members.iter().any(|&m| {
+        if m.kind() != Kind::PropertySignature {
+            return false;
+        }
+        let prop = m.as_property_signature_declaration();
+        ast::is_identifier(prop.name())
+            && matches!(
+                prop.name().as_identifier().text(),
+                "finishReason" | "stopReason"
+            )
+            && prop
+                .type_()
+                .is_some_and(|t| t.kind() == Kind::StringKeyword)
+    })
+}
+
+fn type_node_has_widened_finish_reason(type_node: P<Node>) -> bool {
+    match type_node.kind() {
+        Kind::TypeLiteral => {
+            has_widened_finish_reason_member(type_node.as_type_literal_node().members().nodes())
+        }
+        Kind::UnionType => type_node
+            .as_union_type_node()
+            .types()
+            .nodes()
+            .iter()
+            .copied()
+            .any(type_node_has_widened_finish_reason),
+        _ => false,
+    }
+}
+
+fn has_external_import(sf: P<SourceFile>) -> bool {
+    sf.statements().nodes().iter().any(|&stmt| {
+        stmt.kind() == Kind::ImportDeclaration && {
+            let spec = stmt.as_import_declaration().module_specifier();
+            spec.kind() == Kind::StringLiteral
+                && cooked_text(spec).is_some_and(|s| !s.starts_with('.') && !s.starts_with("node:"))
+        }
+    })
+}
+
+fn count_sdk_part_literals(text: &str) -> usize {
+    ["text", "tool-call", "tool-result", "reasoning", "image"]
+        .iter()
+        .filter(|&&k| text.contains(&format!("\"{k}\"")) || text.contains(&format!("'{k}'")))
+        .count()
+}
+
+fn is_widened_or_redeclared_sdk_contract(sf: P<SourceFile>, node: P<Node>, name: &str) -> bool {
+    match node.kind() {
+        Kind::InterfaceDeclaration => {
+            is_protocol_type_name(name)
+                && has_widened_finish_reason_member(
+                    node.as_interface_declaration().members().nodes(),
+                )
+        }
+        Kind::TypeAliasDeclaration => {
+            let Some(t) = node.as_type_alias_declaration().type_() else {
+                return false;
+            };
+            is_protocol_type_name(name)
+                && (type_node_has_widened_finish_reason(t)
+                    || (t.kind() == Kind::UnionType
+                        && has_external_import(sf)
+                        && count_sdk_part_literals(antidrift_kernel::tsrs_kernel::node_text(
+                            sf, t,
+                        )) >= 3))
+        }
+        Kind::VariableDeclaration => {
+            let Some(init) = node.as_variable_declaration().initializer() else {
+                return false;
+            };
+            let text = antidrift_kernel::tsrs_kernel::node_text(sf, init);
+            (name.contains("Part") || name.contains("Message") || name.contains("Chunk"))
+                && has_external_import(sf)
+                && (text.contains("union(") || text.contains("discriminatedUnion("))
+                && count_sdk_part_literals(text) >= 3
+        }
+        _ => false,
+    }
+}
+
+pub(super) fn check_sdk_transport_fork(ctx: &mut Ctx, node: P<Node>) {
+    let Some(name_node) = node.name().filter(|n| ast::is_identifier(*n)) else {
+        return;
+    };
+    let name = name_node.as_identifier().text();
+    if is_widened_or_redeclared_sdk_contract(ctx.file, node, name) {
+        ctx.report_node(
+            name_node,
+            RuleMessage::new(
+                "sdkTransportContractFork",
+                format!(
+                    "Do not redeclare SDK transport contract '{name}' locally with widened fields (`finishReason: string`) or hand-built part unions; derive or import the contract from the SDK owner."
                 ),
             ),
         );
