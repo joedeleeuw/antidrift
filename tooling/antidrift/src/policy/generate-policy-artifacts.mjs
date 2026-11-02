@@ -82,7 +82,7 @@ const cargoArtifactSchema = z.object({
 });
 
 export function buildWorkspaceLinter(cwd) {
-  let output;
+  let output = "";
   try {
     output = execFileSync(
       "cargo",

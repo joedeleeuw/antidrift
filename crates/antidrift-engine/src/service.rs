@@ -12,7 +12,7 @@ use crate::headless_host::program_counts;
 use crate::relay;
 use crate::rule_catalog::RuleRequest;
 use crate::rule_plan::RulePlanCache;
-use crate::session::{Finding, Session};
+use crate::session::{Finding, Session, rule_pass_count};
 
 enum EngineRequest {
     Lint {
@@ -31,6 +31,7 @@ pub struct EngineStats {
     pub programs_built: u32,
     pub programs_reused: u32,
     pub relayed_requests: u32,
+    pub rule_passes: u32,
 }
 
 pub struct EngineService {
@@ -155,6 +156,7 @@ impl EngineService {
             programs_built,
             programs_reused,
             relayed_requests: self.relayed_requests.load(Ordering::Relaxed),
+            rule_passes: rule_pass_count(),
         }
     }
 }

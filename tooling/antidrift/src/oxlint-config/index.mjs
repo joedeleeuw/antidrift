@@ -142,17 +142,21 @@ function restrictedImportsRule(patterns) {
   return ["error", { patterns }];
 }
 
+function restrictedImportsRulesMap(patterns) {
+  return Object.fromEntries([
+    [
+      "no-restricted-imports",
+      patterns.length > 0 ? restrictedImportsRule(patterns) : "off",
+    ],
+  ]);
+}
+
 function gatewayWrapperOverrides(registries, generatedPatterns) {
   return Object.values(registries.gateways?.approvedGateways ?? {})
     .filter(({ wrapper }) => typeof wrapper === "string" && wrapper.length > 0)
     .map(({ wrapper }) => ({
       files: [wrapper],
-      rules: {
-        "no-restricted-imports":
-          generatedPatterns.length > 0
-            ? restrictedImportsRule(generatedPatterns)
-            : "off",
-      },
+      rules: restrictedImportsRulesMap(generatedPatterns),
     }));
 }
 
@@ -213,10 +217,7 @@ function touchableImportPatterns(reactNativePolicy) {
 function touchableOwnerOverrides(reactNativePolicy, otherPatterns) {
   return (reactNativePolicy?.allowedFiles ?? []).map((file) => ({
     files: [file],
-    rules: {
-      "no-restricted-imports":
-        otherPatterns.length > 0 ? restrictedImportsRule(otherPatterns) : "off",
-    },
+    rules: restrictedImportsRulesMap(otherPatterns),
   }));
 }
 
@@ -224,12 +225,7 @@ function applicationExclusionOverrides(otherPatterns) {
   return [
     {
       files: applicationExclusionFiles,
-      rules: {
-        "no-restricted-imports":
-          otherPatterns.length > 0
-            ? restrictedImportsRule(otherPatterns)
-            : "off",
-      },
+      rules: restrictedImportsRulesMap(otherPatterns),
     },
   ];
 }
@@ -305,24 +301,6 @@ function architectureLayers(registries) {
   );
 }
 
-function architectureBoundaryRules(layers) {
-  if (layers.length === 0) {
-    return {};
-  }
-  return {
-    "boundaries/element-types": [
-      "error",
-      {
-        default: "disallow",
-        rules: layers.map(([from, layer]) => ({
-          from,
-          allow: Array.isArray(layer.mayImport) ? layer.mayImport : [],
-        })),
-      },
-    ],
-  };
-}
-
 function architectureBoundarySettings(layers) {
   if (layers.length === 0) {
     return undefined;
@@ -335,16 +313,29 @@ function architectureBoundarySettings(layers) {
 }
 
 function governanceRules(restrictedImportPatterns, layers) {
-  return {
-    ...(restrictedImportPatterns.length > 0
-      ? {
-          "no-restricted-imports": restrictedImportsRule(
-            restrictedImportPatterns
-          ),
-        }
-      : {}),
-    ...architectureBoundaryRules(layers),
-  };
+  const entries = [];
+  if (restrictedImportPatterns.length > 0) {
+    entries.push([
+      "no-restricted-imports",
+      restrictedImportsRule(restrictedImportPatterns),
+    ]);
+  }
+  if (layers.length > 0) {
+    entries.push([
+      "boundaries/element-types",
+      [
+        "error",
+        {
+          default: "disallow",
+          rules: layers.map(([from, layer]) => ({
+            from,
+            allow: Array.isArray(layer.mayImport) ? layer.mayImport : [],
+          })),
+        },
+      ],
+    ]);
+  }
+  return Object.fromEntries(entries);
 }
 
 function governancePlugins(layers) {

@@ -71,19 +71,21 @@ function linuxLibc() {
       `antidrift-linter cannot tell glibc from musl on this Linux host: process.report is unavailable, so the libc marker cannot be read; supported platforms: ${LINTER_PLATFORMS.map(({ key }) => key).join(", ")}. Build crates/antidrift-linter and crates/antidrift-napi and point ANTIDRIFT_LINTER_BIN and ANTIDRIFT_NAPI_ADDON at the results.`
     );
   }
-  process.report.excludeNetwork = true;
+  Reflect.set(process.report, "excludeNetwork", true);
   const report = process.report.getReport();
-  if (report.header.glibcVersionRuntime || report.header.glibcVersionCompiler) {
+  const header = Reflect.get(report, "header");
+  if (header?.glibcVersionRuntime || header?.glibcVersionCompiler) {
     return "glibc";
   }
-  const loaders = report.sharedObjects.filter((entry) =>
+  const sharedObjects = Reflect.get(report, "sharedObjects") ?? [];
+  const loaders = sharedObjects.filter((entry) =>
     /\/ld-musl-|\/libc\.musl-/u.test(entry)
   );
   if (loaders.length > 0) {
     return "musl";
   }
   throw new Error(
-    `antidrift-linter cannot tell glibc from musl on this Linux host: the process report carries no glibc marker and no musl loader among ${report.sharedObjects.length} shared objects; supported platforms: ${LINTER_PLATFORMS.map(({ key }) => key).join(", ")}. Build crates/antidrift-linter and crates/antidrift-napi and point ANTIDRIFT_LINTER_BIN and ANTIDRIFT_NAPI_ADDON at the results.`
+    `antidrift-linter cannot tell glibc from musl on this Linux host: the process report carries no glibc marker and no musl loader among ${sharedObjects.length} shared objects; supported platforms: ${LINTER_PLATFORMS.map(({ key }) => key).join(", ")}. Build crates/antidrift-linter and crates/antidrift-napi and point ANTIDRIFT_LINTER_BIN and ANTIDRIFT_NAPI_ADDON at the results.`
   );
 }
 
@@ -178,8 +180,9 @@ function platformArtifactPackage(artifact) {
 }
 
 export function resolveNativeArtifact(artifact, cwd) {
-  if (process.env[artifact.env]) {
-    return resolve(cwd, process.env[artifact.env]);
+  const envPath = process.env[artifact.env];
+  if (envPath) {
+    return resolve(cwd, envPath);
   }
   const [localBuild] = localArtifactCandidates(artifact, cwd);
   return localBuild ?? platformArtifactPackage(artifact);
@@ -339,13 +342,20 @@ function oxlintLaunch({ parsed, cwd, spawn }) {
   };
 }
 
+const EMPTY_ARGS = process.argv.slice(0, 0);
+
+function defaultExit(code) {
+  process.exit(code);
+  return code;
+}
+
 export function runOxlint({
-  argv = [],
+  argv = EMPTY_ARGS,
   cwd = process.cwd(),
   spawn = spawnSync,
   stdout = defaultStdout,
   stderr = defaultStderr,
-  exit = process.exit,
+  exit = defaultExit,
 } = {}) {
   const parsed = parseOxlintArgs(argv);
   if (parsed.help) {

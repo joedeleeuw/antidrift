@@ -17,6 +17,7 @@ pub struct EngineStats {
     pub programs_built: u32,
     pub programs_reused: u32,
     pub relayed_requests: u32,
+    pub rule_passes: u32,
 }
 
 static SERVICE: OnceLock<EngineService> = OnceLock::new();
@@ -74,6 +75,7 @@ pub fn engine_stats() -> napi::Result<EngineStats> {
         programs_built: stats.programs_built,
         programs_reused: stats.programs_reused,
         relayed_requests: stats.relayed_requests,
+        rule_passes: stats.rule_passes,
     })
 }
 
@@ -103,4 +105,12 @@ pub fn antidrift_rules() -> Vec<EngineRule> {
                 .map(|(warn_above, max)| EngineLineCap { warn_above, max }),
         })
         .collect()
+}
+
+#[napi]
+#[must_use]
+pub fn validate_registries(repo_root: String, policy_dir: String) -> Vec<String> {
+    let root = std::path::PathBuf::from(repo_root);
+    let policy = std::path::PathBuf::from(policy_dir);
+    antidrift_kernel::registries::PolicyRegistries::validate_policy_dir(&root, &policy)
 }

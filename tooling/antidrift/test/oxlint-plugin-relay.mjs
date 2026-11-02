@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { rmSync, writeFileSync } from "node:fs";
 import { createConnection, createServer } from "node:net";
 import { join, resolve } from "node:path";
 
@@ -171,6 +171,38 @@ function proveRelay(linter, project, addon) {
     );
     restoreSources(project);
   }
+  proveSplitRelaySuppressions(linter, project, addon, environment);
+}
+
+function proveSplitRelaySuppressions(linter, project, addon, environment) {
+  const splitExtra = join(project, "unmatched-split.ts");
+  const suppressionsPath = join(project, "eslint-suppressions.json");
+  writeFileSync(splitExtra, "export const clean = 1;\n");
+  writeFileSync(
+    suppressionsPath,
+    JSON.stringify({
+      "src/other.ts": { "antidrift/no-as-never": { count: 1 } },
+    })
+  );
+  const rules = [{ name: "antidrift/no-as-never" }];
+  const other = join(project, "src/other.ts");
+  const payload = JSON.stringify({
+    version: 2,
+    configs: [
+      { file_paths: [other], rules },
+      { file_paths: [other, splitExtra], rules },
+    ],
+  });
+  const alone = runHeadless({ linter, cwd: project, payload, environment });
+  const relayed = runHeadless({
+    linter,
+    cwd: project,
+    payload,
+    environment: { ...environment, ANTIDRIFT_ENGINE: addon.engineEndpoint() },
+  });
+  assert.deepEqual(relayed, alone);
+  rmSync(splitExtra);
+  rmSync(suppressionsPath);
 }
 
 function runTypeAwareOxlint({ repoRoot, project, linter, plugin }) {
@@ -358,5 +390,31 @@ export async function proveDirectAddonAndCreate(project, linter) {
     1,
     "Two files under one tsconfig must share one type program"
   );
+  proveSessionBounds(project, castFile, addon);
   proveRelay(linter, project, addon);
+}
+
+function proveSessionBounds(project, castFile, addon) {
+  const beforePasses = addon.engineStats().rulePasses;
+  const lateRules = addon
+    .antidriftRules()
+    .filter(
+      (entry) => entry.defaultEnabled && entry.name !== "antidrift/no-as-never"
+    )
+    .slice(0, 4);
+  for (const { name: rule } of lateRules) {
+    addon.lintFile(project, castFile, [{ rule }]);
+  }
+  assert.equal(addon.engineStats().rulePasses - beforePasses, 2);
+  writeFileSync(join(project, "unmatched-a.d.ts"), "export type A = never;\n");
+  writeFileSync(join(project, "unmatched-b.d.ts"), "export type B = never;\n");
+  const beforeInferred = addon.engineStats().programsBuilt;
+  for (const name of ["unmatched-a.d.ts", "unmatched-b.d.ts"]) {
+    addon.lintFile(project, join(project, name), [
+      { rule: "antidrift/no-as-never" },
+    ]);
+  }
+  assert.equal(addon.engineStats().programsBuilt - beforeInferred, 1);
+  rmSync(join(project, "unmatched-a.d.ts"));
+  rmSync(join(project, "unmatched-b.d.ts"));
 }

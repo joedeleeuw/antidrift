@@ -18,10 +18,10 @@ use crate::rule_plan::{RulePlanCache, build_config_rule_plan, lint_program_files
 fn filter_suppressed_diagnostics(
     cwd: &str,
     diagnostics: Vec<Diagnostic>,
+    seen_counts: &mut FxHashMap<(String, String), usize>,
 ) -> Result<Vec<Diagnostic>, String> {
     let path = std::path::Path::new(cwd).join("eslint-suppressions.json");
     let suppressions = antidrift_kernel::suppressions::SuppressionsTable::load(&path)?;
-    let mut seen_counts: FxHashMap<(String, String), usize> = FxHashMap::default();
     Ok(diagnostics
         .into_iter()
         .filter(|diag| {
@@ -124,6 +124,7 @@ pub(crate) struct HeadlessRequest {
 pub(crate) struct Leftovers {
     grouped: Vec<String>,
     inferred: Vec<String>,
+    suppressed_seen: Vec<((String, String), usize)>,
 }
 
 pub(crate) enum RelayReply {
@@ -187,6 +188,7 @@ impl HeadlessRequest {
                 Leftovers {
                     grouped: files,
                     inferred: Vec::new(),
+                    suppressed_seen: Vec::new(),
                 },
             ));
         };
@@ -198,6 +200,7 @@ impl HeadlessRequest {
         let mut leftovers = Leftovers {
             grouped: Vec::new(),
             inferred: unmatched,
+            suppressed_seen: Vec::new(),
         };
         let mut diagnostics: Vec<Diagnostic> = Vec::new();
         for (config_file_name, config_files) in &programs {
@@ -224,8 +227,10 @@ impl HeadlessRequest {
                 Some(Err(config_diags)) => diagnostics.extend(config_diags),
             }
         }
-        let diagnostics = filter_suppressed_diagnostics(&self.cwd, diagnostics)
+        let mut seen_counts: FxHashMap<(String, String), usize> = FxHashMap::default();
+        let diagnostics = filter_suppressed_diagnostics(&self.cwd, diagnostics, &mut seen_counts)
             .map_err(|err| format!("error running linter: {err}"))?;
+        leftovers.suppressed_seen = seen_counts.into_iter().collect();
         Ok((encode(&diagnostics)?, leftovers))
     }
 
@@ -234,6 +239,7 @@ impl HeadlessRequest {
         let leftovers = leftovers.unwrap_or_else(|| Leftovers {
             grouped: requested_files(&payload),
             inferred: Vec::new(),
+            suppressed_seen: Vec::new(),
         });
         tsrs_checker::links::set_sparse_id_pages(true);
         let mut env = ProgramBuilderEnv::new(base_fs(payload.source_overrides.as_ref()), &self.cwd);
@@ -257,6 +263,8 @@ impl HeadlessRequest {
         opts: &Options,
         leftovers: Leftovers,
     ) -> Result<Vec<Diagnostic>, String> {
+        let mut seen_counts: FxHashMap<(String, String), usize> =
+            leftovers.suppressed_seen.into_iter().collect();
         let plan = build_config_rule_plan(payload)?;
         let (programs, unmatched) = env.group_files_by_tsconfig(&leftovers.grouped);
         let mut inferred = leftovers.inferred;
@@ -291,7 +299,7 @@ impl HeadlessRequest {
                 &mut diagnostics,
             );
         }
-        filter_suppressed_diagnostics(&self.cwd, diagnostics)
+        filter_suppressed_diagnostics(&self.cwd, diagnostics, &mut seen_counts)
     }
 }
 

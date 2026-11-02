@@ -7,9 +7,6 @@ import { blockGeneratedPolicyEdits } from "./hooks/block-generated-policy-edits.
 import { runOxlint } from "./oxlint.mjs";
 import { shellGuardrails } from "./shell-guardrails.mjs";
 import { verifySession } from "./verify-session.mjs";
-import { changeContractEvidenceCommand } from "../change-scope/change-contract-evidence.mjs";
-import { changeContractCommand } from "../change-scope/change-contract.mjs";
-import { diffScopedAdaptersCommand } from "../change-scope/diff-scoped-adapters.mjs";
 
 const [, , command, ...args] = process.argv;
 
@@ -37,9 +34,6 @@ const commands = {
   "check-registries": () => {
     if (!checkRegistries()) process.exitCode = 1;
   },
-  "change-contract-evidence": () => changeContractEvidenceCommand(args),
-  "change-contract": () => changeContractCommand(args),
-  "diff-scoped-adapters": () => diffScopedAdaptersCommand(args),
   shell: () => {
     process.exitCode = shellGuardrails({ argv: args });
   },

@@ -9,7 +9,11 @@ export function verifySession() {
     timeout: STEP_TIMEOUT_MS,
     killSignal: "SIGKILL",
   });
-  if (releaseGate.error?.code === "ETIMEDOUT") {
+  if (
+    releaseGate.error &&
+    "code" in releaseGate.error &&
+    releaseGate.error.code === "ETIMEDOUT"
+  ) {
     console.error(
       `Required verification timed out after ${STEP_TIMEOUT_MS / 60_000}m: pnpm verify:release`
     );

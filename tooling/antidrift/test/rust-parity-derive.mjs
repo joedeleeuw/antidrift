@@ -12,8 +12,6 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
-import { parseNameStatusRecords } from "../src/change-scope/change-context.mjs";
-
 const PLANTED_DERIVE_VIOLATIONS = {
   "src/methods/callbacky.ts":
     'import type { Session } from "../shared/session";\n\nexport async function callbacky(input: { label: string; onDone: () => void }, session: Session): Promise<string> {\n  input.onDone();\n  return Promise.resolve(session.userId);\n}\n',
@@ -277,30 +275,6 @@ function verifyShapeSampleRuntime(repoRoot) {
   ]);
 }
 
-function verifyNameStatusRecordProbes() {
-  assert.deepEqual(parseNameStatusRecords("", "/repo"), []);
-  assert.deepEqual(
-    parseNameStatusRecords("M\0a.ts\0R100\0old.ts\0new.ts\0", "/repo"),
-    [
-      { status: "M", operation: "modify", path: "a.ts", oldPath: null },
-      {
-        status: "R100",
-        operation: "rename",
-        path: "new.ts",
-        oldPath: "old.ts",
-      },
-    ]
-  );
-  for (const bad of [
-    "M\0\0",
-    "R100\0old.ts\0",
-    "R100\0old.ts\0\0",
-    "M\0ok.ts\0A",
-  ]) {
-    assert.throws(() => parseNameStatusRecords(bad, "/repo"), TypeError);
-  }
-}
-
 function verifyProtoAndTsconfigDeriveProbes(binaryPath, copyRoot) {
   const protoFile = join(copyRoot, "src/methods/protoKey.ts");
   writeFileSync(
@@ -375,7 +349,6 @@ function verifyAcceptedAndRuntimeProbes(binaryPath, copyRoot, repoRoot) {
     /missing required derive runtime module\(s\): src\/runtime\/decode\.ts/u
   );
   writeFileSync(decodePath, decodeSource);
-  verifyNameStatusRecordProbes();
 }
 
 export function proveDeriveSmoke(binaryPath, repoRoot) {

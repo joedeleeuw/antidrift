@@ -1,6 +1,8 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use antidrift_kernel::directives::effective_token_start;
+use ignore::WalkBuilder;
 use rustc_hash::{FxHashMap, FxHashSet};
 use tsrs_ast::SourceFile;
 use tsrs_core::P;
@@ -13,7 +15,14 @@ use crate::headless_host::{
     suppress_program_diagnostics_enabled,
 };
 use crate::rule_catalog::{RequestedRule, RuleCatalog, RuleRequest};
-use crate::runner::{collect_lintable_files, is_supported_file};
+use crate::runner::is_supported_file;
+
+static RULE_PASSES: AtomicU32 = AtomicU32::new(0);
+
+#[must_use]
+pub(crate) fn rule_pass_count() -> u32 {
+    RULE_PASSES.load(Ordering::Relaxed)
+}
 
 #[derive(Clone)]
 pub struct Finding {
@@ -28,6 +37,7 @@ struct Batch {
     bound: Option<BoundProgram>,
     missing: Vec<String>,
     linted: FxHashSet<String>,
+    passes: usize,
 }
 
 struct Family {
@@ -48,16 +58,32 @@ impl Batch {
             bound: None,
             missing: Vec::new(),
             linted: FxHashSet::default(),
+            passes: 0,
         }
     }
 }
 
 pub(crate) struct Session {
+    cwd: String,
     pub(crate) env: ProgramBuilderEnv,
     catalog: RuleCatalog,
     families: Vec<Family>,
     slots: FxHashMap<String, (usize, Slot)>,
     findings: FxHashMap<String, Vec<(String, Finding)>>,
+}
+
+fn collect_requestable_files(cwd: &str) -> Result<Vec<String>, String> {
+    let mut files = Vec::new();
+    for entry in WalkBuilder::new(cwd).standard_filters(true).build() {
+        let entry = entry.map_err(|err| format!("failed to walk {cwd}: {err}"))?;
+        let path = entry.path();
+        if path.is_file() && is_requestable_file(path) {
+            files.push(tspath::normalize_path(&path.to_string_lossy()));
+        }
+    }
+    files.sort();
+    files.dedup();
+    Ok(files)
 }
 
 impl Session {
@@ -67,17 +93,14 @@ impl Session {
         let cwd = tspath::normalize_path(cwd);
         let env = ProgramBuilderEnv::new(base_fs(None), &cwd);
         let mut session = Self {
+            cwd: cwd.clone(),
             env,
             catalog,
             families: Vec::new(),
             slots: FxHashMap::default(),
             findings: FxHashMap::default(),
         };
-        let walked = collect_lintable_files(&[PathBuf::from(&cwd)], Path::new(&cwd))?;
-        let workspace: Vec<String> = walked
-            .iter()
-            .map(|path| tspath::normalize_slashes(&path.to_string_lossy()))
-            .collect();
+        let workspace = collect_requestable_files(&cwd)?;
         session.add_family(&workspace);
         Ok(session)
     }
@@ -107,7 +130,14 @@ impl Session {
         let (family, slot) = match self.slots.get(&normalized) {
             Some(&found) => found,
             None => {
-                self.add_family(std::slice::from_ref(&normalized));
+                let mut unslotted: Vec<String> = collect_requestable_files(&self.cwd)?
+                    .into_iter()
+                    .filter(|file| !self.slots.contains_key(file))
+                    .collect();
+                if !unslotted.contains(&normalized) {
+                    unslotted.push(normalized.clone());
+                }
+                self.add_family(&unslotted);
                 self.slots[&normalized]
             }
         };
@@ -223,22 +253,27 @@ impl Session {
             Slot::Configured(index) => &mut self.families[family].configured[index].1,
             Slot::Inferred => &mut self.families[family].inferred,
         };
-        let missing: Vec<&RequestedRule> = rules
+        let mut missing: Vec<RequestedRule> = rules
             .iter()
             .filter(|requested| !batch.linted.contains(&requested.identity))
+            .cloned()
             .collect();
         let Some(bound) = batch.bound.as_ref().filter(|_| !missing.is_empty()) else {
             return Ok(());
         };
+        if batch.passes >= 2 {
+            missing.extend(self.catalog.unlinted_defaults(&batch.linted, &missing));
+        }
         for sf in &bound.source_files {
             self.findings
                 .entry(tspath::normalize_slashes(sf.file_name()))
                 .or_default();
         }
-        for group in group_rule_passes(&missing) {
+        let missing_refs: Vec<&RequestedRule> = missing.iter().collect();
+        for group in group_rule_passes(&missing_refs) {
             let instances: Vec<&'static dyn Rule> = group.iter().map(|&(_, rule)| rule).collect();
             let group_keys: FxHashSet<&str> = group.iter().map(|&(key, _)| key).collect();
-            let pass_missing: Vec<&RequestedRule> = missing
+            let pass_missing: Vec<&RequestedRule> = missing_refs
                 .iter()
                 .copied()
                 .filter(|req| group_keys.contains(req.rule_key.as_str()))
@@ -253,9 +288,11 @@ impl Session {
                 )?;
             }
         }
+        batch.passes += 1;
+        RULE_PASSES.fetch_add(1, Ordering::Relaxed);
         batch
             .linted
-            .extend(missing.iter().map(|requested| requested.identity.clone()));
+            .extend(missing.into_iter().map(|requested| requested.identity));
         Ok(())
     }
 }

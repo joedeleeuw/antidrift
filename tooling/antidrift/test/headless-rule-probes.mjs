@@ -11,7 +11,6 @@ import {
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { collectTouchedModuleGraph } from "../src/change-scope/module-graph.mjs";
 import { checkRegistries } from "../src/policy/check-registries.mjs";
 import { dataFlowProbes } from "./headless-data-flow-probes.mjs";
 import { typeContractProbes } from "./headless-type-contract-probes.mjs";
@@ -282,7 +281,7 @@ function verifyCliLevelsAndPaths(binaryPath, workspace) {
   );
 }
 
-function verifyBrokenTsconfigFails(binaryPath, repoRoot, workspace) {
+function verifyBrokenTsconfigFails(binaryPath, workspace) {
   const brokenDir = join(workspace, "broken-tsconfig");
   mkdirSync(join(brokenDir, "src/deep"), { recursive: true });
   symlinkSync("src/deep", join(brokenDir, "link"));
@@ -304,18 +303,6 @@ function verifyBrokenTsconfigFails(binaryPath, repoRoot, workspace) {
     assert.notEqual(run.status, 0);
     assert.match(`${run.stdout}${run.stderr}`, pattern);
   }
-  const entry = "tooling/antidrift/src/index.mjs";
-  const modified = "tooling/antidrift/src/oxlint-config/index.mjs";
-  const graph = collectTouchedModuleGraph({
-    cwd: repoRoot,
-    head: "HEAD",
-    tsconfig: "tsconfig.json",
-    changedFiles: [{ path: modified, operation: "modify" }],
-    allowedEntrypoints: [entry],
-    maxTouchedModuleRadius: 2,
-  });
-  assert.deepEqual(graph.entrypoints, [entry]);
-  assert.equal(graph.touchedFiles[0]?.withinRadius, true);
 }
 
 function verifyRoleSmoke(binaryPath, workspace) {
@@ -406,7 +393,7 @@ export function proveInferredTypesSmoke(binaryPath, repoRoot) {
       ["3 antidrift/no-unsafe-deserialize"]
     );
     verifyCliLevelsAndPaths(binaryPath, workspace);
-    verifyBrokenTsconfigFails(binaryPath, repoRoot, workspace);
+    verifyBrokenTsconfigFails(binaryPath, workspace);
     verifyRegistrySmokes(repoRoot, workspace);
     verifyRoleSmoke(binaryPath, workspace);
   } finally {

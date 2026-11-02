@@ -19,18 +19,20 @@ export function defaultAstGrepBinary(env = process.env) {
   );
 }
 
-export function parseShellGuardrailsArgs(argv = [], env = process.env) {
+const EMPTY_ARGS = process.argv.slice(0, 0);
+
+export function parseShellGuardrailsArgs(argv = EMPTY_ARGS, env = process.env) {
   const parsed = {
     astGrepBinary: defaultAstGrepBinary(env),
     config: DEFAULT_AST_GREP_CONFIG,
     cwd: process.cwd(),
     mode: "scan",
-    passthrough: [],
+    passthrough: process.argv.slice(0, 0),
     help: false,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
+    const arg = argv[index] ?? "";
     const next = argv[index + 1];
 
     if (arg === "test" || arg === "--test") {
@@ -86,7 +88,7 @@ const AST_GREP_MODE_ARGS = {
 };
 
 export function shellGuardrails({
-  argv = [],
+  argv = EMPTY_ARGS,
   exists = existsSync,
   spawn = spawnSync,
   stderr = process.stderr,

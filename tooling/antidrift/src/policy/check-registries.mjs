@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,17 +11,16 @@ import { checkGenerated } from "./check-generated-policy-artifacts.mjs";
 import { AGENT_HOOKS } from "./generate-policy-artifacts.mjs";
 import { REGISTRY_FILES } from "./lib/registries.mjs";
 import { loadNativeAddon } from "./oxlint.mjs";
-import { checkDomainRegistries } from "./registry-checks/domain.mjs";
 import { checkPackageSurface } from "./registry-checks/package-surface.mjs";
-import {
-  isRecord,
-  readRegistry,
-} from "./registry-checks/registry-contracts.mjs";
 import { shellGuardrails } from "./shell-guardrails.mjs";
 import { verifySession } from "./verify-session.mjs";
 
 const moduleRequire = createRequire(import.meta.url);
 const REGISTERED_REGISTRY_FILES = new Set(Object.values(REGISTRY_FILES));
+
+function isRecord(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
 const OXLINT_CONFIG_FILENAMES = [
   "oxlint.config.mts",
   "oxlint.config.mjs",
@@ -84,26 +83,12 @@ function activeOxlintDetectors(root, resolvedPolicyDir) {
   return detectors;
 }
 
-function checkRegistryDirectory(resolvedPolicyDir, errors) {
-  const registriesDir = join(resolvedPolicyDir, "registries");
-  if (!existsSync(registriesDir)) return;
-  for (const entry of readdirSync(registriesDir)) {
-    if (!entry.endsWith(".yaml")) continue;
-    const name = entry.slice(0, -".yaml".length);
-    if (!REGISTERED_REGISTRY_FILES.has(name)) {
-      errors.push(
-        `policy/registries/${entry} has no registered reader (allowed: ${[...REGISTERED_REGISTRY_FILES].join(", ")}).`
-      );
-    }
-  }
-}
-
 function checkClusterRegistry(cluster, resolvedPolicyDir, errors) {
   if (cluster.registry === undefined) return;
   const match = /^policy\/registries\/([^/]+)\.yaml$/u.exec(
     String(cluster.registry)
   );
-  if (!match || !REGISTERED_REGISTRY_FILES.has(match[1])) {
+  if (!match?.[1] || !REGISTERED_REGISTRY_FILES.has(match[1])) {
     errors.push(
       `policy/agent-guardrails.yaml cluster '${cluster.id}' references unregistered registry '${cluster.registry}'.`
     );
@@ -155,9 +140,8 @@ function checkPolicyDetectors(root, resolvedPolicyDir, errors) {
   try {
     parsed = YAML.parse(readFileSync(policyFile, "utf8")) ?? {};
   } catch (error) {
-    errors.push(
-      `policy/agent-guardrails.yaml could not be parsed: ${error.message}`
-    );
+    const message = error instanceof Error ? error.message : String(error);
+    errors.push(`policy/agent-guardrails.yaml could not be parsed: ${message}`);
     return;
   }
   if (!isRecord(parsed) || !Array.isArray(parsed.clusters)) {
@@ -188,19 +172,13 @@ export function checkRegistries({
 } = {}) {
   const root = resolve(repoRoot);
   const resolvedPolicyDir = resolve(policyDir);
-  const errors = [];
-  checkRegistryDirectory(resolvedPolicyDir, errors);
-  const registries = Object.fromEntries(
-    Object.entries(REGISTRY_FILES).map(([key, file]) => [
-      key,
-      readRegistry(resolvedPolicyDir, file, errors),
-    ])
+  const errors = loadNativeAddon(root).validateRegistries(
+    root,
+    resolvedPolicyDir
   );
-
-  checkDomainRegistries(registries, root, errors);
   if (
     errors.length === 0 ||
-    !errors.some((e) => e.includes("could not be parsed"))
+    !errors.some((e) => e.includes("failed to decode"))
   ) {
     checkPolicyDetectors(root, resolvedPolicyDir, errors);
   }

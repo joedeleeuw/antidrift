@@ -8,7 +8,8 @@
     "moduleResolution": "NodeNext",
     "types": ["node"],
     "allowJs": true,
-    "checkJs": false,
+    "checkJs": true,
+    "noImplicitAny": false,
     "erasableSyntaxOnly": true,
     "rewriteRelativeImportExtensions": true,
     "noUnusedLocals": true,
@@ -19,8 +20,7 @@
     "src/**/*.mts",
     "src/**/*.mjs",
     "src/**/*.js",
-    "scripts/**/*.ts",
-    "test/**/*.mjs"
+    "scripts/**/*.ts"
   ],
   "exclude": ["src/**/fixtures/**", "src/**/*.test.*"]
 }

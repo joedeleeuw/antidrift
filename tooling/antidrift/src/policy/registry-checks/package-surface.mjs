@@ -19,8 +19,9 @@ function readPackageJson(root, errors) {
     }
     return parsed;
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     errors.push(
-      `tooling/antidrift/package.json could not be parsed: ${error.message}`
+      `tooling/antidrift/package.json could not be parsed: ${message}`
     );
     return null;
   }

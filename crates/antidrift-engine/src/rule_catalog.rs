@@ -14,6 +14,7 @@ pub struct RuleRequest {
     pub options: Option<String>,
 }
 
+#[derive(Clone)]
 pub(crate) struct RequestedRule {
     pub(crate) identity: String,
     pub(crate) rule_key: String,
@@ -129,6 +130,44 @@ impl RuleCatalog {
             tier,
             rule,
         })
+    }
+
+    pub(crate) fn unlinted_defaults(
+        &self,
+        linted: &FxHashSet<String>,
+        already_missing: &[RequestedRule],
+    ) -> Vec<RequestedRule> {
+        let mut seen: FxHashSet<String> = linted.clone();
+        seen.extend(already_missing.iter().map(|req| req.identity.clone()));
+        let mut names: Vec<&'static str> = self.defaults.keys().copied().collect();
+        names.sort_unstable();
+        let mut out = Vec::new();
+        for base_name in names {
+            let rule = self.defaults[base_name];
+            let (_, tier) = resolve_line_cap_request(base_name);
+            let identity = rule_identity(base_name, None);
+            let rule_key = identity.clone();
+            if !seen.contains(&identity) {
+                out.push(RequestedRule {
+                    identity,
+                    rule_key: rule_key.clone(),
+                    output_name: base_name.to_owned(),
+                    tier,
+                    rule,
+                });
+            }
+            let near_name = format!("{base_name}-near");
+            if tier.is_some() && !seen.contains(&near_name) {
+                out.push(RequestedRule {
+                    identity: near_name.clone(),
+                    rule_key,
+                    output_name: near_name,
+                    tier: Some(LineCapTier::Near),
+                    rule,
+                });
+            }
+        }
+        out
     }
 }
 

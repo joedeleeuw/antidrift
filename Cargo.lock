@@ -73,6 +73,7 @@ name = "antidrift-napi"
 version = "0.21.1"
 dependencies = [
  "antidrift-engine",
+ "antidrift-kernel",
  "napi",
  "napi-build",
  "napi-derive",
