@@ -174,6 +174,8 @@ export const noWrappingFunctionsRule = {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
+    const exportedNames = new Set();
+    const candidates = [];
 
     function returnedCall(body) {
       if (!body) return null;
@@ -186,20 +188,30 @@ export const noWrappingFunctionsRule = {
       return unwrapExpression(body);
     }
 
+    function unexportedFunctionName(node) {
+      const parent = node.parent;
+      if (
+        parent?.type === "ExportNamedDeclaration" ||
+        parent?.type === "ExportDefaultDeclaration" ||
+        parent?.parent?.parent?.type === "ExportNamedDeclaration"
+      ) {
+        return null;
+      }
+      if (node.id?.name) return node.id.name;
+      if (
+        parent?.type === "VariableDeclarator" &&
+        parent.id?.type === "Identifier"
+      ) {
+        return parent.id.name;
+      }
+      return null;
+    }
+
     function checkFunction(node) {
-      if (node.params.length === 0) return;
+      if (node.async || node.generator || node.params.length === 0) return;
       if (node.params.some((p) => p.type !== "Identifier")) return;
-      const name =
-        node.id?.name ??
-        (node.parent?.type === "VariableDeclarator" &&
-        node.parent.id?.type === "Identifier"
-          ? node.parent.id.name
-          : null);
+      const name = unexportedFunctionName(node);
       if (!name) return;
-      const isExported =
-        node.parent?.type === "ExportNamedDeclaration" ||
-        node.parent?.parent?.parent?.type === "ExportNamedDeclaration";
-      if (isExported) return;
       const call = returnedCall(node.body);
       if (
         call?.type !== "CallExpression" ||
@@ -214,17 +226,39 @@ export const noWrappingFunctionsRule = {
           call.arguments[idx].name === param.name
       );
       if (!sameOrder) return;
-      context.report({
+      candidates.push({
         node: node.id ?? node,
-        messageId: "wrapper",
-        data: { name, callee: call.callee.name },
+        name,
+        callee: call.callee.name,
       });
     }
 
     return {
+      ExportNamedDeclaration(node) {
+        for (const spec of node.specifiers ?? []) {
+          if (spec.local?.type === "Identifier") {
+            exportedNames.add(spec.local.name);
+          }
+        }
+      },
+      ExportDefaultDeclaration(node) {
+        if (node.declaration?.type === "Identifier") {
+          exportedNames.add(node.declaration.name);
+        }
+      },
       FunctionDeclaration: checkFunction,
       FunctionExpression: checkFunction,
       ArrowFunctionExpression: checkFunction,
+      "Program:exit"() {
+        for (const cand of candidates) {
+          if (exportedNames.has(cand.name)) continue;
+          context.report({
+            node: cand.node,
+            messageId: "wrapper",
+            data: { name: cand.name, callee: cand.callee },
+          });
+        }
+      },
     };
   },
 };

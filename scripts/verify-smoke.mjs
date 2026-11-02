@@ -43,6 +43,9 @@ assert.deepEqual(oxlintPreset.jsPlugins, ["@joedeleeuw/antidrift"]);
 assert.equal(eslintPreset.plugins.antidrift, antidriftPlugin);
 
 const badSource = `
+import { useSyncExternalStore } from "react";
+import { TouchableOpacity } from "react-native";
+import { Text as WidgetText } from "@expo/ui/swift-ui";
 import { z } from "zod";
 
 type HiddenUnknown = unknown;
@@ -57,6 +60,22 @@ interface DuplicateContract {
   id: string;
   title: string;
   count: number;
+}
+
+const outerGreeting = "Hello";
+
+export function BrokenWidget() {
+  "widget";
+  return <WidgetText>{outerGreeting}</WidgetText>;
+}
+
+function getUnstableSnapshot() {
+  return { now: 1 };
+}
+
+export function LegacyTouchableView({ subscribe }: { subscribe: () => () => void }) {
+  const snap = useSyncExternalStore(subscribe, getUnstableSnapshot);
+  return <TouchableOpacity>{snap.now}</TouchableOpacity>;
 }
 
 export function processLegacyData(
@@ -94,6 +113,10 @@ export function BadComponent({ items = [] }: { items?: string[] }) {
 `;
 
 const goodSource = `
+import { useSyncExternalStore } from "react";
+import { Text } from "@expo/ui/swift-ui";
+import { z } from "zod";
+
 export interface OrderSummary {
   readonly orderId: string;
   readonly totalCents: number;
@@ -101,6 +124,33 @@ export interface OrderSummary {
 
 export function formatOrderSummary(summary: OrderSummary): string {
   return \`\${summary.orderId}: \${summary.totalCents}\`;
+}
+
+export function CleanWidget() {
+  "widget";
+  const label = "Ready";
+  return <Text>{label}</Text>;
+}
+
+const cachedSnapshot = { ready: true };
+function getStableSnapshot() {
+  return Object.assign(cachedSnapshot, { ready: true });
+}
+
+export function useReadySnapshot(subscribe: () => () => void) {
+  return useSyncExternalStore(subscribe, getStableSnapshot);
+}
+
+const InputSchema = z.object({ id: z.string(), secret: z.string() });
+const PublicSchema = z.object({ id: z.string() });
+export const ProjectedSchema = InputSchema.transform((row) => ({
+  id: row.id,
+  redacted: true,
+}));
+
+export function parseTwoStage(raw: unknown) {
+  const first = InputSchema.parse(raw);
+  return PublicSchema.parse(first);
 }
 `;
 
@@ -117,14 +167,32 @@ const expectedRules = [
   "antidrift/no-async-array-method",
   "antidrift/no-unstable-render-default-collection",
   "antidrift/no-impure-render-call",
+  "antidrift/no-unbound-widget-capture",
+  "antidrift/no-raw-react-native-touchables",
+  "antidrift/require-stable-snapshot",
 ];
 
 const workDir = mkdtempSync(join(tmpdir(), "antidrift-smoke-"));
 try {
   const badFile = join(workDir, "bad.tsx");
-  const goodFile = join(workDir, "good.ts");
+  const goodFile = join(workDir, "good.tsx");
+  const pkgJsonFile = join(workDir, "package.json");
   const oxlintConfigFile = join(workDir, "oxlint.config.json");
 
+  writeFileSync(
+    pkgJsonFile,
+    JSON.stringify({
+      name: "smoke-fixture",
+      private: true,
+      dependencies: {
+        "@expo/ui": "1.0.0",
+        react: "19.0.0",
+        "react-native": "0.78.0",
+        zod: "4.0.0",
+      },
+    }),
+    "utf8"
+  );
   writeFileSync(badFile, badSource, "utf8");
   writeFileSync(goodFile, goodSource, "utf8");
   writeFileSync(

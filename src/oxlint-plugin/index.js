@@ -54,12 +54,14 @@ import noPlaceholderTestsRule from "./portable/no-placeholder-tests.js";
 import noPortalUnderInteractiveAncestorRule from "./portable/no-portal-under-interactive-ancestor.js";
 import noRawFilenameWriteRule from "./portable/no-raw-filename-write.js";
 import noRawForegroundOpacityRule from "./portable/no-raw-foreground-opacity.js";
+import noRawReactNativeTouchablesRule from "./portable/no-raw-react-native-touchables.js";
 import noRedactedLogAttributeKeyRule from "./portable/no-redacted-log-attribute-key.js";
 import noRelativeCrossPackageImportsRule from "./portable/no-relative-cross-package-imports.js";
 import noSpreadInputInQueryKeyRule from "./portable/no-spread-input-in-query-key.js";
 import noStaticDevtoolsImportRule from "./portable/no-static-devtools-import.js";
 import noTodoWithoutIssueRule from "./portable/no-todo-without-issue.js";
 import noTutorialCommentsRule from "./portable/no-tutorial-comments.js";
+import noUnboundWidgetCaptureRule from "./portable/no-unbound-widget-capture.js";
 import noUnformattedNumberRule from "./portable/no-unformatted-number.js";
 import noUnlistedExternalImportsRule from "./portable/no-unlisted-external-imports.js";
 import noUnsafeInnerHtmlRule from "./portable/no-unsafe-inner-html.js";
@@ -175,6 +177,7 @@ export const rules = {
   "no-query-join-or-tree-reshape": noQueryJoinOrTreeReshapeRule,
   "no-raw-filename-write": noRawFilenameWriteRule,
   "no-raw-foreground-opacity": noRawForegroundOpacityRule,
+  "no-raw-react-native-touchables": noRawReactNativeTouchablesRule,
   "no-redacted-log-attribute-key": noRedactedLogAttributeKeyRule,
   "no-redeclared-owned-union": ruleNoRedeclaredOwnedUnion(),
   "no-redundant-type-predicate": noRedundantTypePredicateRule,
@@ -191,6 +194,7 @@ export const rules = {
   "no-structural-type-fork": noStructuralTypeForkRule,
   "no-todo-without-issue": noTodoWithoutIssueRule,
   "no-tutorial-comments": noTutorialCommentsRule,
+  "no-unbound-widget-capture": noUnboundWidgetCaptureRule,
   "no-underchecked-type-predicate": noUndercheckedTypePredicateRule,
   "no-unformatted-number": noUnformattedNumberRule,
   "no-unknown-type-aliases": noUnknownTypeAliasesRule,

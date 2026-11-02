@@ -9,9 +9,7 @@ import {
 const HOOK_NAME = /^use[A-Z0-9]/u;
 const QUERY_HOOK_NAME =
   /^use(?:Suspense)?(?:Infinite)?(?:Query|Mutation|PaginatedQuery)$/u;
-const ENVELOPE_KEYS = new Set([
-  "data",
-  "error",
+const LIFECYCLE_ENVELOPE_KEYS = new Set([
   "isLoading",
   "isPending",
   "isError",
@@ -20,6 +18,7 @@ const ENVELOPE_KEYS = new Set([
   "fetchStatus",
   "refetch",
 ]);
+const ENVELOPE_KEYS = new Set(["data", "error", ...LIFECYCLE_ENVELOPE_KEYS]);
 
 function functionNameOf(node) {
   if (node.id?.type === "Identifier") return node.id.name;
@@ -170,24 +169,35 @@ export const noQueryEnvelopeLeakRule = {
   create(context) {
     if (!isRuleFile(context)) return {};
     const sourceCode = context.sourceCode;
+    const convexDirectValueHooks = new Set();
 
     function isQueryHookCall(expr) {
       const node = unwrapExpression(expr);
       if (node?.type !== "CallExpression") return false;
       const callee = unwrapExpression(node.callee);
-      return callee?.type === "Identifier" && QUERY_HOOK_NAME.test(callee.name);
+      if (
+        callee?.type !== "Identifier" ||
+        !QUERY_HOOK_NAME.test(callee.name) ||
+        convexDirectValueHooks.has(callee.name)
+      ) {
+        return false;
+      }
+      return true;
     }
 
     function isEnvelopeObject(expr) {
       const node = unwrapExpression(expr);
       if (node?.type !== "ObjectExpression") return false;
       let hits = 0;
+      let hasLifecycleKey = false;
       for (const prop of node.properties) {
         if (prop.type === "Property" && prop.key?.type === "Identifier") {
-          if (ENVELOPE_KEYS.has(prop.key.name)) hits += 1;
+          const keyName = prop.key.name;
+          if (ENVELOPE_KEYS.has(keyName)) hits += 1;
+          if (LIFECYCLE_ENVELOPE_KEYS.has(keyName)) hasLifecycleKey = true;
         }
       }
-      return hits >= 2 && hits === node.properties.length;
+      return hasLifecycleKey && hits >= 2 && hits === node.properties.length;
     }
 
     function checkReturnedExpr(expr, reportNode) {
@@ -229,6 +239,18 @@ export const noQueryEnvelopeLeakRule = {
     }
 
     return {
+      ImportDeclaration(node) {
+        if (node.source?.value !== "convex/react") return;
+        for (const spec of node.specifiers ?? []) {
+          if (
+            spec.type === "ImportSpecifier" &&
+            spec.imported?.type === "Identifier" &&
+            spec.imported.name === "useQuery"
+          ) {
+            convexDirectValueHooks.add(spec.local.name);
+          }
+        }
+      },
       FunctionDeclaration: checkFunction,
       FunctionExpression: checkFunction,
       ArrowFunctionExpression: checkFunction,
@@ -253,12 +275,20 @@ export const noImpureRenderCallRule = {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
+    const sourceCode = context.sourceCode;
+
+    function isUnshadowedGlobal(ident) {
+      const variable = findVariable(sourceCode, ident);
+      return !variable || variable.defs.length === 0;
+    }
+
     function isImpureCall(node) {
       if (node.type === "NewExpression") {
         return (
           node.callee?.type === "Identifier" &&
           node.callee.name === "Date" &&
-          node.arguments.length === 0
+          node.arguments.length === 0 &&
+          isUnshadowedGlobal(node.callee)
         );
       }
       if (node.type !== "CallExpression") return false;
@@ -270,12 +300,15 @@ export const noImpureRenderCallRule = {
         callee.property?.type === "Identifier"
       ) {
         const pair = `${callee.object.name}.${callee.property.name}`;
-        return (
-          pair === "Date.now" ||
-          pair === "Math.random" ||
-          pair === "crypto.randomUUID" ||
-          pair === "performance.now"
-        );
+        if (
+          pair !== "Date.now" &&
+          pair !== "Math.random" &&
+          pair !== "crypto.randomUUID" &&
+          pair !== "performance.now"
+        ) {
+          return false;
+        }
+        return isUnshadowedGlobal(callee.object);
       }
       return false;
     }

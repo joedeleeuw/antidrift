@@ -1,10 +1,10 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
+import { findVariable, isFunctionLike } from "../shared/scope.js";
 import { getImportedName, isIdentifier, unwrapExpression } from "./ast.js";
 
 const REACT_MODULE = "react";
 const HOOK_NAME = "useSyncExternalStore";
 const SNAPSHOT_ARG_INDICES = [1, 2];
-const FRESH_REFERENCE_STATIC_CALLS = new Set(["Object.assign", "Array.from"]);
 const FRESH_REFERENCE_MEMBER_METHODS = new Set([
   "map",
   "filter",
@@ -12,10 +12,10 @@ const FRESH_REFERENCE_MEMBER_METHODS = new Set([
   "concat",
   "flat",
   "flatMap",
+  "toSorted",
+  "toReversed",
+  "toSpliced",
 ]);
-const isInlineFunction = (node) =>
-  node?.type === "ArrowFunctionExpression" ||
-  node?.type === "FunctionExpression";
 const isFreshReferenceCall = (node) => {
   if (node.type !== "CallExpression") {
     return false;
@@ -30,8 +30,11 @@ const isFreshReferenceCall = (node) => {
   }
   if (isIdentifier(callee.object)) {
     const staticName = `${callee.object.name}.${callee.property.name}`;
-    if (FRESH_REFERENCE_STATIC_CALLS.has(staticName)) {
+    if (staticName === "Array.from") {
       return true;
+    }
+    if (staticName === "Object.assign") {
+      return isFreshReferenceExpression(node.arguments[0]);
     }
   }
   return FRESH_REFERENCE_MEMBER_METHODS.has(callee.property.name);
@@ -100,15 +103,69 @@ const collectReturnArguments = (node, results) => {
       return;
   }
 };
-const snapshotReturnsFreshReference = (fn) => {
+const isFreshReturnedValue = (expr, fnScope, sourceCode) => {
+  const unwrapped = unwrapExpression(expr);
+  if (!unwrapped) return false;
+  if (isFreshReferenceExpression(unwrapped)) return true;
+  if (unwrapped.type === "Identifier" && fnScope) {
+    const variable = findVariable(sourceCode, unwrapped);
+    if (variable && variable.scope === fnScope) {
+      const def = variable.defs?.[0];
+      if (def?.node?.type === "VariableDeclarator") {
+        return isFreshReferenceExpression(def.node.init);
+      }
+    }
+  }
+  return false;
+};
+const snapshotReturnsFreshReference = (fn, sourceCode) => {
+  const fnScope = sourceCode?.getScope?.(fn);
   if (fn.body.type !== "BlockStatement") {
-    return isFreshReferenceExpression(fn.body);
+    return isFreshReturnedValue(fn.body, fnScope, sourceCode);
   }
   const returnArguments = [];
   collectReturnArguments(fn.body, returnArguments);
   return returnArguments.some((argument) =>
-    isFreshReferenceExpression(argument)
+    isFreshReturnedValue(argument, fnScope, sourceCode)
   );
+};
+const resolveObjectMethodCallback = (expr, sourceCode) => {
+  if (
+    expr.type !== "MemberExpression" ||
+    expr.computed ||
+    expr.object?.type !== "Identifier" ||
+    expr.property?.type !== "Identifier"
+  ) {
+    return null;
+  }
+  const variable = findVariable(sourceCode, expr.object);
+  const init = unwrapExpression(variable?.defs?.[0]?.node?.init);
+  if (init?.type !== "ObjectExpression") return null;
+  for (const prop of init.properties) {
+    if (
+      prop.type === "Property" &&
+      !prop.computed &&
+      prop.key?.type === "Identifier" &&
+      prop.key.name === expr.property.name
+    ) {
+      const value = unwrapExpression(prop.value);
+      return isFunctionLike(value) ? value : null;
+    }
+  }
+  return null;
+};
+const resolveSnapshotCallback = (arg, sourceCode) => {
+  const expr = unwrapExpression(arg);
+  if (!expr) return null;
+  if (isFunctionLike(expr)) return expr;
+  if (expr.type === "Identifier") {
+    const variable = findVariable(sourceCode, expr);
+    const defNode = variable?.defs?.[0]?.node;
+    if (isFunctionLike(defNode)) return defNode;
+    const init = unwrapExpression(defNode?.init);
+    return isFunctionLike(init) ? init : null;
+  }
+  return resolveObjectMethodCallback(expr, sourceCode);
 };
 export default {
   meta: {
@@ -179,11 +236,14 @@ export default {
           return;
         }
         for (const index of SNAPSHOT_ARG_INDICES) {
-          const arg = node.arguments[index];
-          if (!isInlineFunction(arg)) {
+          const cb = resolveSnapshotCallback(
+            node.arguments[index],
+            context.sourceCode
+          );
+          if (!cb) {
             continue;
           }
-          if (snapshotReturnsFreshReference(arg)) {
+          if (snapshotReturnsFreshReference(cb, context.sourceCode)) {
             context.report({ node, messageId: "requireStableSnapshot" });
             return;
           }

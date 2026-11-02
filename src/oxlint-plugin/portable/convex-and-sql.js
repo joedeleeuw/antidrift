@@ -1,5 +1,5 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
-import { unwrapExpression } from "../shared/scope.js";
+import { findVariable, unwrapExpression } from "../shared/scope.js";
 
 export const requireConvexReturnValidatorRule = {
   meta: {
@@ -18,6 +18,7 @@ export const requireConvexReturnValidatorRule = {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
+    const sourceCode = context.sourceCode;
     const CONVEX_BUILDERS = new Set([
       "query",
       "mutation",
@@ -27,6 +28,25 @@ export const requireConvexReturnValidatorRule = {
       "internalAction",
     ]);
     const convexBindings = new Set();
+
+    function isReturnsProperty(prop) {
+      if (prop.type !== "Property") return false;
+      if (!prop.computed && prop.key?.type === "Identifier") {
+        return prop.key.name === "returns";
+      }
+      return prop.key?.type === "Literal" && prop.key.value === "returns";
+    }
+
+    function resolveConfigObject(argNode) {
+      const expr = unwrapExpression(argNode);
+      if (expr?.type === "ObjectExpression") return expr;
+      if (expr?.type === "Identifier") {
+        const variable = findVariable(sourceCode, expr);
+        const init = unwrapExpression(variable?.defs?.[0]?.node?.init);
+        if (init?.type === "ObjectExpression") return init;
+      }
+      return null;
+    }
 
     function containsVAny(node) {
       let found = false;
@@ -79,24 +99,38 @@ export const requireConvexReturnValidatorRule = {
         ) {
           return;
         }
-        const config = unwrapExpression(node.arguments[0]);
-        if (config?.type !== "ObjectExpression") return;
-        const returnsProp = config.properties.find(
-          (p) =>
-            p.type === "Property" &&
-            p.key?.type === "Identifier" &&
-            p.key.name === "returns"
-        );
-        if (!returnsProp) {
+        const calleeVar = findVariable(sourceCode, node.callee);
+        if (
+          calleeVar &&
+          calleeVar.defs.length > 0 &&
+          calleeVar.defs[0].type !== "ImportBinding"
+        ) {
+          return;
+        }
+        const config = resolveConfigObject(node.arguments[0]);
+        if (!config) return;
+        let effectiveReturns = null;
+        let hasUnresolvedSpread = false;
+        for (const prop of config.properties) {
+          if (prop.type === "SpreadElement") {
+            hasUnresolvedSpread = true;
+            effectiveReturns = null;
+          } else if (isReturnsProperty(prop)) {
+            hasUnresolvedSpread = false;
+            effectiveReturns = prop;
+          }
+        }
+        if (!effectiveReturns) {
+          if (hasUnresolvedSpread) return;
           context.report({
             node,
             message: `Convex ${node.callee.name} registration is missing a 'returns' validator.`,
           });
           return;
         }
-        if (containsVAny(returnsProp.value)) {
+        if (containsVAny(effectiveReturns.value)) {
           context.report({
-            node: returnsProp.value,
+            node: effectiveReturns.value,
             message:
               "Convex 'returns' validator uses `v.any()`, erasing the return contract; declare the exact validator shape.",
           });

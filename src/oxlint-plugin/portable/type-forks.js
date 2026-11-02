@@ -225,15 +225,35 @@ export const noUnresolvedDependencyTypesRule = {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
+    const importLines = new Set();
+
+    function markImportNode(node) {
+      const startLine = node.loc?.start?.line;
+      if (typeof startLine === "number") {
+        importLines.add(startLine);
+      }
+    }
+
     return {
-      Program() {
+      ImportDeclaration: markImportNode,
+      ExportAllDeclaration: markImportNode,
+      ExportNamedDeclaration(node) {
+        if (node.source) markImportNode(node);
+      },
+      TSImportType: markImportNode,
+      "Program:exit"() {
         const comments = context.sourceCode.getAllComments?.() ?? [];
         for (const comment of comments) {
-          if (/@ts-(?:expect-error|ignore)/u.test(comment.value)) {
+          if (!/@ts-(?:expect-error|ignore)/u.test(comment.value)) continue;
+          const endLine = comment.loc?.end?.line;
+          if (
+            typeof endLine === "number" &&
+            (importLines.has(endLine) || importLines.has(endLine + 1))
+          ) {
             context.report({
               loc: comment.loc,
               message:
-                "Do not suppress TypeScript errors with `@ts-expect-error` or `@ts-ignore`; fix the underlying type or dependency contract.",
+                "Do not suppress unresolved module or type imports with `@ts-expect-error` or `@ts-ignore`; declare or install the dependency types.",
             });
           }
         }

@@ -182,7 +182,7 @@ export const noRedundantZodParseRule = {
     type: "problem",
     docs: {
       description:
-        "Disallow re-parsing a value that was already decoded by a schema or typed as `z.infer<typeof Schema>`.",
+        "Disallow re-parsing a value with the same schema after `.parse()` / `.parseAsync()` or when already typed as `z.infer<typeof Schema>`.",
     },
     schema: [
       {
@@ -196,27 +196,48 @@ export const noRedundantZodParseRule = {
     if (!isRuleFile(context)) return {};
     const sourceCode = context.sourceCode;
 
-    function isSchemaParseCall(node) {
-      const expr = unwrapExpression(node);
+    function parseCallInfo(node) {
+      let expr = unwrapExpression(node);
+      if (expr?.type === "AwaitExpression") {
+        expr = unwrapExpression(expr.argument);
+      }
       if (expr?.type !== "CallExpression" || expr.arguments.length !== 1) {
-        return false;
+        return null;
       }
       const callee = unwrapExpression(expr.callee);
-      return (
-        callee?.type === "MemberExpression" &&
-        !callee.computed &&
-        callee.property?.type === "Identifier" &&
-        (callee.property.name === "parse" ||
-          callee.property.name === "safeParse" ||
-          callee.property.name === "parseAsync")
-      );
+      if (
+        callee?.type !== "MemberExpression" ||
+        callee.computed ||
+        callee.property?.type !== "Identifier"
+      ) {
+        return null;
+      }
+      const method = callee.property.name;
+      if (
+        method !== "parse" &&
+        method !== "safeParse" &&
+        method !== "parseAsync" &&
+        method !== "safeParseAsync"
+      ) {
+        return null;
+      }
+      return {
+        method,
+        returnsDecodedValue: method === "parse" || method === "parseAsync",
+        schemaText: sourceCode.getText(callee.object).replace(/\s+/gu, ""),
+      };
     }
 
     return {
       CallExpression(node) {
-        if (!isSchemaParseCall(node)) return;
+        const outer = parseCallInfo(node);
+        if (!outer) return;
         const arg = unwrapExpression(node.arguments[0]);
-        if (isSchemaParseCall(arg)) {
+        const inner = parseCallInfo(arg);
+        if (
+          inner?.returnsDecodedValue &&
+          inner.schemaText === outer.schemaText
+        ) {
           context.report({
             node,
             message:
@@ -228,15 +249,18 @@ export const noRedundantZodParseRule = {
         const variable = findVariable(sourceCode, arg);
         const def = variable?.defs?.[0];
         if (!def) return;
-        if (
-          def.node?.type === "VariableDeclarator" &&
-          isSchemaParseCall(def.node.init)
-        ) {
-          context.report({
-            node,
-            message: `Binding '${arg.name}' was already decoded by a schema in this scope; reuse the decoded value instead of re-parsing.`,
-          });
-          return;
+        if (def.node?.type === "VariableDeclarator") {
+          const initInfo = parseCallInfo(def.node.init);
+          if (
+            initInfo?.returnsDecodedValue &&
+            initInfo.schemaText === outer.schemaText
+          ) {
+            context.report({
+              node,
+              message: `Binding '${arg.name}' was already decoded by '${outer.schemaText}' in this scope; reuse the decoded value instead of re-parsing.`,
+            });
+            return;
+          }
         }
         if (def.type === "Parameter") {
           const param = def.name;
@@ -262,7 +286,7 @@ export const noIdentitySchemaTransformRule = {
     type: "problem",
     docs: {
       description:
-        "Disallow `.transform(x => x)` or exact object-cloning `.transform(x => ({ a: x.a, b: x.b }))` no-ops on schemas.",
+        "Disallow `.transform(x => x)` or exhaustive destructuring `.transform(({ a, b }) => ({ a, b }))` no-ops on schemas.",
     },
     schema: [
       {
@@ -274,21 +298,37 @@ export const noIdentitySchemaTransformRule = {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-    function isIdentityBody(paramName, body) {
+    function isIdentityTransform(param, body) {
       const expr = unwrapExpression(body);
-      if (expr?.type === "Identifier" && expr.name === paramName) return true;
-      if (expr?.type === "ObjectExpression" && expr.properties.length >= 2) {
+      if (!expr) return false;
+      if (param.type === "Identifier") {
+        return expr.type === "Identifier" && expr.name === param.name;
+      }
+      if (
+        param.type === "ObjectPattern" &&
+        param.properties.length > 0 &&
+        expr.type === "ObjectExpression" &&
+        expr.properties.length === param.properties.length
+      ) {
+        const bindings = new Map();
+        for (const prop of param.properties) {
+          if (
+            prop.type !== "Property" ||
+            prop.computed ||
+            prop.key?.type !== "Identifier" ||
+            prop.value?.type !== "Identifier"
+          ) {
+            return false;
+          }
+          bindings.set(prop.key.name, prop.value.name);
+        }
         return expr.properties.every(
           (p) =>
             p.type === "Property" &&
             !p.computed &&
             p.key?.type === "Identifier" &&
-            p.value?.type === "MemberExpression" &&
-            !p.value.computed &&
-            p.value.object?.type === "Identifier" &&
-            p.value.object.name === paramName &&
-            p.value.property?.type === "Identifier" &&
-            p.value.property.name === p.key.name
+            p.value?.type === "Identifier" &&
+            bindings.get(p.key.name) === p.value.name
         );
       }
       return false;
@@ -304,16 +344,15 @@ export const noIdentitySchemaTransformRule = {
           return;
         }
         const cb = unwrapExpression(node.arguments[0]);
-        if (!isFunctionLike(cb) || cb.params.length !== 1) return;
+        if (!isFunctionLike(cb) || cb.async || cb.params.length !== 1) return;
         const param = cb.params[0];
-        if (param.type !== "Identifier") return;
         const returned =
           cb.body?.type === "BlockStatement" &&
           cb.body.body.length === 1 &&
           cb.body.body[0].type === "ReturnStatement"
             ? cb.body.body[0].argument
             : cb.body;
-        if (isIdentityBody(param.name, returned)) {
+        if (isIdentityTransform(param, returned)) {
           context.report({
             node,
             message:
