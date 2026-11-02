@@ -193,16 +193,25 @@ function findPrivilegedCall(node) {
   return found;
 }
 
+function isNegativeSenderCheck(test) {
+  if (test.type === "UnaryExpression" && test.operator === "!") return true;
+  return (
+    test.type === "BinaryExpression" &&
+    (test.operator === "!==" || test.operator === "!=")
+  );
+}
+
 function classifyIfSenderGuard(stmt, eventName) {
   if (!eventName || !referencesSenderOrFrame(stmt.test, eventName)) {
     return null;
   }
+  if (!isNegativeSenderCheck(stmt.test) && !stmt.alternate) {
+    return "positive-branch";
+  }
   if (terminatesControlFlow(stmt.consequent) && !stmt.alternate) {
     return "early-exit";
   }
-  const isPositiveCheck =
-    stmt.test.type !== "UnaryExpression" || stmt.test.operator !== "!";
-  return isPositiveCheck && !stmt.alternate ? "positive-branch" : null;
+  return null;
 }
 
 function findUnguardedIpcEffect(stmts, eventName, authzSet) {

@@ -174,6 +174,11 @@ ipcMain.handle("open-url-safe", (event, url) => {
   }
   shell.openExternal(url);
 });
+ipcMain.handle("open-url-positive", (event, url) => {
+  if (isTrustedSender(event.sender)) {
+    return shell.openExternal(url);
+  }
+});
 
 const cachedSnapshot = { ready: true };
 function getStableSnapshot() {
