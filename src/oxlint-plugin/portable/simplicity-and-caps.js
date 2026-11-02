@@ -148,7 +148,23 @@ export const reactMaxComponentPropsRule = {
     const max = context.options[0]?.max ?? 12;
     const typeDeclarations = new Map();
 
-    function countTypeMembers(typeNode) {
+    function hasWidgetDirective(fnNode) {
+      if (fnNode?.body?.type !== "BlockStatement") return false;
+      for (const stmt of fnNode.body.body) {
+        if (stmt.type !== "ExpressionStatement") break;
+        const dir =
+          stmt.directive ??
+          (stmt.expression?.type === "Literal" &&
+          typeof stmt.expression.value === "string"
+            ? stmt.expression.value
+            : null);
+        if (!dir) break;
+        if (dir === "widget") return true;
+      }
+      return false;
+    }
+
+    function countTypeMembers(typeNode, seen = new Set()) {
       if (!typeNode) return 0;
       if (typeNode.type === "TSTypeLiteral") {
         return typeNode.members.filter((m) => m.type === "TSPropertySignature")
@@ -158,17 +174,35 @@ export const reactMaxComponentPropsRule = {
         return typeNode.body.filter((m) => m.type === "TSPropertySignature")
           .length;
       }
+      if (typeNode.type === "TSIntersectionType") {
+        return typeNode.types.reduce(
+          (sum, part) => sum + countTypeMembers(part, seen),
+          0
+        );
+      }
       if (
         typeNode.type === "TSTypeReference" &&
-        typeNode.typeName?.type === "Identifier"
+        typeNode.typeName?.type === "Identifier" &&
+        !seen.has(typeNode.typeName.name)
       ) {
-        return countTypeMembers(typeDeclarations.get(typeNode.typeName.name));
+        seen.add(typeNode.typeName.name);
+        return countTypeMembers(
+          typeDeclarations.get(typeNode.typeName.name),
+          seen
+        );
       }
       return 0;
     }
 
     function checkComponent(node) {
-      if (!functionReturnsJsx(node) || node.params.length !== 1) return;
+      if (
+        !functionReturnsJsx(node) ||
+        hasWidgetDirective(node) ||
+        node.params.length === 0 ||
+        node.params.length > 2
+      ) {
+        return;
+      }
       const first = node.params[0];
       let propCount = 0;
       if (first.type === "ObjectPattern") {

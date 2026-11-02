@@ -110,6 +110,28 @@ export function BadComponent({ items = [] }: { items?: string[] }) {
   const randomId = Math.random();
   return <div>{randomId}{items.length}</div>;
 }
+
+declare const ipcMain: {
+  handle: (channel: string, handler: (event: { sender: unknown; senderFrame: unknown }, url: string) => void) => void;
+};
+declare const shell: { openExternal: (url: string) => void };
+ipcMain.handle("open-url", (_event, url) => {
+  shell.openExternal(url);
+});
+
+export function badActivityReducer(
+  state: { submitting: boolean; resending: boolean; googleSubmitting: boolean },
+  action: { type: string }
+) {
+  switch (action.type) {
+    case "submit":
+      return { ...state, submitting: true, resending: false, googleSubmitting: false };
+    case "resend":
+      return { ...state, submitting: false, resending: true, googleSubmitting: false };
+    default:
+      return state;
+  }
+}
 `;
 
 const goodSource = `
@@ -126,11 +148,32 @@ export function formatOrderSummary(summary: OrderSummary): string {
   return \`\${summary.orderId}: \${summary.totalCents}\`;
 }
 
-export function CleanWidget() {
+export function CleanWidget(props: {
+  a: string;
+  b: string;
+  c: string;
+  d: string;
+  e: string;
+  f: string;
+  g: string;
+  h: string;
+}) {
   "widget";
-  const label = "Ready";
+  const label = props.a;
   return <Text>{label}</Text>;
 }
+
+declare const ipcMain: {
+  handle: (channel: string, handler: (event: { sender: unknown; senderFrame: unknown }, url: string) => void) => void;
+};
+declare const shell: { openExternal: (url: string) => void };
+declare function isTrustedSender(sender: unknown): boolean;
+ipcMain.handle("open-url-safe", (event, url) => {
+  if (!isTrustedSender(event.sender)) {
+    throw new Error("Untrusted sender");
+  }
+  shell.openExternal(url);
+});
 
 const cachedSnapshot = { ready: true };
 function getStableSnapshot() {
@@ -170,6 +213,8 @@ const expectedRules = [
   "antidrift/no-unbound-widget-capture",
   "antidrift/no-raw-react-native-touchables",
   "antidrift/require-stable-snapshot",
+  "antidrift/require-authz-check",
+  "antidrift/no-handrolled-resource-lifecycle-cells",
 ];
 
 const workDir = mkdtempSync(join(tmpdir(), "antidrift-smoke-"));
