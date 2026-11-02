@@ -11,6 +11,7 @@ pub mod no_unresolved_dependency_types;
 pub mod no_vague_names;
 pub mod no_wrapping_functions;
 pub mod predicate_scan;
+pub mod redundant_unknown_call;
 mod vague_name_lexicon;
 
 use crate::CatalogRule;

@@ -96,7 +96,7 @@ export const typeContractProbes = [
     expectedCount: 1,
   },
   {
-    name: "no-appeasement-erasure (flags closed Record annotation on case table and unknown widening on known object while satisfies stays clean)",
+    name: "no-appeasement-erasure (flags closed Record annotation on case table, unknown widening on known object, and redundant unknown-narrowing helper calls while satisfies and value refinements stay clean)",
     rule: "antidrift/no-appeasement-erasure",
     file: "tooling/antidrift/src/__probe_appeasement_erasure.ts",
     source: `
@@ -104,8 +104,41 @@ export const typeContractProbes = [
       export const BAD_TABLE: Record<Mode, number> = { fast: 1, slow: 2 };
       export const BAD_UNKNOWN: unknown = { id: "1" };
       export const GOOD_TABLE = { fast: 1, slow: 2 } satisfies Record<Mode, number>;
+      class AtomicFileWriteError extends Error {
+        readonly committed = false;
+      }
+      function errorFromUnknown(raw: unknown): Error {
+        if (raw instanceof Error) {
+          return raw;
+        }
+        return new Error(String(raw));
+      }
+      function isFiniteNumber(raw: unknown): raw is number {
+        return typeof raw === "number" && Number.isFinite(raw);
+      }
+      function finiteNumber(raw: unknown): number {
+        if (typeof raw === "number" && Number.isFinite(raw)) {
+          return raw;
+        }
+        return 0;
+      }
+      function finiteViaPredicate(raw: unknown): number {
+        if (isFiniteNumber(raw)) return raw;
+        throw new Error("not finite");
+      }
+      export function handleWriteFailure(cause: AtomicFileWriteError, genuineUnknown: unknown, count: number) {
+        const direct = errorFromUnknown(cause);
+        const explicitCast = errorFromUnknown(cause as unknown);
+        const widened: unknown = cause;
+        const viaVar = errorFromUnknown(widened);
+        const fromUnknown = errorFromUnknown(genuineUnknown);
+        const fromString = errorFromUnknown("boom");
+        const refined = finiteNumber(count);
+        const refinedViaPredicate = finiteViaPredicate(count);
+        return [direct, explicitCast, viaVar, fromUnknown, fromString, refined, refinedViaPredicate];
+      }
     `,
-    expectedCount: 2,
+    expectedCount: 5,
   },
   {
     name: "no-redundant-type-predicate (flags callback typeof predicate inferred by TS while unannotated callback stays clean)",

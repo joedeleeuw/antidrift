@@ -51,7 +51,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 26
           package-manager-cache: false
 
       - uses: actions-rust-lang/setup-rust-toolchain@v2
@@ -107,7 +107,7 @@ jobs:
         if: "!endsWith(matrix.package, '-musl')"
         run: pnpm package:verify
 
-      - name: Smoke the packed platform package in node:24-alpine
+      - name: Smoke the packed platform package in node:26-alpine
         if: endsWith(matrix.package, '-musl')
         run: |
           docker run --rm \
@@ -118,7 +118,7 @@ jobs:
             --volume "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" \
             --volume "$RUNNER_TEMP:$RUNNER_TEMP" \
             --workdir "$GITHUB_WORKSPACE" \
-            node:24-alpine \
+            node:26-alpine \
             sh -euc 'export PATH="/tmp/npm-global/bin:$PATH"; npm install --global "$(node -p "require(\"./package.json\").packageManager")" && pnpm package:verify'
 
       - name: Archive antidrift-linter for the GitHub release
@@ -154,7 +154,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 26
           package-manager-cache: false
 
       - uses: actions/download-artifact@v8

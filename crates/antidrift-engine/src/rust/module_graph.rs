@@ -229,7 +229,7 @@ fn collect_external_mods(
 }
 
 fn is_cfg_test_attribute(attr: &Attribute) -> bool {
-    attr.path().is_ident("cfg") && super::syn_kernel::is_banned_test_attribute(attr)
+    attr.path().is_ident("cfg") && super::syn_ast::is_banned_test_attribute(attr)
 }
 
 fn resolve_external_mod(item_mod: &ItemMod, file_dir: &Path, base_dir: &Path) -> Option<PathBuf> {

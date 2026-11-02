@@ -84,6 +84,11 @@ try {
   proveReactNativePolicy();
   proveFallbackPolicy();
   rmSync(join(work, "portable-proofs"), { recursive: true, force: true });
+  rmSync(join(work, "apps"), { recursive: true, force: true });
+  rmSync(join(work, "configured/node_modules"), {
+    recursive: true,
+    force: true,
+  });
   rmSync(join(work, "adoption-proof.tsx"));
   rmSync(join(work, "adoption.config.json"));
 

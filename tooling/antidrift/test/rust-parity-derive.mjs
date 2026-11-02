@@ -63,8 +63,16 @@ const PLANTED_DERIVE_VIOLATIONS = {
     'const secret = Symbol("secret");\nexport async function symbolKey(input: { [secret]: number }): Promise<string> {\n  return Promise.resolve(String(input[secret]));\n}\n',
   "src/methods/mappedSymbolKey.ts":
     'const secret = Symbol("secret");\nexport async function mappedSymbolKey(input: { id: string } & Record<typeof secret, number>): Promise<number> {\n  return Promise.resolve(input[secret]);\n}\n',
+  "src/methods/stringEnum.ts":
+    'enum Level { Low = "low", High = "high" }\nexport async function stringEnum(level: Level): Promise<string> {\n  return Promise.resolve(level);\n}\n',
+  "src/methods/numericEnum.ts":
+    "enum Rank { One, Two }\nexport async function numericEnum(): Promise<Rank> {\n  return Promise.resolve(Rank.One);\n}\n",
   "src/client/leaky.ts":
     'import { listTodos } from "../server/store";\n\nexport function leak(): Promise<number> {\n  return listTodos("any").then((todos) => todos.length);\n}\n',
+  "src/client/dyn.ts":
+    'export async function loadStore(): Promise<number> {\n  const store = await import("../server/store");\n  const rows = await store.listTodos("any");\n  return rows.length;\n}\n',
+  "src/client/viaTable.ts":
+    'import { dispatch } from "../generated/server";\nexport function hasDispatch(): boolean {\n  return typeof dispatch === "object";\n}\n',
 };
 
 const DERIVE_GENERATED_FILES = [
@@ -76,7 +84,9 @@ const DERIVE_GENERATED_FILES = [
 ];
 
 const EXPECTED_PLANTED_DERIVE_DIAGNOSTICS = [
+  "client/dyn.ts client-reaches-server",
   "client/leaky.ts client-reaches-server",
+  "client/viaTable.ts client-reaches-server",
   "methods/arrayOverlap.ts method-result-not-wire",
   "methods/brokenImport.ts type-script-diagnostic",
   "methods/callbacky.ts method-param-not-wire",
@@ -87,12 +97,14 @@ const EXPECTED_PLANTED_DERIVE_DIAGNOSTICS = [
   "methods/expectString.ts reserved-generated-identifier",
   "methods/mappedSymbolKey.ts method-param-not-wire",
   "methods/nested/addTodo.ts duplicate-wire-name",
+  "methods/numericEnum.ts method-result-not-wire",
   "methods/optionalArg.ts method-param-not-wire",
   "methods/overlap.ts method-result-not-wire",
   "methods/primitiveArrayOverlap.ts method-result-not-wire",
   "methods/renamed.ts method-export-name",
   "methods/restArg.ts method-param-not-wire",
   "methods/shadowCallMethod.ts reserved-generated-identifier",
+  "methods/stringEnum.ts method-param-not-wire",
   "methods/surrogateKey.ts method-param-not-wire",
   "methods/surrogateLiteral.ts method-result-not-wire",
   "methods/symbolKey.ts method-param-not-wire",
@@ -224,6 +236,10 @@ function verifyPlantedDeriveViolations(binaryPath, sampleRoot, copyRoot) {
     plantedReport.diagnostics.map((d) => `${d.file} ${d.rule}`).sort(),
     EXPECTED_PLANTED_DERIVE_DIAGNOSTICS
   );
+  for (const enumFile of ["methods/stringEnum.ts", "methods/numericEnum.ts"]) {
+    const diag = plantedReport.diagnostics.find((d) => d.file === enumFile);
+    assert.match(diag?.message ?? "", /TypeScript enum.*literal union/u);
+  }
   const strictUtf8 = new TextDecoder("utf-8", { fatal: true });
   for (const name of DERIVE_GENERATED_FILES) {
     assert.doesNotThrow(() =>
@@ -324,12 +340,12 @@ function verifyProtoAndTsconfigDeriveProbes(binaryPath, copyRoot) {
   writeFileSync(tsconfigPath, originalTsconfig);
 }
 
-function verifyAcceptedAndRuntimeProbes(binaryPath, copyRoot) {
+function verifyAcceptedAndRuntimeProbes(binaryPath, copyRoot, repoRoot) {
   verifyProtoAndTsconfigDeriveProbes(binaryPath, copyRoot);
   const acceptedFile = join(copyRoot, "src/methods/acceptedShapes.ts");
   writeFileSync(
     acceptedFile,
-    'export async function acceptedShapes(input: { a: string } & { b: number }): Promise<Date | "missing"> {\n  return Promise.resolve(input.b > 0 ? new Date(0) : "missing");\n}\n'
+    'export async function acceptedShapes(input: { a: string } & { b: number }): Promise<{ kind: "a"; id: string; at: Date | "missing" }[] | { kind: "b"; id: string; detail: number }[]> {\n  return Promise.resolve([{ kind: "a", id: input.a, at: input.b > 0 ? new Date(0) : "missing" }]);\n}\n'
   );
   const acceptedRun = spawnSync(binaryPath, ["derive", copyRoot], {
     encoding: "utf8",
@@ -339,6 +355,12 @@ function verifyAcceptedAndRuntimeProbes(binaryPath, copyRoot) {
     0,
     `${acceptedRun.stdout}${acceptedRun.stderr}`
   );
+  const tscRun = spawnSync(
+    resolve(repoRoot, "node_modules/.bin/tsc"),
+    ["-p", copyRoot, "--noEmit", "--pretty", "false"],
+    { cwd: repoRoot, encoding: "utf8" }
+  );
+  assert.equal(tscRun.status, 0, `${tscRun.stdout}${tscRun.stderr}`);
   rmSync(acceptedFile);
 
   const decodePath = join(copyRoot, "src/runtime/decode.ts");
@@ -360,7 +382,7 @@ export function proveDeriveSmoke(binaryPath, repoRoot) {
   const workspace = mkdtempSync(join(tmpdir(), "antidrift-derive-"));
   try {
     const { sampleRoot, copyRoot } = copyDeriveSample(repoRoot, workspace);
-    verifyAcceptedAndRuntimeProbes(binaryPath, copyRoot);
+    verifyAcceptedAndRuntimeProbes(binaryPath, copyRoot, repoRoot);
     const cleanRun = spawnSync(binaryPath, ["derive", copyRoot], {
       encoding: "utf8",
     });

@@ -236,6 +236,7 @@ const loneSurrogateSource = [
   "declare const userInput: string;",
   'export const concatQuery = "SELECT * FROM users WHERE name = \'\\uD83D" + userInput + "\'";',
   "export const templateQuery = `SELECT * FROM users WHERE name = '${userInput}' -- \\uD83D`;",
+  'export const downloadResponse = new Response("body", { headers: { "Content-Disposition": "attachment; filename=x\\uD83D" } });',
 ].join("\n");
 const loneSurrogateDiags = runHeadlessProbe({
   version: 2,
@@ -270,6 +271,13 @@ assert.equal(
   ).length,
   2,
   `A lone surrogate in a SQL fragment must not hide the dynamic input, got ${JSON.stringify(loneSurrogateDiags)}`
+);
+assert.equal(
+  loneSurrogateDiags.filter(
+    (diag) => diag.rule === "antidrift/require-secure-document-response"
+  ).length,
+  1,
+  `A lone surrogate in a Content-Disposition header must not hide an attachment download response, got ${JSON.stringify(loneSurrogateDiags)}`
 );
 
 const sqlDefaultDiags = runHeadlessProbe({

@@ -131,6 +131,37 @@ const CFG_SUPPRESSION_SOURCE = [
   "    let count = 0;",
   "    count",
   "}",
+  "pub trait Logger {}",
+  "pub fn typed_wild_trait_assertion<T: Logger>(tree: T) {",
+  "    let _: &dyn Logger = &tree;",
+  "}",
+  "pub fn inferred_wild_still_reports(unused: usize) {",
+  "    let _: _ = unused;",
+  "}",
+  "pub struct DirectorySourceDist { pub install_path: String, pub editable: String, pub r#virtual: Option<bool> }",
+  "pub enum SourceDist { Directory(DirectorySourceDist) }",
+  "pub enum TargetDist { Directory { install_path: String, editable: String, r#virtual: Option<bool> } }",
+  "impl TargetDist {",
+  "    pub fn from_source(dist: &SourceDist) -> Self {",
+  "        match dist {",
+  "            SourceDist::Directory(sdist) => Self::Directory {",
+  "                install_path: sdist.install_path.clone(),",
+  "                editable: sdist.editable.clone(),",
+  "                r#virtual: sdist.r#virtual,",
+  "            },",
+  "        }",
+  "    }",
+  "}",
+  "pub fn same_struct_clone_reports(sdist: &DirectorySourceDist) -> DirectorySourceDist {",
+  "    DirectorySourceDist {",
+  "        install_path: sdist.install_path.clone(),",
+  "        editable: sdist.editable.clone(),",
+  "        r#virtual: sdist.r#virtual,",
+  "    }",
+  "}",
+  "pub fn typed_map_index_clean(headers: &std::collections::HashMap<&str, String>) -> &str {",
+  '    headers["content-type"].as_str()',
+  "}",
   "",
 ].join("\n");
 
@@ -138,16 +169,21 @@ export function cfgSuppressionAndMacroModuleSmoke(linter) {
   withTempDir("antidrift-rust-cfg-macro-", (root) => {
     writeCrate(root, "cfg-macro");
     writeFileSync(join(root, "src/lib.rs"), CFG_SUPPRESSION_SOURCE);
+    const findings = linter.findings(root);
+    const byRule = (id) => findings.filter((line) => line.includes(id));
     assert.deepEqual(
-      linter
-        .findings(root)
-        .filter((line) => line.includes("rust/no-let-underscore-suppression")),
+      byRule("rust/no-let-underscore-suppression"),
       [
         "src/lib.rs:12 rust/no-let-underscore-suppression error",
+        "src/lib.rs:32 rust/no-let-underscore-suppression error",
         "src/lib.rs:4 rust/no-let-underscore-suppression error",
       ],
-      "Only expression uses of the suppressed binding justify let _ = ...; method calls and shadowed bindings still report"
+      "Only expression uses of the suppressed binding or typed let _: Trait = ... assertions are allowed; let _ = ... and let _: _ = ... still report"
     );
+    assert.deepEqual(byRule("rust/no-contract-appeasement-projection"), [
+      "src/lib.rs:49 rust/no-contract-appeasement-projection error",
+    ]);
+    assert.deepEqual(byRule("rust/no-untyped-config-probe"), []);
     writeFileSync(
       join(root, "Cargo.toml"),
       '[package]\nname = "cfg-macro"\nversion = "0.0.0"\n\n[lib]\npath = "src/lib.rs"\ntest = false\ndoctest = false\n\n[package.metadata.antidrift]\nmodule-macros = ["declare_custom_mod"]\n'
@@ -157,17 +193,13 @@ export function cfgSuppressionAndMacroModuleSmoke(linter) {
       'macro_rules! noop { ($id:ident) => {}; }\nmacro_rules! declare_custom_mod { ($id:ident) => {}; }\nnoop!(orphan);\ndeclare_custom_mod!(custom_owned);\ninclude!("included.rs");\n'
     );
     writeFileSync(join(root, "src/orphan.rs"), "pub fn orphan() {}\n");
-    writeFileSync(
-      join(root, "src/custom_owned.rs"),
-      "pub fn custom_owned() {}\n"
-    );
+    writeFileSync(join(root, "src/custom_owned.rs"), "pub fn owned() {}\n");
     writeFileSync(join(root, "src/included.rs"), "pub fn included() {}\n");
     assert.deepEqual(
       linter
         .findings(root)
         .filter((line) => line.includes("rust/no-orphan-module")),
-      ["src/orphan.rs:1 rust/no-orphan-module error"],
-      "Arbitrary macro invocations do not grant module ownership, while include! and configured module-macros do"
+      ["src/orphan.rs:1 rust/no-orphan-module error"]
     );
   });
 }

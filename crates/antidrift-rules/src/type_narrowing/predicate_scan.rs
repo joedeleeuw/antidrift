@@ -6,26 +6,6 @@ use tsrs_checker::{Checker, Type, TypeFlags};
 use tsrs_core::P;
 use tsrslint::utils::{get_construct_signatures, is_type_flag_set, is_union_type};
 
-pub fn unit_literal_key(typ: P<Type>) -> Option<String> {
-    if is_union_type(typ) {
-        return None;
-    }
-    if typ.is_string_literal()
-        && let Some(tsrs_checker::LiteralValue::String(val)) = typ.as_literal_type().value()
-    {
-        return Some(format!("string:{val}"));
-    }
-    if typ.is_number_literal()
-        && let Some(tsrs_checker::LiteralValue::Number(num)) = typ.as_literal_type().value()
-    {
-        return Some(format!("number:{}", num.string()));
-    }
-    if shape::is_true_literal_type(typ) {
-        return Some("boolean:true".to_owned());
-    }
-    shape::is_false_literal_type(typ).then(|| "boolean:false".to_owned())
-}
-
 #[derive(Default)]
 pub struct BodyScanState {
     pub(super) param_names: FxHashSet<String>,
@@ -155,7 +135,7 @@ fn record_tag_comparison(
         return;
     }
     let other_type = checker.get_type_at_location(other);
-    let Some(lit_key) = unit_literal_key(other_type) else {
+    let Some(lit_key) = shape::unit_literal_key(other_type) else {
         return;
     };
     let field = path[0].clone();
@@ -192,7 +172,9 @@ fn apply_delegated_predicate_decl(
     }
     let props = checker.get_properties_of_type(delegated);
     for &prop in props {
-        state.checked_props.insert(prop.name().to_owned());
+        if let Some(name) = tsrs_kernel::decodable_text(prop.name()) {
+            state.checked_props.insert(name.to_owned());
+        }
     }
     false
 }

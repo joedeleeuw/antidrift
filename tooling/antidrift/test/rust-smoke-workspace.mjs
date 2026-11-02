@@ -124,7 +124,6 @@ function writeKernelCrate(tempWorkspace) {
   );
   writeFileSync(join(kernelSrc, "provenance.rs"), provenanceSource.join("\n"));
   writeFileSync(join(kernelSrc, "orphan_file.rs"), "pub fn unused() {}\n");
-  writeFileSync(join(kernelSrc, "bad_helpers.rs"), "pub fn helper() {}\n");
 }
 
 function writeRulesCrate(tempWorkspace) {

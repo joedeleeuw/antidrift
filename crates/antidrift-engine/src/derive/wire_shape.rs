@@ -1,9 +1,12 @@
 use super::wire_overlap::overlap_reason;
-use antidrift_kernel::shape::{has_string_or_number_index_signature, is_true_literal_type};
+use antidrift_kernel::shape::{
+    has_string_or_number_index_signature, is_true_literal_type, literal_type_number_string,
+    literal_type_string,
+};
 use antidrift_kernel::tsrs_kernel::decodable_text;
 use serde::Serialize;
 use tsrs_ast::{Kind, Symbol, SymbolFlags};
-use tsrs_checker::{Checker, LiteralValue, ObjectFlags, SignatureKind, Type, TypeFlags};
+use tsrs_checker::{Checker, ObjectFlags, SignatureKind, Type, TypeFlags};
 use tsrs_core::P;
 
 #[derive(Serialize, Clone)]
@@ -73,6 +76,13 @@ pub(crate) fn shape_of(
     if flags.intersects(TypeFlags::Boolean) {
         return Ok(WireShape::Boolean);
     }
+    if is_enum_type(typ) {
+        return Err(ShapeProblem::at(
+            path,
+            "is a TypeScript enum, which cannot cross the wire; use a literal union instead"
+                .to_owned(),
+        ));
+    }
     if flags.intersects(TypeFlags::Union) {
         return union_shape(checker, typ, path, depth);
     }
@@ -114,13 +124,21 @@ pub(crate) fn shape_of(
     ))
 }
 
+fn is_enum_type(typ: P<Type>) -> bool {
+    typ.flags().intersects(TypeFlags::EnumLike)
+        || typ.symbol().is_some_and(|sym| {
+            sym.flags()
+                .intersects(SymbolFlags::Enum | SymbolFlags::EnumMember)
+        })
+}
+
 fn literal_shape(
     checker: &mut Checker,
     typ: P<Type>,
     path: &str,
 ) -> Result<WireShape, ShapeProblem> {
-    match typ.as_literal_type().value() {
-        Some(LiteralValue::String(text)) => decodable_text(text)
+    if typ.is_string_literal() {
+        return literal_type_string(typ)
             .map(|text| WireShape::Literal {
                 value: WireLiteral::Text(text.to_owned()),
             })
@@ -130,26 +148,26 @@ fn literal_shape(
                     "is a string literal holding a lone surrogate, which cannot cross the wire"
                         .to_owned(),
                 )
-            }),
-        Some(LiteralValue::Number(_)) => {
-            let printed = checker.type_to_string_exported(typ);
-            printed
-                .parse::<f64>()
-                .map(|number| WireShape::Literal {
-                    value: WireLiteral::Number(number),
-                })
-                .map_err(|err| {
-                    ShapeProblem::at(
-                        path,
-                        format!("numeric literal `{printed}` is not a JSON number: {err}"),
-                    )
-                })
-        }
-        _ => Err(ShapeProblem::at(
-            path,
-            "is a bigint or computed enum literal, which cannot cross the wire".to_owned(),
-        )),
+            });
     }
+    if literal_type_number_string(typ).is_some() {
+        let printed = checker.type_to_string_exported(typ);
+        return printed
+            .parse::<f64>()
+            .map(|number| WireShape::Literal {
+                value: WireLiteral::Number(number),
+            })
+            .map_err(|err| {
+                ShapeProblem::at(
+                    path,
+                    format!("numeric literal `{printed}` is not a JSON number: {err}"),
+                )
+            });
+    }
+    Err(ShapeProblem::at(
+        path,
+        "is a bigint or computed enum literal, which cannot cross the wire".to_owned(),
+    ))
 }
 
 fn union_shape(

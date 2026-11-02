@@ -77,7 +77,11 @@ impl SourceLayout {
         if !self.within(file_name) {
             return None;
         }
-        match self.relative(file_name).split('/').next()? {
+        let relative = self.relative(file_name);
+        if matches!(relative, "generated/server.ts" | "runtime/server.ts") {
+            return Some(Role::Server);
+        }
+        match relative.split('/').next()? {
             "methods" => Some(Role::Method),
             "pubs" => Some(Role::Publication),
             "routes" => Some(Role::Route),
@@ -189,28 +193,55 @@ fn shared_exported_callables(sf: P<SourceFile>) -> Vec<(&'static str, bool, bool
     callables
 }
 
+fn resolve_import_target(
+    program: &Program,
+    sf: P<SourceFile>,
+    specifier_node: P<Node>,
+    source: &str,
+) -> Option<String> {
+    if let Some(resolved) = program.get_resolved_module_from_module_specifier(sf, specifier_node)
+        && resolved.is_resolved()
+        && !resolved.is_external_library_import
+    {
+        return Some(tspath::normalize_slashes(resolved.resolved_file_name));
+    }
+    if !source.starts_with("./") && !source.starts_with("../") {
+        return None;
+    }
+    let dir = tspath::get_directory_path(sf.file_name());
+    let joined = tspath::get_normalized_absolute_path(source, &dir);
+    let stem = joined.strip_suffix(".js").unwrap_or(&joined);
+    if stem.ends_with(".ts") || stem.ends_with(".tsx") {
+        Some(stem.to_owned())
+    } else {
+        Some(format!("{stem}.ts"))
+    }
+}
+
+fn collect_runtime_imports(
+    program: &Program,
+    sf: P<SourceFile>,
+    node: P<Node>,
+    layout: &SourceLayout,
+    targets: &mut Vec<String>,
+) {
+    if let Some(import) = extract_module_import(node)
+        && !import.type_only
+        && let Some(target) =
+            resolve_import_target(program, sf, import.specifier_node, import.source)
+        && layout.within(&target)
+    {
+        targets.push(target);
+    }
+    node.for_each_child(&mut |child| {
+        collect_runtime_imports(program, sf, child, layout, targets);
+        false
+    });
+}
+
 fn runtime_imports(program: &Program, sf: P<SourceFile>, layout: &SourceLayout) -> Vec<String> {
     let mut targets = Vec::new();
-    for &stmt in sf.statements().nodes() {
-        let Some(import) = extract_module_import(stmt) else {
-            continue;
-        };
-        if import.type_only {
-            continue;
-        }
-        let Some(resolved) =
-            program.get_resolved_module_from_module_specifier(sf, import.specifier_node)
-        else {
-            continue;
-        };
-        if !resolved.is_resolved() || resolved.is_external_library_import {
-            continue;
-        }
-        let target = tspath::normalize_slashes(resolved.resolved_file_name);
-        if layout.within(&target) {
-            targets.push(target);
-        }
-    }
+    collect_runtime_imports(program, sf, sf.as_node(), layout, &mut targets);
     targets
 }
 

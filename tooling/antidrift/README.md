@@ -82,6 +82,9 @@ export default {
     "max-lines": "off",
     "max-lines-per-function": "off",
     "antidrift/no-as-never": "warn",
+    "antidrift/no-explicit-type-arguments-on-owned-api": "error",
+    "antidrift/no-identity-schema-transform": "error",
+    "antidrift/no-schema-validator-transcoding": "error",
     "antidrift/react-max-component-props": ["error", { max: 6 }],
     "antidrift/require-convex-return-validator": "off",
   },
@@ -94,6 +97,10 @@ export default {
     {
       files: ["apps/client/convex/**/*.ts"],
       rules: { "antidrift/require-convex-return-validator": "error" },
+    },
+    {
+      files: ["apps/client/src/legacy-card.tsx"],
+      rules: { "antidrift/react-max-component-props": "off" },
     },
   ],
 };

@@ -1,6 +1,6 @@
 use antidrift_kernel::{boundary, shape, tsrs_kernel};
 use tsrs_ast::{self as ast, Kind, Node, NodeFlags, Symbol};
-use tsrs_checker::{Checker, TypeFlags};
+use tsrs_checker::{Checker, Type, TypeFlags};
 use tsrs_core::P;
 use tsrslint::utils::is_type_flag_set;
 
@@ -269,13 +269,28 @@ pub fn erased_unknown_source(type_node: Option<P<Node>>, init: P<Node>) -> Optio
         .then_some(unwrapped_init)
 }
 
-fn is_laundered_reference(checker: &mut Checker, node: P<Node>) -> bool {
+fn is_laundered_reference(
+    checker: &mut Checker,
+    node: P<Node>,
+    source_type: P<Type>,
+    in_test_file: bool,
+) -> bool {
     let Some(parent) = skip_parentheses_up(node) else {
         return false;
     };
     if parent.kind() == Kind::CallExpression {
-        return boundary::schema_validation_call_parts(parent, checker)
-            .is_some_and(|parts| tsrs_kernel::unwrap_parentheses(parts.arg_node) == node);
+        if boundary::schema_validation_call_parts(parent, checker)
+            .is_some_and(|parts| tsrs_kernel::unwrap_parentheses(parts.arg_node) == node)
+        {
+            return true;
+        }
+        return !in_test_file
+            && super::redundant_unknown_call::call_arg_narrows_satisfied_type(
+                checker,
+                parent,
+                node,
+                source_type,
+            );
     }
     tsrs_kernel::assertion_parts(parent).is_some_and(|(_, t)| t.kind() == Kind::TypeReference)
 }
@@ -285,6 +300,8 @@ pub fn has_laundered_unknown_use(
     root: P<Node>,
     target_sym: P<Symbol>,
     decl_name: P<Node>,
+    source_type: P<Type>,
+    in_test_file: bool,
 ) -> bool {
     let mut found = false;
     walk_nodes(root, &mut |node| {
@@ -292,7 +309,7 @@ pub fn has_laundered_unknown_use(
             && node != decl_name
             && ast::is_identifier(node)
             && checker.get_symbol_at_location_exported(node) == Some(target_sym)
-            && is_laundered_reference(checker, node)
+            && is_laundered_reference(checker, node, source_type, in_test_file)
         {
             found = true;
         }

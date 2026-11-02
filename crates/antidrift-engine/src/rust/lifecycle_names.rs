@@ -151,24 +151,3 @@ fn collect_leaves(tree: &syn::UseTree, leaves: &mut Vec<String>) {
         syn::UseTree::Glob(_) => {}
     }
 }
-
-pub(super) fn banned_lifecycle_message(name: &str) -> Option<String> {
-    let lower = name.to_ascii_lowercase();
-    (has_numbered_prefix(&lower, "batch") || has_numbered_prefix(&lower, "slice_v")).then(|| {
-        format!("'{name}' uses batch-scaffolding naming; name the item after its domain concept.")
-    })
-}
-
-fn has_numbered_prefix(lower: &str, prefix: &str) -> bool {
-    let mut search_from = 0usize;
-    while let Some(offset) = lower[search_from..].find(prefix) {
-        let after = search_from + offset + prefix.len();
-        let rest = &lower[after..];
-        let trimmed = rest.strip_prefix('_').unwrap_or(rest);
-        if trimmed.as_bytes().first().is_some_and(u8::is_ascii_digit) {
-            return true;
-        }
-        search_from = after;
-    }
-    false
-}

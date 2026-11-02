@@ -4,7 +4,6 @@ import { fileURLToPath } from "node:url";
 import { checkDomainRegistries } from "./registry-checks/domain.mjs";
 import { readRegistry } from "./registry-checks/registry-contracts.mjs";
 import { checkPackageSurface } from "./registry-checks/package-surface.mjs";
-import { checkRuleRegistry } from "./registry-checks/rules.mjs";
 
 export function checkRegistries({
   repoRoot = process.cwd(),
@@ -23,11 +22,9 @@ export function checkRegistries({
     gateways: readRegistry(resolvedPolicyDir, "gateways", errors),
     generated: readRegistry(resolvedPolicyDir, "generated", errors),
     ownership: readRegistry(resolvedPolicyDir, "ownership", errors),
-    rules: readRegistry(resolvedPolicyDir, "rules", errors),
   };
 
   checkDomainRegistries(registries, root, errors);
-  checkRuleRegistry(registries.rules, root, errors);
   checkPackageSurface(root, errors);
 
   for (const error of errors) report(error);

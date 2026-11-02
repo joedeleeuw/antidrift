@@ -1,6 +1,6 @@
 use super::RustDiagnostic;
 use super::struct_index::{ImportTable, PathResolution, file_scope};
-use super::syn_kernel::{extract_pat_ident, is_wild_pat};
+use super::syn_ast::{extract_pat_ident, is_wild_pat};
 use super::workspace::relative_display;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::path::{Path, PathBuf};

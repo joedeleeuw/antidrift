@@ -24,7 +24,7 @@ allowBuilds:
 # pnpm catalog specifiers.
 catalogs:
   core:
-    "@types/node": ^22.10.2
+    "@types/node": ^26.6.6
     tsx: ^4.19.2
     typescript: 6.0.3
     yaml: ^2.6.1

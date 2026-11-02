@@ -1,4 +1,4 @@
-use super::syn_kernel::path_ends_with;
+use super::syn_ast::path_ends_with;
 use rustc_hash::FxHashMap;
 use syn::visit::{self, Visit};
 use syn::{Expr, ExprCall, Pat, Type};

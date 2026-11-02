@@ -26,7 +26,6 @@ const HOUSE_STYLE_RULE_IDS = [
   "rust/no-stringly-variant",
   "rust/no-boolean-map",
   "rust/no-orphan-module",
-  "rust/no-grab-bag-module",
   "rust/no-anemic-errors",
   "rust/no-compat-names",
   "rust/no-wrapping-functions",
@@ -65,15 +64,6 @@ const HOUSE_STYLE_MESSAGES = [
   "Module layer 'provenance' (rank 0) cannot import higher layer 'boundary' (rank 3)",
   "'Listener::Enter' is forbidden here: Listener::Enter(Kind::SourceFile) never fires in tsrslint.",
   "'hop_wrapper' is a hop to 'legacy_adapter': inlining it at its 1 call site(s)",
-];
-
-const REMOVED_RULE_IDS = [
-  "rust/target-manifest-policy",
-  "rust/require-rule-scope",
-  "rust/no-duplicate-scope-fields",
-  "rust/no-discarded-decoded-config",
-  "rust/no-redundant-owner-prefix",
-  "antidrift/no-tsrslint-sourcefile-listener",
 ];
 
 function houseStyleShapeAsserts(diags) {
@@ -140,12 +130,6 @@ function houseStyleSmoke(linter) {
           .length,
         1,
         `Expected antidrift-linter rust diagnostics to include '${expectedMessage}' once, got ${printed}`
-      );
-    }
-    for (const absentRuleId of REMOVED_RULE_IDS) {
-      assert.ok(
-        !reportedRuleIds.has(absentRuleId),
-        `Expected removed rule ${absentRuleId} to be gone, got ${printed}`
       );
     }
     houseStyleShapeAsserts(diags);

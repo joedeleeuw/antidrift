@@ -106,11 +106,6 @@ pub(super) const RULES: &[RuleRow] = &[
         "Every Rust source file under src must be reachable from a Cargo target root through `mod` declarations.",
     ),
     general(
-        "rust/no-grab-bag-module",
-        ScopePolicy::Everywhere,
-        "Name modules after the domain concept they own instead of utils, helpers, common, or misc.",
-    ),
-    general(
         "rust/no-hollow-module",
         ScopePolicy::Everywhere,
         "Delete empty or stub-only Rust modules.",

@@ -330,17 +330,16 @@ function verifyBrokenTsconfigFails(binaryPath, repoRoot, workspace) {
     assert.notEqual(run.status, 0);
     assert.match(`${run.stdout}${run.stderr}`, pattern);
   }
-  const changedFiles = [
-    {
-      path: "tooling/antidrift/src/oxlint-config/index.mjs",
-      operation: "modify",
-    },
-  ];
   const graph = collectTouchedModuleGraph({
     cwd: repoRoot,
     head: "HEAD",
     tsconfig: "tsconfig.json",
-    changedFiles,
+    changedFiles: [
+      {
+        path: "tooling/antidrift/src/oxlint-config/index.mjs",
+        operation: "modify",
+      },
+    ],
     allowedEntrypoints: ["tooling/antidrift/src/index.mjs"],
     maxTouchedModuleRadius: 2,
   });

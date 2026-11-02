@@ -79,6 +79,7 @@ struct RolePattern {
     dirs: &'static [&'static str],
     stems: &'static [&'static str],
     stem_suffixes: &'static [&'static str],
+    dot_segments: &'static [&'static str],
     script_only: bool,
 }
 
@@ -86,6 +87,7 @@ const NO_PATTERN: RolePattern = RolePattern {
     dirs: &[],
     stems: &[],
     stem_suffixes: &[],
+    dot_segments: &[],
     script_only: false,
 };
 
@@ -139,6 +141,7 @@ impl FileRole {
             Self::ScriptEntry => RolePattern {
                 dirs: &["scripts", "bin"],
                 stem_suffixes: &["worker-process"],
+                dot_segments: &["worker-process"],
                 ..NO_PATTERN
             },
             Self::Shared => RolePattern {
@@ -167,6 +170,9 @@ impl RolePattern {
                 .stem_suffixes
                 .iter()
                 .any(|suffix| stem.ends_with(suffix))
+            || name
+                .split('.')
+                .any(|part| self.dot_segments.contains(&part))
     }
 }
 

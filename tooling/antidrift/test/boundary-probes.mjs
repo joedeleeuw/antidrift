@@ -228,6 +228,20 @@ const boundaryProbeRows = [
     expectedCount: 0,
   },
   {
+    id: "role:worker-process-dot-prefix",
+    rule: "antidrift/no-eager-singleton",
+    sourceText: "const storage = new S3Client({});\n",
+    file: "src/worker-process.entry.ts",
+    expectedCount: 0,
+  },
+  {
+    id: "role:worker-process-dot-suffix",
+    rule: "antidrift/no-eager-singleton",
+    sourceText: "const storage = new S3Client({});\n",
+    file: "src/foo.worker-process.ts",
+    expectedCount: 0,
+  },
+  {
     id: "role:outside-shared",
     rule: "antidrift/no-bun-api-in-shared",
     sourceText: 'import { file } from "bun";\n',
@@ -277,6 +291,35 @@ const boundaryProbeRows = [
       "// This function returns the value\nfunction value() { return 1; }\n",
     file: "src/value.stub.ts",
     expectedCount: 0,
+  },
+  {
+    id: "role:tutorial-mock-dts",
+    rule: "antidrift/no-tutorial-comments",
+    sourceText:
+      "// This function returns the value\nexport declare function value(): number;\n",
+    file: "src/value.mock.d.ts",
+    expectedCount: 0,
+  },
+  {
+    id: "role:host-path-extensionless-example",
+    rule: "antidrift/no-host-path-literal",
+    sourceText: 'const root = "/Users/alice/code/app";\n',
+    file: "src/example",
+    expectedCount: 1,
+  },
+  {
+    id: "role:host-path-extensionless-stories",
+    rule: "antidrift/no-host-path-literal",
+    sourceText: 'const root = "/Users/alice/code/app";\n',
+    file: "src/Button.stories",
+    expectedCount: 1,
+  },
+  {
+    id: "directive-prose-todo:invalid",
+    rule: "antidrift/no-todo-without-issue",
+    sourceText: "// eslint-disable is a todo workaround\nexport const x = 1;\n",
+    file: "src/directive-todo.ts",
+    expectedCount: 1,
   },
 ];
 

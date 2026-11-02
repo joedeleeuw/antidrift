@@ -1,47 +1,13 @@
 use super::RustDiagnostic;
 use antidrift_kernel::line_caps::CappedUnit;
-use std::path::Path;
-
-const BANNED_EXACT_FILENAMES: &[&str] = &[
-    "common.rs",
-    "helpers.rs",
-    "misc.rs",
-    "shared.rs",
-    "util.rs",
-    "utils.rs",
-];
-
-const BANNED_SUFFIXES: &[&str] = &["_helpers.rs", "_utils.rs"];
 
 pub(super) fn check_file_surface(
     rel_path: &str,
-    path: &Path,
     source: &str,
     diagnostics: &mut Vec<RustDiagnostic>,
 ) {
-    check_grab_bag_filename(rel_path, path, diagnostics);
     check_max_lines(rel_path, source, diagnostics);
     scan_inline_comments(rel_path, source, diagnostics);
-}
-
-fn check_grab_bag_filename(rel_path: &str, path: &Path, diagnostics: &mut Vec<RustDiagnostic>) {
-    let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
-        return;
-    };
-    let is_banned = BANNED_EXACT_FILENAMES.contains(&file_name)
-        || BANNED_SUFFIXES
-            .iter()
-            .any(|suffix| file_name.ends_with(suffix));
-    if is_banned {
-        diagnostics.push(RustDiagnostic::error(
-            rel_path.to_owned(),
-            1,
-            "rust/no-grab-bag-module",
-            format!(
-                "Module filename '{file_name}' is a grab-bag name; name the module after the domain concept it owns."
-            ),
-        ));
-    }
 }
 
 fn check_max_lines(rel_path: &str, source: &str, diagnostics: &mut Vec<RustDiagnostic>) {

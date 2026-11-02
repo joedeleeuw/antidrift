@@ -1,5 +1,5 @@
 use proc_macro2::Span;
-use syn::{Attribute, BinOp, Expr, ExprCall, GenericArgument, Meta, Pat, PathArguments, Type};
+use syn::{Attribute, BinOp, Expr, ExprCall, Meta, Pat, Type};
 
 pub(super) fn path_ends_with(path: &syn::Path, expected: &[&str]) -> bool {
     if path.segments.len() < expected.len() {
@@ -10,6 +10,10 @@ pub(super) fn path_ends_with(path: &syn::Path, expected: &[&str]) -> bool {
         .rev()
         .zip(expected.iter().rev())
         .all(|(seg, want)| seg.ident == *want)
+}
+
+pub(super) fn call_path_ends_with(call: &ExprCall, expected: &[&str]) -> bool {
+    matches!(&*call.func, Expr::Path(callee) if path_ends_with(&callee.path, expected))
 }
 
 pub(super) fn is_banned_test_attribute(attr: &Attribute) -> bool {
@@ -141,8 +145,14 @@ pub(super) fn is_wild_pat(pat: &Pat) -> bool {
     }
 }
 
-pub(super) fn call_path_ends_with(call: &ExprCall, expected: &[&str]) -> bool {
-    matches!(&*call.func, Expr::Path(callee) if path_ends_with(&callee.path, expected))
+pub(super) fn is_untyped_wild_pat(pat: &Pat) -> bool {
+    match pat {
+        Pat::Wild(_) => true,
+        Pat::Type(pat_type) => {
+            matches!(&*pat_type.ty, Type::Infer(_)) && is_wild_pat(&pat_type.pat)
+        }
+        _ => false,
+    }
 }
 
 pub(super) fn is_compound_assign_op(op: &BinOp) -> bool {
@@ -186,92 +196,4 @@ pub(super) fn has_derive_or_repr(attrs: &[Attribute], traits: &[&str]) -> bool {
         }
     }
     false
-}
-
-pub(super) fn is_err_wild_pat(pat: &Pat) -> bool {
-    let Pat::TupleStruct(tuple) = pat else {
-        return false;
-    };
-    tuple
-        .path
-        .segments
-        .last()
-        .is_some_and(|seg| seg.ident == "Err")
-        && tuple.elems.len() == 1
-        && is_wild_pat(&tuple.elems[0])
-}
-
-pub(super) fn is_fs_io_call(expr: &Expr) -> bool {
-    let Expr::Call(ExprCall { func, .. }) = expr else {
-        return false;
-    };
-    let Expr::Path(callee) = &**func else {
-        return false;
-    };
-    let segments: Vec<&syn::Ident> = callee.path.segments.iter().map(|s| &s.ident).collect();
-    let Some(last) = segments.last() else {
-        return false;
-    };
-    segments.len() >= 2
-        && *segments[segments.len() - 2] == "fs"
-        && (**last == "read_to_string"
-            || **last == "read"
-            || **last == "write"
-            || **last == "read_dir"
-            || **last == "metadata")
-}
-
-pub(super) fn is_string_or_str_type(ty: &Type) -> bool {
-    match ty {
-        Type::Path(type_path) => {
-            path_ends_with(&type_path.path, &["String"])
-                || path_ends_with(&type_path.path, &["str"])
-                || is_cow_str_path(&type_path.path)
-        }
-        Type::Reference(type_ref) => is_string_or_str_type(&type_ref.elem),
-        _ => false,
-    }
-}
-
-fn is_cow_str_path(path: &syn::Path) -> bool {
-    let Some(last) = path.segments.last() else {
-        return false;
-    };
-    if last.ident != "Cow" {
-        return false;
-    }
-    let PathArguments::AngleBracketed(angle) = &last.arguments else {
-        return false;
-    };
-    angle.args.iter().any(|arg| {
-        matches!(
-            arg,
-            GenericArgument::Type(Type::Path(inner)) if path_ends_with(&inner.path, &["str"])
-        )
-    })
-}
-
-pub(super) fn is_option_type(ty: &Type) -> bool {
-    let Type::Path(type_path) = ty else {
-        return false;
-    };
-    type_path.qself.is_none()
-        && type_path.path.segments.last().is_some_and(|seg| {
-            seg.ident == "Option" && matches!(seg.arguments, PathArguments::AngleBracketed(_))
-        })
-}
-
-pub(super) fn has_bool_second_type_arg(args: &PathArguments) -> bool {
-    let PathArguments::AngleBracketed(angle) = args else {
-        return false;
-    };
-    let mut type_args = angle.args.iter().filter_map(|arg| match arg {
-        GenericArgument::Type(ty) => Some(ty),
-        _ => None,
-    });
-    let _first = type_args.next();
-    let Some(Type::Path(second)) = type_args.next() else {
-        return false;
-    };
-    second.path.is_ident("bool")
 }

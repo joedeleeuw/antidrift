@@ -85,7 +85,7 @@ export function expectLiteral<const T extends string | number | boolean>(
 export function expectArray<T>(
   raw: unknown,
   path: string,
-  item: Decoder<NoInfer<T>>
+  item: Decoder<T>
 ): T[] {
   if (!Array.isArray(raw)) {
     throw new DecodeError(path, "array", raw);
@@ -100,11 +100,11 @@ function expectRecord(raw: unknown, path: string): Record<string, unknown> {
   return Object.fromEntries(Object.entries(raw));
 }
 
-export function firstOf<T>(
+export function firstOf<T extends readonly unknown[]>(
   raw: unknown,
   path: string,
-  variants: readonly Decoder<NoInfer<T>>[]
-): T {
+  variants: { readonly [K in keyof T]: Decoder<T[K]> }
+): T[number] {
   const failures: string[] = [];
   for (const variant of variants) {
     try {
@@ -119,7 +119,7 @@ export function firstOf<T>(
 export function expectObject<T>(
   raw: unknown,
   path: string,
-  build: (record: Record<string, unknown>) => NoInfer<T>
+  build: (record: Record<string, unknown>) => T
 ): T {
   return build(expectRecord(raw, path));
 }

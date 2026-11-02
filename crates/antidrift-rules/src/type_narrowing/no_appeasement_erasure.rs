@@ -1,3 +1,4 @@
+use antidrift_kernel::file_role::{FileRole, ProjectPath};
 use antidrift_kernel::rule::{Ctx, Listener, RuleMessage, RuleSpec};
 use antidrift_kernel::{shape, tsrs_kernel};
 use tsrs_ast::{self as ast, Kind, Node};
@@ -9,6 +10,14 @@ use super::erasure_analysis::{
     is_mutated_object_binding, is_populated_case_table_object, is_widened_known_declaration,
     skip_parentheses_up,
 };
+use super::redundant_unknown_call::{
+    call_arg_narrows_satisfied_type, find_redundant_unknown_call_arg,
+};
+
+fn is_in_test_file(ctx: &Ctx) -> bool {
+    ProjectPath::of(ctx.program, ctx.file.file_name())
+        .has_any_role(&[FileRole::TestOrSpec, FileRole::TestSupport])
+}
 
 fn check_case_table_annotation(
     ctx: &mut Ctx,
@@ -63,8 +72,16 @@ fn check_appeasement_erasure_variable(
     let Some(sym) = ctx.checker.get_symbol_at_location_exported(name_node) else {
         return false;
     };
+    let in_test = is_in_test_file(ctx);
     let scope_root = tsrs_kernel::enclosing_function(decl_node).unwrap_or(ctx.file.as_node());
-    if !has_laundered_unknown_use(ctx.checker, scope_root, sym, name_node) {
+    if !has_laundered_unknown_use(
+        ctx.checker,
+        scope_root,
+        sym,
+        name_node,
+        source_type,
+        in_test,
+    ) {
         return false;
     }
     ctx.report_node(
@@ -205,6 +222,18 @@ fn is_laundered_unknown_initializer(ctx: &mut Ctx, node: P<Node>, type_node: P<N
     let Some(parent) = skip_parentheses_up(node) else {
         return false;
     };
+    let in_test = is_in_test_file(ctx);
+    if parent.kind() == Kind::CallExpression
+        && !in_test
+        && let Some((operand, _)) = tsrs_kernel::assertion_parts(node)
+    {
+        let source_type = ctx
+            .checker
+            .get_type_at_location(tsrs_kernel::unwrap_parentheses(operand));
+        if call_arg_narrows_satisfied_type(ctx.checker, parent, node, source_type) {
+            return true;
+        }
+    }
     if parent.kind() != Kind::VariableDeclaration || !is_const_declaration(parent) {
         return false;
     }
@@ -219,8 +248,37 @@ fn is_laundered_unknown_initializer(ctx: &mut Ctx, node: P<Node>, type_node: P<N
     let Some(sym) = ctx.checker.get_symbol_at_location_exported(name_node) else {
         return false;
     };
+    let Some((operand, _)) = tsrs_kernel::assertion_parts(node) else {
+        return false;
+    };
+    let source_type = ctx
+        .checker
+        .get_type_at_location(tsrs_kernel::unwrap_parentheses(operand));
     let scope_root = tsrs_kernel::enclosing_function(parent).unwrap_or(ctx.file.as_node());
-    has_laundered_unknown_use(ctx.checker, scope_root, sym, name_node)
+    has_laundered_unknown_use(
+        ctx.checker,
+        scope_root,
+        sym,
+        name_node,
+        source_type,
+        in_test,
+    )
+}
+
+fn check_call_expression(ctx: &mut Ctx, node: P<Node>) {
+    if is_in_test_file(ctx) {
+        return;
+    }
+    let Some(arg_node) = find_redundant_unknown_call_arg(ctx.checker, node) else {
+        return;
+    };
+    ctx.report_node(
+        arg_node,
+        RuleMessage::new(
+            "appeasementErasure",
+            "Appeasement erasure: this value already has a known type, and widening it to unknown only makes the parse or cast below look earned. Keep the compiler's type and validate at the real boundary instead.",
+        ),
+    );
 }
 
 fn check_assertion(ctx: &mut Ctx, node: P<Node>) {
@@ -253,6 +311,7 @@ const LISTENERS: &[Listener] = &[
     Listener::Enter(Kind::ArrowFunction),
     Listener::Enter(Kind::AsExpression),
     Listener::Enter(Kind::TypeAssertionExpression),
+    Listener::Enter(Kind::CallExpression),
 ];
 
 fn visit(ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
@@ -289,6 +348,7 @@ fn visit(ctx: &mut Ctx, _listener: Listener, node: P<Node>) {
             }
         }
         Kind::AsExpression | Kind::TypeAssertionExpression => check_assertion(ctx, node),
+        Kind::CallExpression => check_call_expression(ctx, node),
         _ => {}
     }
 }

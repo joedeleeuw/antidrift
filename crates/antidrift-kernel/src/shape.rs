@@ -175,6 +175,53 @@ pub fn is_false_literal_type(typ: P<Type>) -> bool {
         && typ.as_intrinsic_type().intrinsic_name() == "false"
 }
 
+#[expect(
+    clippy::disallowed_methods,
+    reason = "shape::literal_type_string is the validated reader for LiteralType::value string literals"
+)]
+#[must_use]
+pub fn literal_type_string(typ: P<Type>) -> Option<&'static str> {
+    if !typ.is_string_literal() {
+        return None;
+    }
+    match typ.as_literal_type().value() {
+        Some(LiteralValue::String(val)) => crate::tsrs_kernel::decodable_text(val),
+        _ => None,
+    }
+}
+
+#[expect(
+    clippy::disallowed_methods,
+    reason = "shape::literal_type_number_string is the validated reader for LiteralType::value number literals"
+)]
+#[must_use]
+pub fn literal_type_number_string(typ: P<Type>) -> Option<String> {
+    if !typ.is_number_literal() {
+        return None;
+    }
+    match typ.as_literal_type().value() {
+        Some(LiteralValue::Number(num)) => Some(num.string()),
+        _ => None,
+    }
+}
+
+#[must_use]
+pub fn unit_literal_key(typ: P<Type>) -> Option<String> {
+    if is_union_type(typ) {
+        return None;
+    }
+    if let Some(val) = literal_type_string(typ) {
+        return Some(format!("string:{val}"));
+    }
+    if let Some(num) = literal_type_number_string(typ) {
+        return Some(format!("number:{num}"));
+    }
+    if is_true_literal_type(typ) {
+        return Some("boolean:true".to_owned());
+    }
+    is_false_literal_type(typ).then(|| "boolean:false".to_owned())
+}
+
 pub fn type_literal_keys(typ: P<Type>, out: &mut FxHashSet<String>) {
     if is_union_type(typ) {
         for &part in typ.types() {
@@ -182,22 +229,8 @@ pub fn type_literal_keys(typ: P<Type>, out: &mut FxHashSet<String>) {
         }
         return;
     }
-    if typ.is_string_literal() {
-        if let Some(LiteralValue::String(val)) = typ.as_literal_type().value() {
-            out.insert(format!("string:{val}"));
-        }
-        return;
-    }
-    if typ.is_number_literal() {
-        if let Some(LiteralValue::Number(num)) = typ.as_literal_type().value() {
-            out.insert(format!("number:{}", num.string()));
-        }
-        return;
-    }
-    if is_true_literal_type(typ) {
-        out.insert("boolean:true".to_owned());
-    } else if is_false_literal_type(typ) {
-        out.insert("boolean:false".to_owned());
+    if let Some(key) = unit_literal_key(typ) {
+        out.insert(key);
     }
 }
 
@@ -215,7 +248,7 @@ pub fn object_property_names(checker: &mut Checker, typ: P<Type>) -> Vec<String>
     let mut names: Vec<String> = props
         .iter()
         .filter_map(|&prop| {
-            let name = prop.name();
+            let name = crate::tsrs_kernel::decodable_text(prop.name())?;
             (!name.is_empty()).then(|| name.to_owned())
         })
         .collect();

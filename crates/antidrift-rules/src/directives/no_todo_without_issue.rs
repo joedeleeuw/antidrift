@@ -64,23 +64,35 @@ fn visit(ctx: &mut Ctx, _listener: Listener, _node: P<Node>) {
 
 fn scannable_directive_text(text: &str) -> String {
     let (rule_list, description) = text.split_once("--").unwrap_or((text, ""));
-    let tokens = rule_list
-        .split(|ch: char| ch == ',' || ch.is_whitespace())
-        .filter(|token| !token.is_empty())
-        .enumerate()
-        .filter(|(index, token)| *index > 0 && !is_rule_id(token))
-        .map(|(_, token)| token)
-        .collect::<Vec<_>>()
-        .join(" ");
+    let mut expect_rule = true;
+    let mut prose = Vec::new();
+    for (index, raw) in rule_list.split_whitespace().enumerate() {
+        if index == 0 {
+            continue;
+        }
+        if expect_rule && raw == "," {
+            continue;
+        }
+        let parts: Vec<&str> = raw.split(',').filter(|part| !part.is_empty()).collect();
+        if expect_rule && !parts.is_empty() && parts.iter().copied().all(is_rule_id) {
+            expect_rule = raw.ends_with(',');
+            continue;
+        }
+        expect_rule = false;
+        prose.push(raw);
+    }
+    let tokens = prose.join(" ");
     format!("{tokens} {description}")
 }
 
 fn is_rule_id(token: &str) -> bool {
-    token.bytes().all(|byte| {
-        byte.is_ascii_lowercase()
-            || byte.is_ascii_digit()
-            || matches!(byte, b'@' | b'/' | b'-' | b'_')
-    })
+    !token.is_empty()
+        && !DEBT_TOKENS.contains(&token)
+        && token.bytes().all(|byte| {
+            byte.is_ascii_lowercase()
+                || byte.is_ascii_digit()
+                || matches!(byte, b'@' | b'/' | b'-' | b'_')
+        })
 }
 
 fn unnegated_debt_token(text: &str, tokens: &[&str]) -> Option<String> {

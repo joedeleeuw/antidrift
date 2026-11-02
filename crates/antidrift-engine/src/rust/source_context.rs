@@ -1,4 +1,4 @@
-use super::syn_kernel::is_banned_test_attribute;
+use super::syn_ast::is_banned_test_attribute;
 use antidrift_kernel::file_role::{ProjectPath, is_generated_file};
 use proc_macro2::Span;
 use syn::spanned::Spanned;

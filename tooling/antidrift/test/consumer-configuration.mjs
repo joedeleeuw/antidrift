@@ -43,34 +43,38 @@ export function proveGeneratedHook() {
   }
 }
 
+const EXPECTED_CONFIGURED_RULES = {
+  "configured/cast.ts": ["antidrift(no-as-never) warning"],
+  "configured/sub/cast.ts": [],
+  "configured/shapes.d.ts": [
+    "antidrift(no-tutorial-comments) error",
+    "antidrift(no-tutorial-comments) error",
+  ],
+  "configured/card.tsx": ["antidrift(react-max-component-props) error"],
+  "configured/exempt-card.tsx": [],
+  "apps/client/convex/tasks.ts": [
+    "antidrift(require-convex-return-validator) error",
+  ],
+  "apps/client/src/non-convex-query.ts": [],
+  "apps/client/src/tw/index.tsx": [],
+  "apps/client/src/screen.tsx": ["eslint(no-restricted-imports) error"],
+  "domain/entity.ts": ["import(no-default-export) error"],
+  "domain/migrations/001_init.ts": [],
+};
+
 export function proveConfiguredRules() {
   const config = "oxlint.configured.config.mjs";
   const rows = (relFile) =>
     (lintAntidriftOxlint(relFile, config).diagnostics ?? []).map(
       ({ code, severity }) => `${code} ${severity}`
     );
-  const observed = {
-    "configured/cast.ts": rows("configured/cast.ts"),
-    "configured/sub/cast.ts": rows("configured/sub/cast.ts"),
-    "configured/shapes.d.ts": rows("configured/shapes.d.ts"),
-    "configured/card.tsx": rows("configured/card.tsx"),
-    "configured/exempt-card.tsx": rows("configured/exempt-card.tsx"),
-    "domain/entity.ts": rows("domain/entity.ts"),
-    "domain/migrations/001_init.ts": rows("domain/migrations/001_init.ts"),
-  };
-  const expected = {
-    "configured/cast.ts": ["antidrift(no-as-never) warning"],
-    "configured/sub/cast.ts": [],
-    "configured/shapes.d.ts": [
-      "antidrift(no-tutorial-comments) error",
-      "antidrift(no-tutorial-comments) error",
-    ],
-    "configured/card.tsx": ["antidrift(react-max-component-props) error"],
-    "configured/exempt-card.tsx": [],
-    "domain/entity.ts": ["import(no-default-export) error"],
-    "domain/migrations/001_init.ts": [],
-  };
-  if (JSON.stringify(observed) !== JSON.stringify(expected)) {
+  const observed = Object.fromEntries(
+    Object.keys(EXPECTED_CONFIGURED_RULES).map((relFile) => [
+      relFile,
+      rows(relFile),
+    ])
+  );
+  if (JSON.stringify(observed) !== JSON.stringify(EXPECTED_CONFIGURED_RULES)) {
     fail(
       `the installed package must honor per-rule severity, override globs, rule options, per-file off and a declaration file the config stops ignoring through the Oxlint config, got: ${JSON.stringify(observed)}`
     );

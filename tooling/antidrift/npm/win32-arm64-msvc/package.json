@@ -8,7 +8,7 @@
     "directory": "tooling/antidrift/npm/win32-arm64-msvc"
   },
   "engines": {
-    "node": ">=24"
+    "node": ">=26"
   },
   "os": [
     "win32"

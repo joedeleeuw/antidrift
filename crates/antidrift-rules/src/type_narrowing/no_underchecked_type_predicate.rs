@@ -1,5 +1,5 @@
 use antidrift_kernel::rule::{Ctx, Listener, RuleMessage, RuleSpec};
-use antidrift_kernel::tsrs_kernel;
+use antidrift_kernel::{shape, tsrs_kernel};
 use rustc_hash::FxHashSet;
 use tsrs_ast::{self as ast, Kind, Node, Symbol, SymbolFlags};
 use tsrs_checker::{Checker, Type, TypeFlags};
@@ -9,7 +9,7 @@ use tsrslint::utils::{
     is_type_flag_set, is_union_type, union_type_parts,
 };
 
-use super::predicate_scan::{BodyScanState, scan_body_node, unit_literal_key};
+use super::predicate_scan::{BodyScanState, scan_body_node};
 
 fn is_broad_predicate_input_type(checker: &mut Checker, typ: P<Type>) -> bool {
     if is_type_flag_set(typ, TypeFlags::AnyOrUnknown) {
@@ -47,8 +47,10 @@ fn required_type_props(checker: &mut Checker, typ: P<Type>) -> Vec<String> {
     for &prop in props {
         if !prop.flags.get().intersects(SymbolFlags::Optional) {
             let prop_type = checker.get_type_of_symbol(prop);
-            if get_call_signatures(checker, prop_type).is_empty() {
-                names.push(prop.name().to_owned());
+            if get_call_signatures(checker, prop_type).is_empty()
+                && let Some(name) = tsrs_kernel::decodable_text(prop.name())
+            {
+                names.push(name.to_owned());
             }
         }
     }
@@ -68,7 +70,7 @@ fn variant_accepted_by_tags(
             continue;
         };
         let prop_type = checker.get_type_of_symbol(prop_sym);
-        if let Some(tag_key) = unit_literal_key(prop_type)
+        if let Some(tag_key) = shape::unit_literal_key(prop_type)
             && !allowed.contains(&tag_key)
         {
             return false;
@@ -82,7 +84,10 @@ fn prop_has_unchecked_payload(
     prop: P<Symbol>,
     state: &BodyScanState,
 ) -> bool {
-    let prefix = format!("{}.", prop.name());
+    let Some(prop_name) = tsrs_kernel::decodable_text(prop.name()) else {
+        return false;
+    };
+    let prefix = format!("{prop_name}.");
     if !state
         .checked_path_list
         .iter()

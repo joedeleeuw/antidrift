@@ -36,39 +36,27 @@ const workspaceFiles = {
     "    generated: packages/app/src/generated\n" +
     "  routeTree:\n" +
     "    generated: src/routeTree.gen.ts\n",
-  "policy/registries/rules.yaml": "schemaVersion: 1\n",
   "tsconfig.base.json":
-    JSON.stringify(
-      {
-        compilerOptions: baseCompilerOptions,
-      },
-      null,
-      2
-    ) + "\n",
+    JSON.stringify({ compilerOptions: baseCompilerOptions }) + "\n",
   "tsconfig.bundler.json":
-    JSON.stringify(
-      {
-        compilerOptions: {
-          ...baseCompilerOptions,
-        },
-        include: ["packages/app/src/**/*.ts", "portable-proofs/**/*.ts"],
-      },
-      null,
-      2
-    ) + "\n",
+    JSON.stringify({
+      compilerOptions: { ...baseCompilerOptions },
+      include: [
+        "packages/app/src/**/*.ts",
+        "portable-proofs/**/*.ts",
+        "configured/**/*.ts",
+        "apps/client/**/*.ts",
+      ],
+    }) + "\n",
   "tsconfig.nodenext.json":
-    JSON.stringify(
-      {
-        compilerOptions: {
-          ...baseCompilerOptions,
-          module: "NodeNext",
-          moduleResolution: "NodeNext",
-        },
-        include: ["packages/app/src/**/*.ts"],
+    JSON.stringify({
+      compilerOptions: {
+        ...baseCompilerOptions,
+        module: "NodeNext",
+        moduleResolution: "NodeNext",
       },
-      null,
-      2
-    ) + "\n",
+      include: ["packages/app/src/**/*.ts"],
+    }) + "\n",
   "oxlint.config.mjs":
     'import { createGovernanceOxlintConfig } from "@joedeleeuw/antidrift/oxlint-config";\n' +
     'import { createConfig } from "@joedeleeuw/typescript-tooling/oxlint";\n' +
@@ -84,7 +72,8 @@ const workspaceFiles = {
   "react-native-policy/registries/react-native.yaml":
     'replacementImport: "@/tw"\n' +
     "allowedFiles:\n" +
-    "  - portable-proofs/tw/index.tsx\n",
+    "  - portable-proofs/tw/index.tsx\n" +
+    "  - apps/client/src/tw/index.tsx\n",
   "oxlint.react-native.config.mjs":
     'import { createGovernanceOxlintConfig } from "@joedeleeuw/antidrift/oxlint-config";\n' +
     "export default createGovernanceOxlintConfig({ repoRoot: import.meta.dirname, policyDir: 'react-native-policy' });\n",
@@ -120,7 +109,7 @@ const workspaceFiles = {
     "export function count(row: { count?: number }) { return row.count ?? 0; }\n",
   "oxlint.configured.config.mjs":
     'import { createGovernanceOxlintConfig } from "@joedeleeuw/antidrift/oxlint-config";\n' +
-    "const governance = createGovernanceOxlintConfig({ repoRoot: import.meta.dirname });\n" +
+    "const governance = createGovernanceOxlintConfig({ repoRoot: import.meta.dirname, policyDir: 'react-native-policy' });\n" +
     "export default {\n" +
     "  ...governance,\n" +
     '  categories: { correctness: "off" },\n' +
@@ -128,14 +117,41 @@ const workspaceFiles = {
     "  rules: {\n" +
     "    ...governance.rules,\n" +
     '    "antidrift/no-as-never": "warn",\n' +
+    '    "antidrift/no-explicit-type-arguments-on-owned-api": "error",\n' +
+    '    "antidrift/no-identity-schema-transform": "error",\n' +
+    '    "antidrift/no-schema-validator-transcoding": "error",\n' +
+    '    "antidrift/require-convex-return-validator": "off",\n' +
     '    "antidrift/react-max-component-props": ["error", { max: 2 }],\n' +
     "  },\n" +
     "  overrides: [\n" +
     "    ...governance.overrides,\n" +
     '    { files: ["configured/sub/**"], rules: { "antidrift/no-as-never": "off" } },\n' +
     '    { files: ["configured/exempt-card.tsx"], rules: { "antidrift/react-max-component-props": "off" } },\n' +
+    '    { files: ["apps/client/convex/**/*.ts"], rules: { "antidrift/require-convex-return-validator": "error" } },\n' +
     "  ],\n" +
     "};\n",
+  "configured/node_modules/convex/server.d.ts":
+    "export declare function query(config: { args?: unknown; returns?: unknown; handler: (...args: never[]) => unknown }): unknown;\n",
+  "apps/client/package.json":
+    JSON.stringify({
+      name: "client",
+      private: true,
+      dependencies: { "react-native": "0.0.0" },
+    }) + "\n",
+  "apps/client/node_modules/react-native/package.json":
+    JSON.stringify({ name: "react-native", types: "index.d.ts" }) + "\n",
+  "apps/client/node_modules/react-native/index.d.ts":
+    "export declare const Pressable: unknown;\n",
+  "apps/client/convex/tasks.ts":
+    'import { query } from "../../../configured/node_modules/convex/server.js";\n' +
+    'export const listTasks = query({ args: {}, handler: () => "ok" });\n',
+  "apps/client/src/non-convex-query.ts":
+    'import { query } from "../../../configured/node_modules/convex/server.js";\n' +
+    'export const localQuery = query({ args: {}, handler: () => "ok" });\n',
+  "apps/client/src/tw/index.tsx":
+    'import { Pressable } from "react-native";\nexport const Interaction = Pressable;\n',
+  "apps/client/src/screen.tsx":
+    'import { Pressable } from "react-native";\nexport const Screen = Pressable;\n',
   "configured/cast.ts": 'export const top = "x" as never;\n',
   "configured/sub/cast.ts": 'export const inner = "y" as never;\n',
   "configured/shapes.d.ts":
@@ -378,7 +394,7 @@ export function scaffoldConsumerWorkspace({
         devDependencies: {
           "@joedeleeuw/antidrift": `file:${tarball}`,
           "@joedeleeuw/typescript-tooling": `file:${toolingTarball}`,
-          "@types/node": "22.19.19",
+          "@types/node": "26.6.6",
           oxlint: "1.89.0",
           typescript: "6.0.3",
           vitest: "2.1.9",

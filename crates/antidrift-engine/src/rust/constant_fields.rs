@@ -1,6 +1,6 @@
 use super::RustDiagnostic;
 use super::struct_index::{StructIndex, file_scope, type_path};
-use super::syn_kernel::{extract_pat_ident, has_derive_or_repr, is_compound_assign_op};
+use super::syn_ast::{extract_pat_ident, has_derive_or_repr, is_compound_assign_op};
 use super::value_origin::peel_expr;
 use super::workspace::relative_display;
 use rustc_hash::FxHashMap;

@@ -1,5 +1,5 @@
 use super::RustDiagnostic;
-use super::syn_kernel::{
+use super::syn_ast::{
     derives_deserialize, has_derive_or_repr, has_serde_deny_unknown_fields, is_ok_tuple_pat,
 };
 use antidrift_kernel::decode_guards::{

@@ -179,8 +179,7 @@ impl ValueFlow<'_, '_> {
         matches!(
             self.origin(expr),
             Origin::Untyped | Origin::Serialized(Representation::Value)
-        ) || matches!(expr, Expr::Index(index) if !matches!(self.origin(&index.expr), Origin::Typed))
-            || matches!(expr, Expr::MethodCall(call) if self.probe_is_untyped(&call.receiver))
+        ) || matches!(expr, Expr::MethodCall(call) if self.probe_is_untyped(&call.receiver))
     }
 }
 
@@ -271,7 +270,7 @@ impl<'ast> Visit<'ast> for ValueFlow<'_, 'ast> {
 
     fn visit_expr_binary(&mut self, node: &'ast syn::ExprBinary) {
         visit::visit_expr_binary(self, node);
-        if super::syn_kernel::is_compound_assign_op(&node.op) {
+        if super::syn_ast::is_compound_assign_op(&node.op) {
             self.bindings.invalidate(&node.left);
         }
     }

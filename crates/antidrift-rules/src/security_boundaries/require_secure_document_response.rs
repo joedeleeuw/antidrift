@@ -1,6 +1,6 @@
 use super::web_provenance::property_name;
 use antidrift_kernel::rule::{Ctx, Listener, Rule, RuleMessage, RuleVisitor};
-use antidrift_kernel::tsrs_kernel::cooked_text;
+use antidrift_kernel::tsrs_kernel::{cooked_text, cooked_text_lossy};
 use serde::Deserialize;
 use std::collections::BTreeSet;
 use tsrs_ast::{self as ast, Kind, Node};
@@ -257,8 +257,9 @@ fn attachment_disposition(headers: P<Node>) -> bool {
         return false;
     };
     match disposition.kind() {
-        Kind::StringLiteral => cooked_text(disposition)
-            .is_some_and(|text| text.to_lowercase().starts_with("attachment;")),
+        Kind::StringLiteral => cooked_text_lossy(disposition)
+            .to_lowercase()
+            .starts_with("attachment;"),
         Kind::CallExpression => {
             let callee = disposition.as_call_expression().expression();
             ast::is_identifier(callee) && callee.as_identifier().text() == "contentDisposition"

@@ -1,38 +1,22 @@
 use super::RustDiagnostic;
 use super::boundary_decode::check_strict_serde;
 use super::config::{ForbiddenCall, RustConfig};
-use super::syn_kernel::{
-    has_bool_second_type_arg, is_banned_test_attribute, is_option_type, is_string_or_str_type,
-    path_ends_with,
-};
+use super::syn_ast::{is_banned_test_attribute, path_ends_with};
 use proc_macro2::Span;
 use std::path::Path;
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{
     Attribute, Expr, ExprCall, ExprPath, ImplItemFn, Item, ItemEnum, ItemFn, ItemMod, ItemStruct,
-    ItemUse, Lit, Macro, Stmt, Type, TypePath, UseTree,
+    ItemUse, Lit, Macro, Stmt, TypePath, UseTree,
 };
-
-const STRINGLY_VARIANT_FIELDS: &[&str] = &[
-    "kind",
-    "mode",
-    "status",
-    "variant",
-    "category",
-    "classification",
-    "type",
-    "state",
-    "level",
-    "severity",
-];
 
 pub(super) struct CrateLayer<'a> {
     pub(super) crate_name: Option<&'a str>,
     pub(super) top_module: Option<&'a str>,
 }
 
-pub(super) fn check_syn_ast(
+pub(super) fn check_module_boundaries(
     rel_path: &str,
     path: &Path,
     ast: &syn::File,
@@ -59,7 +43,7 @@ pub(super) fn check_syn_ast(
             .iter()
             .position(|candidate| candidate == module)
     });
-    let mut visitor = AstRuleVisitor {
+    let mut visitor = BoundaryVisitor {
         rel_path,
         crate_rank,
         crate_layers: &config.layers.crates,
@@ -155,7 +139,7 @@ fn is_empty_vec_macro(mac: &Macro) -> bool {
     path_ends_with(&mac.path, &["vec"]) && mac.tokens.is_empty()
 }
 
-struct AstRuleVisitor<'a> {
+struct BoundaryVisitor<'a> {
     rel_path: &'a str,
     crate_rank: Option<usize>,
     crate_layers: &'a [String],
@@ -165,7 +149,7 @@ struct AstRuleVisitor<'a> {
     diagnostics: &'a mut Vec<RustDiagnostic>,
 }
 
-impl AstRuleVisitor<'_> {
+impl BoundaryVisitor<'_> {
     fn push(&mut self, span: Span, rule_id: &'static str, message: String) {
         self.diagnostics.push(RustDiagnostic::error(
             self.rel_path.to_owned(),
@@ -234,7 +218,7 @@ impl AstRuleVisitor<'_> {
     }
 }
 
-impl<'ast> Visit<'ast> for AstRuleVisitor<'_> {
+impl<'ast> Visit<'ast> for BoundaryVisitor<'_> {
     fn visit_item_mod(&mut self, node: &'ast ItemMod) {
         self.check_attributes(&node.attrs);
         visit::visit_item_mod(self, node);
@@ -280,38 +264,7 @@ impl<'ast> Visit<'ast> for AstRuleVisitor<'_> {
             .map(|seg| seg.ident.to_string())
             .collect();
         self.check_module_path(&segments, node.span());
-        if let Some(last) = node.path.segments.last()
-            && (last.ident == "HashMap" || last.ident == "FxHashMap" || last.ident == "BTreeMap")
-            && has_bool_second_type_arg(&last.arguments)
-        {
-            self.push(
-                last.span(),
-                "rust/no-boolean-map",
-                format!(
-                    "{}<K, bool> is a two-state boolean map; use a Set<K> or a closed state enum instead.",
-                    last.ident
-                ),
-            );
-        }
         visit::visit_type_path(self, node);
-    }
-
-    fn visit_type(&mut self, node: &'ast Type) {
-        if let Type::Tuple(tuple) = node {
-            let option_count = tuple
-                .elems
-                .iter()
-                .filter(|elem| is_option_type(elem))
-                .count();
-            if option_count >= 2 {
-                self.push(
-                    tuple.paren_token.span.open(),
-                    "rust/no-nullable-positional-tuple",
-                    "Tuple type has 2 or more nullable (Option<_>) positional elements; use a named struct or enum so each optional slot is named.".to_owned(),
-                );
-            }
-        }
-        visit::visit_type(self, node);
     }
 
     fn visit_item_enum(&mut self, node: &'ast ItemEnum) {
@@ -321,23 +274,6 @@ impl<'ast> Visit<'ast> for AstRuleVisitor<'_> {
 
     fn visit_item_struct(&mut self, node: &'ast ItemStruct) {
         self.check_attributes(&node.attrs);
-        for field in &node.fields {
-            let Some(ident) = &field.ident else {
-                continue;
-            };
-            let raw_name = ident.to_string();
-            let field_name = raw_name.strip_prefix("r#").unwrap_or(&raw_name);
-            if STRINGLY_VARIANT_FIELDS.contains(&field_name) && is_string_or_str_type(&field.ty) {
-                self.push(
-                    ident.span(),
-                    "rust/no-stringly-variant",
-                    format!(
-                        "Struct '{}' field '{raw_name}' uses a stringly discriminant; replace with a closed enum.",
-                        node.ident
-                    ),
-                );
-            }
-        }
         visit::visit_item_struct(self, node);
     }
 
