@@ -149,12 +149,11 @@ class BindingNames {
 
   check = (identifier) => {
     if (identifier?.type !== "Identifier") return;
-    if (
-      identifier.name === "ctx" &&
-      this.isParameterIdentifier(identifier) &&
-      identifier.typeAnnotation?.typeAnnotation?.type !== "TSTypeLiteral"
-    ) {
-      return;
+    if (identifier.name === "ctx" && this.isParameterIdentifier(identifier)) {
+      const ctxAnnType = identifier.typeAnnotation?.typeAnnotation?.type ?? "";
+      if (ctxAnnType !== "TSTypeLiteral" && !ctxAnnType.endsWith("Keyword")) {
+        return;
+      }
     }
     if (this.isQueryBuilderParam(identifier)) return;
     if (this.isUnknownCandidateParam(identifier)) return;

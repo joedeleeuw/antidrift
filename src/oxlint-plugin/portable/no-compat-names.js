@@ -7,7 +7,7 @@ import { findVariable, unwrapExpression } from "../shared/scope.js";
 import { patternIdentifiers } from "./static-resolution.js";
 
 const REMOVAL_VOCABULARY =
-  /legacy|compat(?!ib)|deprecated|retired(?!At\b)|no_?longer/i;
+  /legacy|compat(?!ible\b)|deprecated|retired(?!At\b)|no_?longer/i;
 const AFFIX_STRIP_RE =
   /^(?:legacy|deprecated|compat|retired|old)_?|(?:\s|_)?(?:Legacy|Deprecated|Compat|Retired|Old|Shims?|Fallback)$/giu;
 const SNAKE_KEY_PATTERN = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/u;

@@ -290,14 +290,53 @@ function isOwnedParameterReference(expression, sourceCode) {
   );
 }
 
+function isUnknownRecordAnnotation(ann) {
+  if (ann?.type !== "TSTypeReference" || ann.typeName?.name !== "Record") {
+    return false;
+  }
+  const valType = ann.typeArguments?.params?.[1]?.type;
+  return valType === "TSUnknownKeyword" || valType === "TSAnyKeyword";
+}
+
+function isSyntacticBroadExpression(expression, sourceCode) {
+  const expr = unwrapExpression(expression);
+  if (expr?.type === "Identifier") {
+    return findVariable(sourceCode, expr)?.defs?.[0]?.type === "CatchClause";
+  }
+  if (
+    expr?.type !== "MemberExpression" ||
+    !expr.computed ||
+    expr.object.type !== "Identifier"
+  ) {
+    return false;
+  }
+  const def = findVariable(sourceCode, expr.object)?.defs?.[0];
+  if (!def) return false;
+  const ann =
+    def.type === "Parameter"
+      ? def.name.typeAnnotation?.typeAnnotation
+      : def.node?.id?.typeAnnotation?.typeAnnotation;
+  return isUnknownRecordAnnotation(ann);
+}
+
 function isBroadStructuredCast(node, sourceCode) {
   const target = node.typeAnnotation;
+  if (
+    (target?.type ?? "").endsWith("Keyword") ||
+    isRawDeserializeCall(node.expression) ||
+    isAliasedRawDeserialize(node.expression, sourceCode) ||
+    isOwnedParameterReference(node.expression, sourceCode)
+  ) {
+    return false;
+  }
+  if (
+    (target?.type === "TSTypeReference" || target?.type === "TSTypeLiteral") &&
+    isSyntacticBroadExpression(node.expression, sourceCode)
+  ) {
+    return true;
+  }
   return (
     hasTypeChecker(sourceCode) &&
-    !(target?.type ?? "").endsWith("Keyword") &&
-    !isRawDeserializeCall(node.expression) &&
-    !isAliasedRawDeserialize(node.expression, sourceCode) &&
-    !isOwnedParameterReference(node.expression, sourceCode) &&
     isBroadResolvedType(node.expression, sourceCode) &&
     (resolvedPropertyShape(target, sourceCode)?.all.length ?? 0) > 0
   );

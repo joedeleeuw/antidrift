@@ -182,20 +182,29 @@ function redundantOwnerStem(typeName, fieldNames) {
 
 function checkProgramOwner(context, declaration, fieldNames, fieldBlocks) {
   const index = getProgramIndex(context.sourceCode);
+  if (!index || fieldNames.length < fieldBlocks.minFields) {
+    return;
+  }
+  const isExported = declaration.parent?.type === "ExportNamedDeclaration";
+  const fieldKey = [...new Set(fieldNames)].sort().join(",");
+  const filename = ruleFilename(context);
   if (
-    !index ||
-    declaration.parent?.type === "ExportNamedDeclaration" ||
-    fieldNames.length < fieldBlocks.minFields
+    isExported &&
+    /(?:^|\/)(?:types|models|schemas|contracts|entities)\.[cm]?tsx?$/u.test(
+      filename
+    )
   ) {
     return;
   }
-  const fieldKey = [...new Set(fieldNames)].sort().join(",");
-  const filename = ruleFilename(context);
   const owners = index.exportedOwners.filter(
     (owner) =>
       owner.fieldKey === fieldKey &&
       owner.fileName !== filename &&
-      /^[A-Z]/u.test(owner.name)
+      /^[A-Z]/u.test(owner.name) &&
+      (!isExported ||
+        /(?:^|\/)(?:types|models|schemas|contracts|entities)\.[cm]?tsx?$/u.test(
+          owner.fileName
+        ))
   );
   if (owners.length === 0 || owners.length + 1 < fieldBlocks.minOccurrences) {
     return;

@@ -101,8 +101,30 @@ function constituentTexts(typeNode, sourceCode) {
   return members.map((member) => sourceCode.getText(member));
 }
 
-function narrowedMatchesTarget(parts, removed, sourceCode) {
-  const annotation = parts.parameter.typeAnnotation?.typeAnnotation;
+function bindingTypeAnnotation(def) {
+  if (!def) return null;
+  return def.type === "Parameter"
+    ? def.name.typeAnnotation?.typeAnnotation
+    : def.node?.id?.typeAnnotation?.typeAnnotation;
+}
+
+function receiverElementAnnotation(call, sourceCode) {
+  const receiver =
+    call?.type === "CallExpression" && call.callee?.type === "MemberExpression"
+      ? call.callee.object
+      : null;
+  const arrAnn =
+    receiver?.type === "Identifier"
+      ? bindingTypeAnnotation(findVariable(sourceCode, receiver)?.defs?.[0])
+      : null;
+  if (arrAnn?.type === "TSArrayType") return arrAnn.elementType;
+  return arrAnn?.type === "TSTypeReference" &&
+    /^(?:Array|ReadonlyArray|Set)$/u.test(arrAnn.typeName?.name ?? "")
+    ? (arrAnn.typeArguments?.params?.[0] ?? null)
+    : null;
+}
+
+function narrowedMatchesTarget(annotation, parts, removed, sourceCode) {
   const declared = annotation
     ? constituentTexts(annotation, sourceCode)
     : resolvedTypeTexts(parts.parameter, sourceCode);
@@ -127,13 +149,15 @@ function checkCallbackPredicate(node, parts, context) {
   const sourceCode = context.sourceCode;
   const test = singleReturnExpression(node.body);
   const removed = nullishRemoval(test, parts.paramName);
+  const annotation =
+    parts.parameter.typeAnnotation?.typeAnnotation ??
+    receiverElementAnnotation(node.parent, sourceCode);
   if (
     node.async ||
     node.generator ||
     !removed ||
     !node.parent?.arguments?.includes(node) ||
-    (!parts.parameter.typeAnnotation && !hasTypeChecker(sourceCode)) ||
-    !narrowedMatchesTarget(parts, removed, sourceCode)
+    !narrowedMatchesTarget(annotation, parts, removed, sourceCode)
   ) {
     return;
   }

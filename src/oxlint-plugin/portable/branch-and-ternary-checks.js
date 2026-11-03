@@ -274,7 +274,7 @@ function checkNegatedDiscriminantScatter(blockNode, context) {
     }
   }
   for (const [key, stmts] of negatedByKey) {
-    if (stmts.length >= 2 && positiveKeys.has(key)) {
+    if ((stmts.length >= 2 && positiveKeys.has(key)) || stmts.length >= 3) {
       context.report({
         node: stmts[1],
         message: `Scattered negated discriminant checks on '${key}'; handle all variants in a single switch or case table.`,
