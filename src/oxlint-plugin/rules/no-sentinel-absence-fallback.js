@@ -29,16 +29,28 @@ function isZeroLiteral(node) {
   return expr?.type === "Literal" && expr.value === 0;
 }
 
+const SIZE_PROPERTIES = new Set(["length", "size", "count"]);
+
 function hasOptionalChain(node) {
   const expr = unwrapExpression(node);
   if (!expr) return false;
-  if (expr.type === "ChainExpression") return true;
   if (expr.type === "MemberExpression" || expr.type === "CallExpression") {
     return (
       Boolean(expr.optional) || hasOptionalChain(expr.object ?? expr.callee)
     );
   }
   return false;
+}
+
+function isOptionalChainSizeAccess(node) {
+  const expr = unwrapExpression(node);
+  return (
+    expr?.type === "MemberExpression" &&
+    !expr.computed &&
+    expr.property?.type === "Identifier" &&
+    SIZE_PROPERTIES.has(expr.property.name) &&
+    hasOptionalChain(expr)
+  );
 }
 
 function matchedSentinelLiteral(node) {
@@ -68,7 +80,13 @@ function createSentinelVisitors(context, memberSentinels) {
     memberSentinels
       ? {
           LogicalExpression(node) {
-            if (node.operator !== "??") return;
+            if (
+              node.operator !== "??" ||
+              node.parent?.type === "TemplateLiteral" ||
+              node.parent?.type === "NewExpression"
+            ) {
+              return;
+            }
             if (unwrapExpression(node.left)?.type !== "MemberExpression") {
               return;
             }
@@ -86,9 +104,9 @@ function createSentinelVisitors(context, memberSentinels) {
       BinaryExpression(node) {
         if (node.operator !== "!==" && node.operator !== "!=") return;
         const leftChain =
-          hasOptionalChain(node.left) && isZeroLiteral(node.right);
+          isOptionalChainSizeAccess(node.left) && isZeroLiteral(node.right);
         const rightChain =
-          hasOptionalChain(node.right) && isZeroLiteral(node.left);
+          isOptionalChainSizeAccess(node.right) && isZeroLiteral(node.left);
         if (leftChain || rightChain) {
           context.report({
             node,

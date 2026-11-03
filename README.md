@@ -10,7 +10,6 @@ Every rule is authored against standard `ESTree` + `sourceCode` + `ScopeManager`
 - `@joedeleeuw/antidrift/oxlint-plugin` / `@joedeleeuw/antidrift/eslint-plugin`: `antidriftPlugin` (`meta.name: "antidrift"`, `rules`)
 - `@joedeleeuw/antidrift/oxlint-config` / `@joedeleeuw/antidrift/preset`: `{ oxlintPreset, createOxlintConfig, recommendedRules }`
 - `@joedeleeuw/antidrift/eslint-config`: `{ eslintPreset, createEslintConfig, recommendedRules }`
-- `@joedeleeuw/antidrift/brand`: `{ brand }` nominal branding helper
 
 ## Usage with Oxlint
 

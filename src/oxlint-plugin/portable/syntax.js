@@ -94,7 +94,7 @@ export const getFunctionStatements = (node) => {
   }
   return getNodeArray(body, "body");
 };
-const isFunctionExpression = (node) =>
+export const isFunctionExpression = (node) =>
   node.type === "ArrowFunctionExpression" || node.type === "FunctionExpression";
 export const unwrapChainExpression = (candidate) => {
   const node = toNode(candidate);
@@ -117,5 +117,3 @@ export const isMigrationFile = (filename) =>
 const DOMAIN_PATTERN = /(?:^|\/)(?:domain|model)\//;
 export const isDomainFile = (filename) =>
   typeof filename === "string" && DOMAIN_PATTERN.test(filename);
-
-export { isFunctionExpression as isFunctionValue };

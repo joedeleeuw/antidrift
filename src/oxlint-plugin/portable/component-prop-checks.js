@@ -1,16 +1,8 @@
 import { functionReturnsJsx } from "../shared/scope.js";
-
-function collectPropNames(members, names) {
-  for (const member of members) {
-    if (
-      member.type === "TSPropertySignature" &&
-      member.key?.type === "Identifier"
-    ) {
-      names.add(member.key.name);
-    }
-  }
-  return names;
-}
+import {
+  collectTypePropertyNames,
+  recordProgramTypeDeclarations,
+} from "./parameter-bag-checks.js";
 
 function hasWidgetDirective(fnNode) {
   if (fnNode?.body?.type !== "BlockStatement") return false;
@@ -26,72 +18,6 @@ function hasWidgetDirective(fnNode) {
     if (dir === "widget") return true;
   }
   return false;
-}
-
-function extractOmittedKeys(typeNode, keys = new Set()) {
-  if (
-    typeNode?.type === "TSTypeReference" &&
-    typeNode.typeName?.type === "Identifier" &&
-    typeNode.typeName.name === "Omit"
-  ) {
-    const keyArg = typeNode.typeArguments?.params?.[1];
-    let parts = [];
-    if (keyArg?.type === "TSUnionType") {
-      parts = keyArg.types;
-    } else if (keyArg) {
-      parts = [keyArg];
-    }
-    for (const part of parts) {
-      if (
-        part?.type === "TSLiteralType" &&
-        part.literal?.type === "Literal" &&
-        typeof part.literal.value === "string"
-      ) {
-        keys.add(part.literal.value);
-      }
-    }
-  }
-  return keys;
-}
-
-function collectTypePropertyNames(
-  typeNode,
-  typeDeclarations,
-  names = new Set(),
-  seen = new Set()
-) {
-  if (!typeNode) return names;
-  if (typeNode.type === "TSTypeLiteral") {
-    return collectPropNames(typeNode.members, names);
-  }
-  if (typeNode.type === "TSInterfaceBody") {
-    return collectPropNames(typeNode.body, names);
-  }
-  if (typeNode.type === "TSIntersectionType") {
-    const omittedKeys = new Set();
-    for (const part of typeNode.types) {
-      extractOmittedKeys(part, omittedKeys);
-      collectTypePropertyNames(part, typeDeclarations, names, seen);
-    }
-    for (const key of omittedKeys) {
-      names.delete(key);
-    }
-    return names;
-  }
-  if (
-    typeNode.type === "TSTypeReference" &&
-    typeNode.typeName?.type === "Identifier" &&
-    !seen.has(typeNode.typeName.name)
-  ) {
-    seen.add(typeNode.typeName.name);
-    collectTypePropertyNames(
-      typeDeclarations.get(typeNode.typeName.name),
-      typeDeclarations,
-      names,
-      seen
-    );
-  }
-  return names;
 }
 
 function checkComponent(node, typeDeclarations, context) {
@@ -131,15 +57,7 @@ export function createComponentPropChecks(context) {
 
   return {
     Program(node) {
-      for (const stmt of node.body) {
-        const decl =
-          stmt.type === "ExportNamedDeclaration" ? stmt.declaration : stmt;
-        if (decl?.type === "TSInterfaceDeclaration" && decl.id?.name) {
-          typeDeclarations.set(decl.id.name, decl.body);
-        } else if (decl?.type === "TSTypeAliasDeclaration" && decl.id?.name) {
-          typeDeclarations.set(decl.id.name, decl.typeAnnotation);
-        }
-      }
+      recordProgramTypeDeclarations(node, typeDeclarations);
     },
     FunctionDeclaration: check,
     FunctionExpression: check,

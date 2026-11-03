@@ -8,7 +8,7 @@ import {
   getNode,
   getNodeArray,
   getString,
-  isFunctionValue,
+  isFunctionExpression,
   isTestFilename,
   unwrapChainExpression,
 } from "./syntax.js";
@@ -182,7 +182,7 @@ function inspectCatchStatements(statements, errorName, context) {
 }
 
 function promiseCatchCallbackParamName(node) {
-  if (!isFunctionValue(node)) {
+  if (!isFunctionExpression(node)) {
     return null;
   }
   const parent = getNode(node, "parent");

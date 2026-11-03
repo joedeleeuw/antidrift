@@ -1,4 +1,8 @@
-import { isFunctionLike, unwrapExpression } from "../shared/scope.js";
+import {
+  findVariable,
+  isFunctionLike,
+  unwrapExpression,
+} from "../shared/scope.js";
 
 const DISCRIMINANT_KEYS = new Set([
   "kind",
@@ -123,12 +127,48 @@ function hasLiteralEqualityTest(test) {
   return false;
 }
 
+function isHookCallee(callee) {
+  if (callee?.type === "Identifier") {
+    return /^use[A-Z0-9]/u.test(callee.name);
+  }
+  return (
+    callee?.type === "MemberExpression" &&
+    !callee.computed &&
+    callee.property?.type === "Identifier" &&
+    /^use[A-Z0-9]/u.test(callee.property.name)
+  );
+}
+
+function isConsumedByHookCall(identNode, sourceCode) {
+  const binding = findVariable(sourceCode, identNode);
+  if (!binding) return false;
+  return binding.references.some((ref) => {
+    if (ref.identifier === identNode) return false;
+    for (
+      let cur = ref.identifier.parent;
+      cur && !isFunctionLike(cur);
+      cur = cur.parent
+    ) {
+      if (cur.type === "CallExpression" && isHookCallee(cur.callee)) {
+        return true;
+      }
+    }
+    return false;
+  });
+}
+
 function checkShreddedBindings(blockNode, context) {
   const byBase = new Map();
   for (const stmt of blockNode.body) {
     if (stmt.type !== "VariableDeclaration") continue;
     for (const decl of stmt.declarations) {
-      if (decl.id?.type !== "Identifier" || !decl.init) continue;
+      if (
+        decl.id?.type !== "Identifier" ||
+        !decl.init ||
+        isConsumedByHookCall(decl.id, context.sourceCode)
+      ) {
+        continue;
+      }
       const shred = extractDiscriminantShred(decl.init);
       if (!shred) continue;
       const key = `${shred.baseName}.${shred.discKey}`;
@@ -177,6 +217,9 @@ function checkLiteralBranches(node, context) {
 export function createBranchChecks(context) {
   const scopeCounts = new Map();
   return {
+    Program(node) {
+      checkShreddedBindings(node, context);
+    },
     BlockStatement(node) {
       checkShreddedBindings(node, context);
     },

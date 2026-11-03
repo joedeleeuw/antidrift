@@ -1,12 +1,17 @@
 import { isKnownEvidenceExpression } from "../anti-slop/shared/dictionary-types.js";
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import {
+  isObjectSchemaMethod,
   resolveSchemaBuilderCall,
   resolveSchemaMemberChain,
   schemaDiscriminantKeys,
   staticPropertyName,
 } from "../shared/runtime-schema-libraries.js";
 import { findVariable, unwrapExpression } from "../shared/scope.js";
+
+const SCOPE_SCHEMA = [
+  { type: "object", properties: scopeProperties, additionalProperties: false },
+];
 
 export const noAppeasementCastRule = {
   meta: {
@@ -15,13 +20,7 @@ export const noAppeasementCastRule = {
       description:
         "Disallow appeasement type assertions (`as any`, `as unknown as T`, or casting object literals with `as T`).",
     },
-    schema: [
-      {
-        type: "object",
-        properties: scopeProperties,
-        additionalProperties: false,
-      },
-    ],
+    schema: SCOPE_SCHEMA,
   },
   create(context) {
     if (!isRuleFile(context)) return {};
@@ -281,13 +280,26 @@ function explicitlyNullable(property, sourceCode) {
 }
 
 function checkNullableFailureBag(properties, node, context) {
-  if (properties.length < 2 || properties.length > 4) return;
+  const ownerName =
+    node.id?.name ??
+    (node.parent?.type === "VariableDeclarator" &&
+    node.parent.id?.type === "Identifier"
+      ? node.parent.id.name
+      : "");
+  if (
+    properties.length < 2 ||
+    properties.length > 4 ||
+    /(?:Error|Props)(?:Schema)?$/u.test(ownerName)
+  ) {
+    return;
+  }
   const names = properties.map(staticPropertyName);
   if (names.some((name) => name === null || RESULT_TAGS.has(name))) return;
   const nullableNames = properties
     .filter((property) => explicitlyNullable(property, context.sourceCode))
     .map(staticPropertyName);
   if (
+    nullableNames.length === properties.length &&
     nullableNames.some((name) => FAILURE_FIELDS.has(name)) &&
     nullableNames.some((name) => !FAILURE_FIELDS.has(name))
   ) {
@@ -304,15 +316,9 @@ export const noNullablePositionalTupleRule = {
     type: "problem",
     docs: {
       description:
-        "Disallow tuple types with 2 or more nullable (`T | null | undefined`) positional elements.",
+        "Disallow tuple types with 2 or more nullable positional elements and untagged nullable failure/payload product bags.",
     },
-    schema: [
-      {
-        type: "object",
-        properties: scopeProperties,
-        additionalProperties: false,
-      },
-    ],
+    schema: SCOPE_SCHEMA,
   },
   create(context) {
     if (!isRuleFile(context)) return {};
@@ -344,7 +350,7 @@ export const noNullablePositionalTupleRule = {
       CallExpression(node) {
         const builder = resolveSchemaBuilderCall(node, context.sourceCode);
         if (
-          builder?.method === "object" &&
+          isObjectSchemaMethod(builder?.method) &&
           builder.args[0]?.type === "ObjectExpression"
         ) {
           checkNullableFailureBag(builder.args[0].properties, node, context);
@@ -361,13 +367,7 @@ export const noRedundantTypePredicateRule = {
       description:
         "Disallow type predicates `x is T` whose parameter is already annotated with the same type `T`.",
     },
-    schema: [
-      {
-        type: "object",
-        properties: scopeProperties,
-        additionalProperties: false,
-      },
-    ],
+    schema: SCOPE_SCHEMA,
   },
   create(context) {
     if (!isRuleFile(context)) return {};
@@ -473,21 +473,13 @@ export const noUndercheckedTypePredicateRule = {
       description:
         "Disallow user-defined type predicates on `unknown` inputs that return a boolean without checking required fields of the target contract.",
     },
-    schema: [
-      {
-        type: "object",
-        properties: scopeProperties,
-        additionalProperties: false,
-      },
-    ],
+    schema: SCOPE_SCHEMA,
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-
     const typeFields = new Map();
     const checkFunction = (node) =>
       checkUndercheckedPredicate(node, typeFields, context);
-
     return {
       Program(node) {
         for (const stmt of node.body) {

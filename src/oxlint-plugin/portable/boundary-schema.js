@@ -8,6 +8,7 @@ import {
 import {
   findVariable,
   isFunctionLike,
+  isTestFile,
   unwrapExpression,
 } from "../shared/scope.js";
 
@@ -167,7 +168,14 @@ function isSilentFallback(expression, sourceCode) {
   );
 }
 
-function checkSchemaCatch(node, context) {
+function enclosingObjectLiteral(node) {
+  for (let cur = node.parent; cur && !isFunctionLike(cur); cur = cur.parent) {
+    if (cur.type === "ObjectExpression") return cur;
+  }
+  return null;
+}
+
+function checkSchemaCatch(node, reportedObjects, context) {
   const callee = node.callee;
   if (
     callee?.type === "MemberExpression" &&
@@ -176,12 +184,38 @@ function checkSchemaCatch(node, context) {
     hasRuntimeSchemaProvenance(callee.object, context.sourceCode) &&
     isSilentFallback(node.arguments[0], context.sourceCode)
   ) {
+    const objectLiteral = enclosingObjectLiteral(node);
+    if (objectLiteral) {
+      if (reportedObjects.has(objectLiteral)) return;
+      reportedObjects.add(objectLiteral);
+    }
     context.report({
       node,
       message:
         "Schema `.catch(fallback)` silently repairs invalid boundary input on read; reject invalid input instead.",
     });
   }
+}
+
+const UNKNOWN_RECORD_NAMES = new Set([
+  "UnknownRecord",
+  "JsonObject",
+  "JsonRecord",
+]);
+
+function isUnknownPreservingReference(typeNode) {
+  if (typeNode.typeName?.type !== "Identifier") return false;
+  const name = typeNode.typeName.name;
+  const typeArgs = typeNode.typeArguments?.params ?? [];
+  if (UNKNOWN_RECORD_NAMES.has(name)) return true;
+  if (name === "Record" && typeArgs.length === 2) {
+    return isUnknownPreservingAssertionType(typeArgs[1]);
+  }
+  return (
+    (name === "Readonly" || name === "Partial" || name === "ReadonlyArray") &&
+    typeArgs.length === 1 &&
+    isUnknownPreservingAssertionType(typeArgs[0])
+  );
 }
 
 function isUnknownPreservingAssertionType(typeNode) {
@@ -196,13 +230,29 @@ function isUnknownPreservingAssertionType(typeNode) {
   if (typeNode.type === "TSUnionType") {
     return typeNode.types.every(isUnknownPreservingAssertionType);
   }
+  if (typeNode.type === "TSArrayType") {
+    return isUnknownPreservingAssertionType(typeNode.elementType);
+  }
+  if (
+    typeNode.type === "TSTypeOperator" &&
+    typeNode.operator === "readonly" &&
+    isUnknownPreservingAssertionType(typeNode.typeAnnotation)
+  ) {
+    return true;
+  }
+  if (typeNode.type === "TSTypeReference") {
+    return isUnknownPreservingReference(typeNode);
+  }
   if (typeNode.type === "TSTypeLiteral") {
     return (
       typeNode.members.length > 0 &&
       typeNode.members.every(
         (member) =>
-          member.type === "TSPropertySignature" &&
-          member.typeAnnotation?.typeAnnotation?.type === "TSUnknownKeyword"
+          (member.type === "TSPropertySignature" ||
+            member.type === "TSIndexSignature") &&
+          isUnknownPreservingAssertionType(
+            member.typeAnnotation?.typeAnnotation
+          )
       )
     );
   }
@@ -210,8 +260,18 @@ function isUnknownPreservingAssertionType(typeNode) {
 }
 
 function checkUnknownFunction(node, context) {
+  const filename = (
+    context.filename ??
+    context.getFilename?.() ??
+    ""
+  ).replaceAll("\\", "/");
+  if (
+    isTestFile(filename) ||
+    node.returnType?.typeAnnotation?.type === "TSTypePredicate"
+  ) {
+    return;
+  }
   const sourceCode = context.sourceCode;
-  if (node.returnType?.typeAnnotation?.type === "TSTypePredicate") return;
   for (const parameter of node.params) {
     if (
       parameter.type !== "Identifier" ||
@@ -255,17 +315,18 @@ export const unknownInputMustBeDecodedRule = {
     type: "problem",
     docs: {
       description:
-        "Disallow casting or probing `: unknown` boundary parameters into domain types without a schema decoder.",
+        "Disallow casting or probing `: unknown` boundary parameters into domain types without a schema decoder, and disallow `.catch(fallback)` repair-on-read.",
     },
     schema: SCOPE_SCHEMA,
   },
   create(context) {
     if (!isRuleFile(context)) return {};
+    const reportedObjects = new WeakSet();
     const checkFunction = (node) => checkUnknownFunction(node, context);
 
     return {
       CallExpression(node) {
-        checkSchemaCatch(node, context);
+        checkSchemaCatch(node, reportedObjects, context);
       },
       FunctionDeclaration: checkFunction,
       FunctionExpression: checkFunction,

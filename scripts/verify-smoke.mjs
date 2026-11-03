@@ -162,23 +162,10 @@ export function missingLabel(entry: { label?: string }) {
 export function shredUnionAndRepeatNullable(
   scope: { kind: "machine"; machineId: string } | { kind: "project"; projectId: string },
   entry: { a: string; b: number; c: boolean } | null,
-  bag: {
-    setA: () => void;
-    setB: () => void;
-    getC: () => string;
-  },
+  bag: { setA: () => void; setB: () => void; getC: () => string },
   wide: {
-    p1: number;
-    p2: number;
-    p3: number;
-    p4: number;
-    p5: number;
-    p6: number;
-    p7: number;
-    p8: number;
-    p9: number;
-    p10: number;
-    p11: number;
+    p1: number; p2: number; p3: number; p4: number; p5: number; p6: number;
+    p7: number; p8: number; p9: number; p10: number; p11: number;
   }
 ) {
   const machineId = scope.kind === "machine" ? scope.machineId : null;
@@ -232,14 +219,7 @@ export function formatOrderSummary(summary: OrderSummary): string {
 }
 
 export function CleanWidget(props: {
-  a: string;
-  b: string;
-  c: string;
-  d: string;
-  e: string;
-  f: string;
-  g: string;
-  h: string;
+  a: string; b: string; c: string; d: string; e: string; f: string; g: string; h: string;
 }) {
   "widget";
   const label = props.a;
@@ -287,6 +267,26 @@ export function parseTwoStage(raw: unknown) {
 export function decodeBoundaryJson(rawText: string) {
   const boundaryRaw: unknown = JSON.parse(rawText);
   return PublicSchema.parse(boundaryRaw);
+}
+
+export const ClickEventSchema = z.object({ type: z.literal("click"), x: z.number() });
+export const KeyEventSchema = z.object({ type: z.literal("key"), code: z.string() });
+export const UiEventSchema = z.discriminatedUnion("type", [ClickEventSchema, KeyEventSchema]);
+export const ClientClickSchema = ClickEventSchema.omit({ x: true }).extend({
+  clientX: z.number(),
+  clientY: z.number(),
+});
+
+export async function consumeStreamSafely(stream: ReadableStream<Uint8Array>) {
+  const reader = stream.getReader();
+  try {
+    while (true) {
+      const { done } = await reader.read();
+      if (done === true) break;
+    }
+  } finally {
+    reader.releaseLock();
+  }
 }
 `;
 
@@ -442,6 +442,13 @@ try {
     badOut = String(error.stdout ?? "");
   }
   const oxlintDiagnostics = JSON.parse(badOut).diagnostics ?? [];
+  assert.ok(
+    oxlintDiagnostics.every(
+      (diagnostic) =>
+        typeof diagnostic.code === "string" && diagnostic.code.length > 0
+    ),
+    `Expected all Oxlint diagnostics to carry a rule code, got: ${JSON.stringify(oxlintDiagnostics.filter((diagnostic) => !diagnostic.code))}`
+  );
   const oxlintCodes = new Set(
     oxlintDiagnostics.map((diagnostic) => diagnostic.code)
   );

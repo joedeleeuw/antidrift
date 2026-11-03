@@ -3,6 +3,7 @@ import {
   findVariable,
   functionReturnsJsx,
   isFunctionLike,
+  isTestFile,
   unwrapExpression,
 } from "../shared/scope.js";
 
@@ -275,38 +276,62 @@ class ResourceLifecycleAnalysis {
     }
   };
 
+  checkProgramDeclarator = (kind, declarator) => {
+    if (declarator.id?.type !== "Identifier") return;
+    const init = unwrapExpression(declarator.init);
+    if (
+      init?.type === "CallExpression" &&
+      init.callee?.type === "Identifier" &&
+      init.callee.name === "makeMutable"
+    ) {
+      const def = findVariable(this.sourceCode, init.callee)?.defs?.[0];
+      if (
+        def?.node?.type === "TSDeclareFunction" ||
+        (def?.type === "ImportBinding" &&
+          def.parent?.source?.value === "react-native-reanimated")
+      ) {
+        this.context.report({
+          node: declarator,
+          message: `Module-scope 'makeMutable' binding '${declarator.id.name}' shares mutable UI state across component instances; own the shared value inside a hook or context.`,
+        });
+      }
+      return;
+    }
+    if (kind !== "let") return;
+    const bindingSymbol = findVariable(this.sourceCode, declarator.id);
+    if (!bindingSymbol) return;
+    const mutatedInUi = bindingSymbol.references.some((ref) => {
+      const parent = ref.identifier.parent;
+      return (
+        ref.isWrite() &&
+        Boolean(enclosingUiFunction(ref.identifier)) &&
+        parent?.type === "AssignmentExpression" &&
+        parent.operator === "=" &&
+        parent.left === ref.identifier
+      );
+    });
+    const readInUi = bindingSymbol.references.some(
+      (ref) => ref.isRead() && Boolean(enclosingUiFunction(ref.identifier))
+    );
+    const isBoolInit =
+      declarator.init?.type === "Literal" &&
+      typeof declarator.init.value === "boolean";
+    if (mutatedInUi && (readInUi || isBoolInit)) {
+      this.context.report({
+        node: declarator,
+        message: `Module-scope 'let ${declarator.id.name}' is mutated inside a React component or hook; move UI state into React state/context or a dedicated store.`,
+      });
+    }
+  };
+
   onProgram = (programNode) => {
-    if (!this.filename.endsWith(".tsx")) return;
+    if (!this.filename.endsWith(".tsx") || isTestFile(this.filename)) return;
     for (const stmt of programNode.body) {
       const decl =
         stmt.type === "ExportNamedDeclaration" ? stmt.declaration : stmt;
       if (decl?.type !== "VariableDeclaration") continue;
       for (const declarator of decl.declarations) {
-        if (declarator.id?.type !== "Identifier") continue;
-        const init = unwrapExpression(declarator.init);
-        if (
-          init?.type === "CallExpression" &&
-          init.callee?.type === "Identifier" &&
-          init.callee.name === "makeMutable"
-        ) {
-          this.context.report({
-            node: declarator,
-            message: `Module-scope 'makeMutable' binding '${declarator.id.name}' shares mutable UI state across component instances; own the shared value inside a hook or context.`,
-          });
-          continue;
-        }
-        if (decl.kind !== "let") continue;
-        const bindingSymbol = findVariable(this.sourceCode, declarator.id);
-        if (!bindingSymbol) continue;
-        const mutatedInUi = bindingSymbol.references.some(
-          (ref) => ref.isWrite() && Boolean(enclosingUiFunction(ref.identifier))
-        );
-        if (mutatedInUi) {
-          this.context.report({
-            node: declarator,
-            message: `Module-scope 'let ${declarator.id.name}' is mutated inside a React component or hook; move UI state into React state/context or a dedicated store.`,
-          });
-        }
+        this.checkProgramDeclarator(decl.kind, declarator);
       }
     }
   };
@@ -385,16 +410,12 @@ export default {
     type: "problem",
     docs: {
       description:
-        "Disallow hand-rolled resource-lifecycle state machines: an async transition that toggles a boolean lifecycle cell, resets and assigns an error cell, and assigns an awaited resource cell.",
+        "Disallow hand-rolled resource-lifecycle state machines, multi-boolean activity phase flags, dual-channel store setters, and module-scope mutable UI state.",
     },
     schema: [
       {
         type: "object",
-        properties: {
-          ...scopeProperties,
-          threshold: { type: "number" },
-          shardThreshold: { type: "number" },
-        },
+        properties: scopeProperties,
         additionalProperties: false,
       },
     ],

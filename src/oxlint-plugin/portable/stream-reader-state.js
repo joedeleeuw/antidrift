@@ -1,5 +1,6 @@
 import { getPropertyName, isAstNode, isIdentifier } from "./ast.js";
 import {
+  isLiteralTrue,
   memberCall,
   staticMemberName,
   unwrapReaderExpression,

@@ -259,7 +259,7 @@ export const noPassThroughParametersRule = {
     type: "problem",
     docs: {
       description:
-        "Disallow function parameters that are only forwarded unchanged to another function.",
+        "Disallow pass-through parameters, wide parameter bags (> 10 properties), and foreign state-callback bags.",
     },
     schema: [
       {

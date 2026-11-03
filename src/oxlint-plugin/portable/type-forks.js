@@ -1,16 +1,12 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import {
-  extractObjectFieldNames,
+  isObjectSchemaMethod,
+  isSchemaFieldRename,
+  objectSchemaTagPairs,
   resolveSchemaBuilderCall,
-  resolveSchemaMemberChain,
-  schemaDiscriminantKeys,
-  staticPropertyName,
+  unionDiscriminantPairs,
 } from "../shared/runtime-schema-libraries.js";
-import {
-  findVariable,
-  isFunctionLike,
-  unwrapExpression,
-} from "../shared/scope.js";
+import { isFunctionLike, unwrapExpression } from "../shared/scope.js";
 
 function enclosingSingleReturnFunction(objNode) {
   const parent = objNode.parent;
@@ -186,95 +182,47 @@ function checkShape(context, seenShapes, name, members, reportNode) {
   seenShapes.set(signature, name);
 }
 
-function objectSchemaTags(expression, sourceCode, seen = new Set()) {
-  const node = unwrapExpression(expression);
-  if (node?.type === "Identifier") {
-    const definition = findVariable(sourceCode, node)?.defs?.[0];
-    if (definition?.parent?.kind !== "const" || seen.has(definition)) return [];
-    seen.add(definition);
-    return objectSchemaTags(definition.node.init, sourceCode, seen);
-  }
-  const builder = resolveSchemaBuilderCall(node, sourceCode);
-  if (
-    builder?.method !== "object" ||
-    builder.args[0]?.type !== "ObjectExpression"
-  ) {
-    return [];
-  }
-  return builder.args[0].properties.flatMap((property) => {
-    const name = staticPropertyName(property);
-    if (!schemaDiscriminantKeys.has(name)) return [];
-    const literal = resolveSchemaBuilderCall(property.value, sourceCode);
-    return literal?.method === "literal" && literal.args[0]?.type === "Literal"
-      ? [name]
-      : [];
-  });
-}
-
-function unionDiscriminants(expression, sourceCode) {
-  const builder = resolveSchemaBuilderCall(
-    unwrapExpression(expression),
-    sourceCode
-  );
-  if (!builder) return [];
-  const tagged = builder.method === "discriminatedUnion";
-  let variants = [];
-  if (tagged && builder.args[1]?.type === "ArrayExpression") {
-    variants = builder.args[1].elements;
-  }
-  if (builder.method === "union") variants = builder.args;
-  if (variants.length < 2) return [];
-  const tags = variants.map((variant) => objectSchemaTags(variant, sourceCode));
-  const candidates =
-    tagged && builder.args[0]?.type === "Literal"
-      ? [builder.args[0].value]
-      : tags[0];
-  return candidates.filter(
-    (key) =>
-      schemaDiscriminantKeys.has(key) &&
-      tags.every((keys) => keys.includes(key))
-  );
-}
-
 function checkSchemaExports(program, context) {
+  const sourceCode = context.sourceCode;
   const declarations = program.body
-    .map((statement) =>
-      statement.type === "ExportNamedDeclaration"
-        ? statement.declaration
-        : statement
+    .map((stmt) =>
+      stmt.type === "ExportNamedDeclaration" ? stmt.declaration : stmt
     )
-    .filter((declaration) => declaration?.type === "VariableDeclaration");
-  const tags = new Set(
-    declarations.flatMap((declaration) =>
-      declaration.declarations.flatMap((binding) =>
-        unionDiscriminants(binding.init, context.sourceCode)
+    .filter((decl) => decl?.type === "VariableDeclaration");
+  const memberDeclarators = new Set();
+  const unionPairs = new Set(
+    declarations.flatMap((decl) =>
+      decl.declarations.flatMap((binding) =>
+        unionDiscriminantPairs(binding.init, sourceCode, memberDeclarators)
       )
     )
   );
-  if (tags.size === 0) return;
-  for (const declaration of declarations) {
+  if (unionPairs.size === 0) return;
+  for (const decl of declarations) {
     if (
-      declaration.kind !== "const" ||
-      declaration.parent?.type !== "ExportNamedDeclaration"
+      decl.kind !== "const" ||
+      decl.parent?.type !== "ExportNamedDeclaration"
     ) {
       continue;
     }
-    for (const binding of declaration.declarations) {
+    for (const binding of decl.declarations) {
+      const builder = resolveSchemaBuilderCall(
+        unwrapExpression(binding.init),
+        sourceCode
+      );
       if (
-        resolveSchemaBuilderCall(
-          unwrapExpression(binding.init),
-          context.sourceCode
-        )?.method !== "object"
+        memberDeclarators.has(binding) ||
+        !isObjectSchemaMethod(builder?.method)
       ) {
         continue;
       }
-      const tag = objectSchemaTags(binding.init, context.sourceCode).find(
-        (key) => tags.has(key)
+      const hit = objectSchemaTagPairs(binding.init, sourceCode).find((entry) =>
+        unionPairs.has(entry.pair)
       );
-      if (tag) {
+      if (hit) {
         context.report({
           node: binding.id,
-          message: `Exported variant schema duplicates the '${tag}' discriminant of a union in this module; derive variants from the canonical union instead of exporting parallel object schemas.`,
+          message: `Exported variant schema duplicates the '${hit.key}' discriminant of a union in this module; derive variants from the canonical union instead of exporting parallel object schemas.`,
         });
       }
     }
@@ -282,29 +230,7 @@ function checkSchemaExports(program, context) {
 }
 
 function checkSchemaRename(node, context) {
-  if (
-    node.callee?.type !== "MemberExpression" ||
-    node.callee.property?.name !== "extend"
-  ) {
-    return;
-  }
-  const chain = resolveSchemaMemberChain(node, context.sourceCode);
-  const extended = chain?.steps.at(-1);
-  const omitted = chain?.steps.at(-2);
-  if (
-    omitted?.method !== "omit" ||
-    extended?.node !== node ||
-    unwrapExpression(node.callee.object) !== omitted.node
-  ) {
-    return;
-  }
-  const omittedNames = extractObjectFieldNames(omitted.args[0]);
-  const extendedNames = extractObjectFieldNames(extended.args[0]);
-  if (
-    omittedNames.length > 0 &&
-    extendedNames.length > 0 &&
-    omittedNames.every((name) => !extendedNames.includes(name))
-  ) {
+  if (isSchemaFieldRename(node, context.sourceCode)) {
     context.report({
       node,
       message:
@@ -318,7 +244,7 @@ export const noStructuralTypeForkRule = {
     type: "problem",
     docs: {
       description:
-        "Disallow duplicate 3+ field object type shapes within a module.",
+        "Disallow duplicate 3+ field object type shapes, parallel exported union variant schemas, and `.omit().extend()` schema field renames.",
     },
     schema: [
       {
@@ -416,26 +342,42 @@ export const noHypotheticalSeamRule = {
   },
 };
 
-function checkAmbientProcessDeclaration(node, filename, context) {
-  if (
+const AMBIENT_RUNTIME_GLOBALS = new Set(["process", "Buffer", "NodeJS"]);
+
+function isAmbientDeclarationFile(filename) {
+  return (
     filename.endsWith(".d.ts") ||
     filename.endsWith(".d.mts") ||
-    filename.endsWith(".d.cts") ||
-    node.declare !== true
-  ) {
+    filename.endsWith(".d.cts")
+  );
+}
+
+function checkAmbientProcessDeclaration(node, filename, context) {
+  if (isAmbientDeclarationFile(filename) || node.declare !== true) {
     return;
   }
   for (const declarator of node.declarations) {
-    if (
-      declarator.id?.type === "Identifier" &&
-      declarator.id.name === "process"
-    ) {
+    const name = declarator.id?.type === "Identifier" ? declarator.id.name : "";
+    if (AMBIENT_RUNTIME_GLOBALS.has(name)) {
       context.report({
         node: declarator,
-        message:
-          "Do not redeclare ambient 'process' types inline; import the typed environment owner or install the runtime types.",
+        message: `Do not redeclare ambient '${name}' types inline; import the typed environment owner or install the runtime types.`,
       });
     }
+  }
+}
+
+function checkAmbientModuleDeclaration(node, filename, context) {
+  const name = node.id?.type === "Identifier" ? node.id.name : "";
+  if (
+    !isAmbientDeclarationFile(filename) &&
+    node.declare === true &&
+    AMBIENT_RUNTIME_GLOBALS.has(name)
+  ) {
+    context.report({
+      node,
+      message: `Do not redeclare ambient '${name}' types inline; import the typed environment owner or install the runtime types.`,
+    });
   }
 }
 
@@ -444,7 +386,7 @@ export const noUnresolvedDependencyTypesRule = {
     type: "problem",
     docs: {
       description:
-        "Disallow `@ts-expect-error` or `@ts-ignore` comments that suppress unresolved module or type imports.",
+        "Disallow `@ts-expect-error`/`@ts-ignore` import suppressions and inline ambient redeclarations of runtime globals (`process`, `Buffer`, `NodeJS`).",
     },
     schema: [
       {
@@ -473,6 +415,9 @@ export const noUnresolvedDependencyTypesRule = {
     return {
       VariableDeclaration(node) {
         checkAmbientProcessDeclaration(node, filename, context);
+      },
+      TSModuleDeclaration(node) {
+        checkAmbientModuleDeclaration(node, filename, context);
       },
       ImportDeclaration: markImportNode,
       ExportAllDeclaration: markImportNode,

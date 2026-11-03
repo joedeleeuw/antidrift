@@ -234,7 +234,7 @@ export const nearestLoopWithin = (node, boundary) => {
   }
   return null;
 };
-const isLiteralTrue = (node) => {
+export const isLiteralTrue = (node) => {
   const expression = unwrapReaderExpression(node);
   return (
     expression !== null &&

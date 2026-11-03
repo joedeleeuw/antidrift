@@ -6,6 +6,13 @@ const FUNCTION_TYPES = new Set([
   "ArrowFunctionExpression",
 ]);
 
+const TEST_FILE_PATTERN =
+  /(?:(?:^|[/\\])(?:test|tests|__tests__)(?:[/\\])|[.](?:test|spec)[.][cm]?[jt]sx?$)/u;
+
+export function isTestFile(filename) {
+  return typeof filename === "string" && TEST_FILE_PATTERN.test(filename);
+}
+
 const EXPRESSION_WRAPPERS = new Set([
   "ChainExpression",
   "ParenthesizedExpression",

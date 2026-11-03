@@ -206,7 +206,7 @@ export const noBranchTreeRule = {
     type: "suggestion",
     docs: {
       description:
-        "Disallow deep if/else branch trees over a closed discriminant; use a typed case table.",
+        "Disallow deep if/else branch trees over a closed discriminant, discriminated-union ternary shredding, and repeated nullable ternary fan-out.",
     },
     schema: [
       {
@@ -221,6 +221,34 @@ export const noBranchTreeRule = {
     return createBranchChecks(context);
   },
 };
+
+const NON_BRANCH_CONTAINERS = new Set([
+  "ForStatement",
+  "ForInStatement",
+  "ForOfStatement",
+  "WhileStatement",
+  "DoWhileStatement",
+  "TryStatement",
+  "SwitchStatement",
+]);
+
+function isOnlyConditionalWrite(write, declarationContainer) {
+  let sawIf = false;
+  for (
+    let cur = write.identifier?.parent;
+    cur && cur !== declarationContainer;
+    cur = cur.parent
+  ) {
+    if (cur.type === "IfStatement") {
+      sawIf = true;
+      continue;
+    }
+    if (isFunctionLike(cur) || NON_BRANCH_CONTAINERS.has(cur.type)) {
+      return false;
+    }
+  }
+  return sawIf;
+}
 
 export const noMutableLetAliasRule = {
   meta: {
@@ -252,21 +280,7 @@ export const noMutableLetAliasRule = {
           );
           if (
             writes.length >= 2 &&
-            writes.every((write) => {
-              for (let cur = write.identifier?.parent; cur; cur = cur.parent) {
-                if (cur.type === "IfStatement") return true;
-                if (
-                  isFunctionLike(cur) ||
-                  cur.type === "ForStatement" ||
-                  cur.type === "WhileStatement" ||
-                  cur.type === "ForOfStatement" ||
-                  cur.type === "TryStatement"
-                ) {
-                  return false;
-                }
-              }
-              return false;
-            })
+            writes.every((write) => isOnlyConditionalWrite(write, node.parent))
           ) {
             context.report({
               node: decl,

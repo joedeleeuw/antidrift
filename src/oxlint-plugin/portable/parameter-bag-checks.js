@@ -1,4 +1,4 @@
-import { functionReturnsJsx } from "../shared/scope.js";
+import { functionReturnsJsx, isTestFile } from "../shared/scope.js";
 
 function collectMemberNames(members, names) {
   for (const member of members) {
@@ -13,7 +13,33 @@ function collectMemberNames(members, names) {
   return names;
 }
 
-function collectTypePropertyNames(
+function extractOmittedKeys(typeNode, keys = new Set()) {
+  if (
+    typeNode?.type === "TSTypeReference" &&
+    typeNode.typeName?.type === "Identifier" &&
+    typeNode.typeName.name === "Omit"
+  ) {
+    const keyArg = typeNode.typeArguments?.params?.[1];
+    let parts = [];
+    if (keyArg?.type === "TSUnionType") {
+      parts = keyArg.types;
+    } else if (keyArg) {
+      parts = [keyArg];
+    }
+    for (const part of parts) {
+      if (
+        part?.type === "TSLiteralType" &&
+        part.literal?.type === "Literal" &&
+        typeof part.literal.value === "string"
+      ) {
+        keys.add(part.literal.value);
+      }
+    }
+  }
+  return keys;
+}
+
+export function collectTypePropertyNames(
   typeNode,
   typeDeclarations,
   names = new Set(),
@@ -27,8 +53,13 @@ function collectTypePropertyNames(
     return collectMemberNames(typeNode.body, names);
   }
   if (typeNode.type === "TSIntersectionType") {
+    const omittedKeys = new Set();
     for (const part of typeNode.types) {
+      extractOmittedKeys(part, omittedKeys);
       collectTypePropertyNames(part, typeDeclarations, names, seen);
+    }
+    for (const key of omittedKeys) {
+      names.delete(key);
     }
     return names;
   }
@@ -77,10 +108,55 @@ function parameterPropertyNames(parameter, typeDeclarations) {
   return names;
 }
 
+function foreignCallbackNames(parameter) {
+  const names = new Set();
+  const typeAnnotation = parameter.typeAnnotation?.typeAnnotation;
+  if (typeAnnotation?.type === "TSTypeLiteral") {
+    for (const member of typeAnnotation.members) {
+      const isFn =
+        member.type === "TSMethodSignature" ||
+        (member.type === "TSPropertySignature" &&
+          member.typeAnnotation?.typeAnnotation?.type === "TSFunctionType");
+      if (isFn && member.key?.type === "Identifier") {
+        names.add(member.key.name);
+      }
+    }
+    return names;
+  }
+  if (
+    parameter.type === "ObjectPattern" &&
+    typeAnnotation?.type !== "TSTypeReference"
+  ) {
+    for (const prop of parameter.properties) {
+      if (prop.type === "Property" && prop.key?.type === "Identifier") {
+        names.add(prop.key.name);
+      }
+    }
+  }
+  return names;
+}
+
 export function checkParameterBags(node, typeDeclarations, context) {
+  const filename = (
+    context.filename ??
+    context.getFilename?.() ??
+    ""
+  ).replaceAll("\\", "/");
+  if (
+    isTestFile(filename) ||
+    functionReturnsJsx(node) ||
+    node.params.length === 0
+  ) {
+    return;
+  }
   const max = context.options[0]?.max ?? 10;
-  if (functionReturnsJsx(node) || node.params.length === 0) return;
   for (const parameter of node.params) {
+    if (
+      parameter.type === "Identifier" &&
+      (parameter.name === "deps" || parameter.name === "dependencies")
+    ) {
+      continue;
+    }
     const names = parameterPropertyNames(parameter, typeDeclarations);
     if (
       names.size > max &&
@@ -92,9 +168,14 @@ export function checkParameterBags(node, typeDeclarations, context) {
         message: `Function parameter bag accepts ${names.size} properties (max ${max}); group cohesive domain concepts or move behavior onto the owning object.`,
       });
     }
-    if (names.size < 3) continue;
-    const setters = [...names].filter((name) => /^set[A-Z]/u.test(name));
-    const getters = [...names].filter((name) => /^get[A-Z]/u.test(name));
+    const callbackNames = foreignCallbackNames(parameter);
+    if (callbackNames.size < 3) continue;
+    const setters = [...callbackNames].filter((name) =>
+      /^set[A-Z]/u.test(name)
+    );
+    const getters = [...callbackNames].filter((name) =>
+      /^get[A-Z]/u.test(name)
+    );
     if (setters.length >= 3 || (setters.length >= 2 && getters.length >= 1)) {
       const sample = [...setters, ...getters].slice(0, 4).join(", ");
       context.report({
