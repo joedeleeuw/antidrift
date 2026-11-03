@@ -24,6 +24,10 @@ export function readDualKeyAlias(input: { taskId?: string; task_id?: string }) {
   return input.taskId ?? input.task_id;
 }
 const BaseItemSchema = z.object({ oldField: z.string(), payloadJson: z.string().catch("default") });
+type NamedItem = z.infer<typeof BaseItemSchema>;
+export function reparseNamedAlias(entry: NamedItem) {
+  return BaseItemSchema.parse(entry);
+}
 export const RenamedItemSchema = BaseItemSchema.omit({ oldField: true }).extend({ newField: z.string() });
 const outerGreeting = "Hello";
 export function BrokenWidget() { "widget"; return <WidgetText>{outerGreeting}</WidgetText>; }
@@ -353,5 +357,10 @@ export const expectedDiagnostics = [
     ruleId: "antidrift/no-anemic-errors",
     message:
       "Failure path drops the error and returns an empty collection, which makes bad data look valid. Let the error propagate or return a typed failure.",
+  },
+  {
+    ruleId: "antidrift/no-redundant-zod-parse",
+    message:
+      "Parameter 'entry' is already typed as a decoded schema output; do not re-parse internal typed values.",
   },
 ];

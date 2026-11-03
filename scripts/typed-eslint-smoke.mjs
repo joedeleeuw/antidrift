@@ -12,6 +12,7 @@ const schemasSource = `
 import { z } from "zod";
 
 export const UserSchema = z.object({ id: z.string(), displayName: z.string() });
+export type User = z.infer<typeof UserSchema>;
 `;
 
 const typedGoodSource = `
@@ -42,11 +43,15 @@ export function readUser(raw: unknown) {
 `;
 
 const typedBadSource = `
-import { UserSchema } from "./schemas";
+import { UserSchema, type User } from "./schemas";
 
 export function decodeTwice(raw: unknown) {
   const user = UserSchema.parse(raw);
   return UserSchema.parse(user);
+}
+
+export function decodeTypedAlias(alreadyDecoded: User) {
+  return UserSchema.parse(alreadyDecoded);
 }
 
 export const IdentityUserSchema = UserSchema.transform((user) => user);
@@ -61,6 +66,11 @@ const typedBadDiagnostics = [
     ruleId: "antidrift/no-redundant-zod-parse",
     message:
       "Binding 'user' was already decoded by 'UserSchema' in this scope; reuse the decoded value instead of re-parsing.",
+  },
+  {
+    ruleId: "antidrift/no-redundant-zod-parse",
+    message:
+      "Parameter 'alreadyDecoded' is already typed as a decoded schema output; do not re-parse internal typed values.",
   },
   {
     ruleId: "antidrift/no-identity-schema-transform",

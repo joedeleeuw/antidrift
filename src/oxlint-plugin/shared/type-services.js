@@ -43,7 +43,7 @@ export function getResolvedType(node, sourceCode) {
   return services.checker.getTypeAtLocation(tsNode);
 }
 
-export function typeConstituents(type) {
+function typeConstituents(type) {
   return type?.isUnion?.() || (type?.flags & TYPE_FLAG_UNION) !== 0
     ? (type.types ?? [type])
     : [type];

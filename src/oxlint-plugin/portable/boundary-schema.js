@@ -1,7 +1,20 @@
-import { checkRedundantSchemaParse } from "./schema-reparse-checks.js";
+import {
+  checkDiscardedDecode,
+  checkSchemaCatch,
+  checkPositionalOptions,
+  checkRepairOnReadTernary,
+  checkSerializationRoundtrip,
+  isAliasedRawDeserialize,
+  isPassedToDecoder,
+  isRawDeserializeCall,
+  RAW_DESERIALIZE_CAST_MESSAGE,
+} from "./boundary-decode-checks.js";
+import {
+  checkCodecRoundtrip,
+  checkRedundantSchemaParse,
+} from "./schema-reparse-checks.js";
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import {
-  hasRuntimeSchemaProvenance,
   resolveSchemaBuilderCall,
   schemaReceiverVerdict,
 } from "../shared/runtime-schema-libraries.js";
@@ -16,61 +29,6 @@ import {
 const SCOPE_SCHEMA = [
   { type: "object", properties: scopeProperties, additionalProperties: false },
 ];
-
-const SCHEMA_DECODE_METHODS = new Set([
-  "parse",
-  "safeParse",
-  "parseAsync",
-  "safeParseAsync",
-  "decodeUnknownSync",
-  "decodeUnknownEither",
-  "decodeUnknownPromise",
-  "decodeSync",
-]);
-function isRawDeserializeCall(node) {
-  const expr = unwrapExpression(node);
-  if (expr?.type === "AwaitExpression") {
-    return isRawDeserializeCall(expr.argument);
-  }
-  if (expr?.type !== "CallExpression") return false;
-  const callee = unwrapExpression(expr.callee);
-  if (
-    callee?.type !== "MemberExpression" ||
-    callee.computed ||
-    callee.property?.type !== "Identifier" ||
-    callee.object?.type !== "Identifier"
-  ) {
-    return false;
-  }
-  if (
-    callee.property.name === "parse" &&
-    /^(?:JSON|YAML)$/u.test(callee.object.name)
-  ) {
-    return true;
-  }
-  return (
-    callee.property.name === "json" &&
-    /^(?:res|response|req|request)$/iu.test(callee.object.name)
-  );
-}
-
-function isPassedToDecoder(node, sourceCode) {
-  const parent = node.parent;
-  if (parent?.type !== "CallExpression" || !parent.arguments.includes(node)) {
-    return false;
-  }
-  const callee = unwrapExpression(parent.callee);
-  if (callee?.type === "Identifier") return true;
-  if (
-    callee?.type !== "MemberExpression" ||
-    callee.property?.type !== "Identifier" ||
-    !SCHEMA_DECODE_METHODS.has(callee.property.name) ||
-    (callee.object?.type === "Identifier" && callee.object.name === "JSON")
-  ) {
-    return false;
-  }
-  return schemaReceiverVerdict(callee.object, sourceCode) !== "disproven";
-}
 
 function checkJsonStringFields(node, context) {
   const builder = resolveSchemaBuilderCall(node, context.sourceCode);
@@ -101,31 +59,35 @@ export const noUnsafeDeserializeRule = {
     type: "problem",
     docs: {
       description:
-        "Disallow casting raw JSON.parse / response.json() results directly to a domain type without schema decoding.",
+        "Disallow casting raw or aliased JSON.parse / response.json() results to domain types, string-or-object repair-on-read ternaries, and JSON stringify/parse value round-trips.",
     },
     schema: SCOPE_SCHEMA,
   },
   create(context) {
     if (!isRuleFile(context)) return {};
+    const sourceCode = context.sourceCode;
     return {
       CallExpression(node) {
         checkJsonStringFields(node, context);
+        checkSerializationRoundtrip(node, context);
+      },
+      ConditionalExpression(node) {
+        checkRepairOnReadTernary(node, context);
       },
       TSAsExpression(node) {
-        if (!isRawDeserializeCall(node.expression)) return;
-        const target = node.typeAnnotation;
-        if (target?.type === "TSUnknownKeyword") return;
-        context.report({
-          node,
-          message:
-            "Do not cast raw deserialized JSON directly to a domain type; decode once at the boundary with a schema validator.",
-        });
+        if (
+          node.typeAnnotation?.type !== "TSUnknownKeyword" &&
+          (isRawDeserializeCall(node.expression) ||
+            isAliasedRawDeserialize(node.expression, sourceCode))
+        ) {
+          context.report({ node, message: RAW_DESERIALIZE_CAST_MESSAGE });
+        }
       },
       VariableDeclarator(node) {
         if (!node.init || !isRawDeserializeCall(node.init)) return;
         const ann = node.id?.typeAnnotation?.typeAnnotation;
         if (!ann || ann.type === "TSUnknownKeyword") return;
-        if (isPassedToDecoder(node.init, context.sourceCode)) return;
+        if (isPassedToDecoder(node.init, sourceCode)) return;
         context.report({
           node,
           message:
@@ -135,70 +97,6 @@ export const noUnsafeDeserializeRule = {
     };
   },
 };
-
-function isFallbackLiteral(node) {
-  return (
-    node?.type === "Literal" ||
-    node?.type === "ArrayExpression" ||
-    node?.type === "ObjectExpression"
-  );
-}
-
-function collectFallbackReturns(node, sourceCode, returns) {
-  if (!node || isFunctionLike(node)) return true;
-  if (node.type === "ThrowStatement") return false;
-  if (node.type === "ReturnStatement") {
-    returns.push(unwrapExpression(node.argument));
-  }
-  return (sourceCode.visitorKeys[node.type] ?? []).every((key) => {
-    const children = Array.isArray(node[key]) ? node[key] : [node[key]];
-    return children.every((child) =>
-      collectFallbackReturns(child, sourceCode, returns)
-    );
-  });
-}
-
-function isSilentFallback(expression, sourceCode) {
-  const fallback = unwrapExpression(expression);
-  if (isFallbackLiteral(fallback)) return true;
-  if (!isFunctionLike(fallback)) return false;
-  if (isFallbackLiteral(unwrapExpression(fallback.body))) return true;
-  const returns = [];
-  return (
-    collectFallbackReturns(fallback.body, sourceCode, returns) &&
-    returns.length > 0 &&
-    returns.every(isFallbackLiteral)
-  );
-}
-
-function enclosingObjectLiteral(node) {
-  for (let cur = node.parent; cur && !isFunctionLike(cur); cur = cur.parent) {
-    if (cur.type === "ObjectExpression") return cur;
-  }
-  return null;
-}
-
-function checkSchemaCatch(node, reportedObjects, context) {
-  const callee = node.callee;
-  if (
-    callee?.type === "MemberExpression" &&
-    !callee.computed &&
-    callee.property?.name === "catch" &&
-    hasRuntimeSchemaProvenance(callee.object, context.sourceCode) &&
-    isSilentFallback(node.arguments[0], context.sourceCode)
-  ) {
-    const objectLiteral = enclosingObjectLiteral(node);
-    if (objectLiteral) {
-      if (reportedObjects.has(objectLiteral)) return;
-      reportedObjects.add(objectLiteral);
-    }
-    context.report({
-      node,
-      message:
-        "Schema `.catch(fallback)` silently repairs invalid boundary input on read; reject invalid input instead.",
-    });
-  }
-}
 
 const UNKNOWN_RECORD_NAMES = new Set([
   "UnknownRecord",
@@ -262,12 +160,8 @@ function isUnknownPreservingAssertionType(typeNode) {
   return false;
 }
 
-function checkUnknownFunction(node, context) {
-  const filename = (
-    context.filename ??
-    context.getFilename?.() ??
-    ""
-  ).replaceAll("\\", "/");
+function checkUnknownFunction(node, context, probeThreshold) {
+  const filename = (context.filename ?? "").replaceAll("\\", "/");
   if (
     isTestFile(filename) ||
     node.returnType?.typeAnnotation?.type === "TSTypePredicate"
@@ -304,7 +198,7 @@ function checkUnknownFunction(node, context) {
         inCheckCount += 1;
       }
     }
-    if (inCheckCount >= 4) {
+    if (inCheckCount >= probeThreshold) {
       context.report({
         node: parameter,
         message: `Unknown input '${parameter.name}' is probed with ${inCheckCount} ad-hoc 'in' checks; decode once with a boundary schema instead.`,
@@ -318,18 +212,33 @@ export const unknownInputMustBeDecodedRule = {
     type: "problem",
     docs: {
       description:
-        "Disallow casting or probing `: unknown` boundary parameters into domain types without a schema decoder, and disallow `.catch(fallback)` repair-on-read.",
+        "Disallow casting or probing `: unknown` boundary parameters into domain types without a schema decoder, discarded statement decodes, and `.catch(fallback)` repair-on-read.",
     },
-    schema: SCOPE_SCHEMA,
+    schema: [
+      {
+        type: "object",
+        properties: {
+          ...scopeProperties,
+          defensiveShapeProbeThreshold: { type: "number" },
+        },
+        additionalProperties: false,
+      },
+    ],
   },
   create(context) {
     if (!isRuleFile(context)) return {};
     const reportedObjects = new WeakSet();
-    const checkFunction = (node) => checkUnknownFunction(node, context);
+    const probeThreshold =
+      context.options[0]?.defensiveShapeProbeThreshold ?? 2;
+    const checkFunction = (node) =>
+      checkUnknownFunction(node, context, probeThreshold);
 
     return {
       CallExpression(node) {
         checkSchemaCatch(node, reportedObjects, context);
+      },
+      ExpressionStatement(node) {
+        checkDiscardedDecode(node, context);
       },
       FunctionDeclaration: checkFunction,
       FunctionExpression: checkFunction,
@@ -343,7 +252,7 @@ export const noRedundantZodParseRule = {
     type: "problem",
     docs: {
       description:
-        "Disallow re-parsing a value with the same schema after `.parse()` / `.parseAsync()` or when already typed as `z.infer<typeof Schema>`.",
+        "Disallow re-parsing already-decoded values: same-schema re-parse, element re-parse, closed-schema JSON string tunnels, and decode-then-re-encode codec round-trips.",
     },
     schema: SCOPE_SCHEMA,
   },
@@ -352,6 +261,7 @@ export const noRedundantZodParseRule = {
     return {
       CallExpression(node) {
         checkRedundantSchemaParse(node, context);
+        checkCodecRoundtrip(node, context);
       },
     };
   },
@@ -398,7 +308,7 @@ export const noIdentitySchemaTransformRule = {
     type: "problem",
     docs: {
       description:
-        "Disallow `.transform(x => x)` or exhaustive destructuring `.transform(({ a, b }) => ({ a, b }))` no-ops on schemas.",
+        "Disallow `.transform(x => x)` or exhaustive destructuring `.transform(({ a, b }) => ({ a, b }))` no-ops on schemas, and positional reads of schema `.options`.",
     },
     schema: SCOPE_SCHEMA,
   },
@@ -406,6 +316,9 @@ export const noIdentitySchemaTransformRule = {
     if (!isRuleFile(context)) return {};
 
     return {
+      MemberExpression(node) {
+        checkPositionalOptions(node, context);
+      },
       CallExpression(node) {
         if (
           node.callee?.type !== "MemberExpression" ||

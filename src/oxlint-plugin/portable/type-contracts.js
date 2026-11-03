@@ -1,4 +1,12 @@
-import { isKnownEvidenceExpression } from "../anti-slop/shared/dictionary-types.js";
+import { checkRedundantUnknownHelper } from "./boundary-decode-checks.js";
+import {
+  checkRedundantPredicate,
+  checkTypeAssertion,
+  createUndercheckedPredicateVisitors,
+  forEachOwnNode,
+  topLevelTypeDeclarations,
+} from "./type-predicate-checks.js";
+import { checkErasedUnknownReparse } from "./schema-reparse-checks.js";
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import {
   isObjectSchemaMethod,
@@ -11,6 +19,10 @@ import {
   staticPropertyKey,
   unwrapExpression,
 } from "../shared/scope.js";
+import {
+  closedStringLiteralUnionValues,
+  hasTypeChecker,
+} from "../shared/type-services.js";
 
 const SCOPE_SCHEMA = [
   { type: "object", properties: scopeProperties, additionalProperties: false },
@@ -27,44 +39,7 @@ export const noAppeasementCastRule = {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-    function checkAssertion(node) {
-      const target = node.typeAnnotation;
-      if (target?.type === "TSAnyKeyword") {
-        context.report({
-          node,
-          message:
-            "Do not cast to `any`; decode untrusted values at the boundary or use a narrow type.",
-        });
-        return;
-      }
-      const inner = node.expression;
-      if (
-        (inner?.type === "TSAsExpression" ||
-          inner?.type === "TSTypeAssertion") &&
-        inner.typeAnnotation?.type !== "TSTypeReference"
-      ) {
-        context.report({
-          node,
-          message:
-            "Do not chain type assertions (`as unknown as T`); fix the type contract or decode at the boundary.",
-        });
-        return;
-      }
-      if (
-        inner?.type === "ObjectExpression" &&
-        target?.type === "TSTypeReference" &&
-        !(
-          target.typeName?.type === "Identifier" &&
-          target.typeName.name === "const"
-        )
-      ) {
-        context.report({
-          node,
-          message:
-            "Do not cast an object literal with `as T`; use `satisfies T` or a variable type annotation so missing fields fail typechecking.",
-        });
-      }
-    }
+    const checkAssertion = (node) => checkTypeAssertion(node, context);
     return {
       TSAsExpression: checkAssertion,
       TSTypeAssertion: checkAssertion,
@@ -72,107 +47,63 @@ export const noAppeasementCastRule = {
   },
 };
 
-function isAsUnknownExpression(node) {
+function isClosedKeyType(keyType, sourceCode, depth = 0) {
+  if (
+    keyType?.type === "TSLiteralType" ||
+    (keyType?.type === "TSTypeOperator" && keyType.operator === "keyof") ||
+    (keyType?.type === "TSUnionType" &&
+      keyType.types.every((member) => member.type === "TSLiteralType"))
+  ) {
+    return true;
+  }
+  if (keyType?.type !== "TSTypeReference" || depth > 4) return false;
+  const alias = topLevelTypeDeclarations(sourceCode.ast).get(
+    keyType.typeName?.name
+  )?.typeAnnotation;
+  if (alias) return isClosedKeyType(alias, sourceCode, depth + 1);
   return (
-    (node?.type === "TSAsExpression" || node?.type === "TSTypeAssertion") &&
-    node.typeAnnotation?.type === "TSUnknownKeyword"
+    hasTypeChecker(sourceCode) &&
+    (closedStringLiteralUnionValues(keyType, sourceCode)?.length ?? 0) > 0
   );
 }
 
-function isUnknownOrAnyAnnotation(typeAnnotation) {
-  const inner = typeAnnotation?.typeAnnotation;
-  return inner?.type === "TSUnknownKeyword" || inner?.type === "TSAnyKeyword";
-}
-
-function rootIdentifierOf(expr) {
-  const unwrapped = unwrapExpression(expr);
-  if (unwrapped?.type === "Identifier") return unwrapped;
-  if (
-    unwrapped?.type === "MemberExpression" &&
-    unwrapped.object?.type === "Identifier"
-  ) {
-    return unwrapped.object;
-  }
-  return null;
-}
-
-function hasKnownAnnotation(identifiers) {
-  for (const ident of identifiers ?? []) {
-    if (
-      ident.typeAnnotation &&
-      !isUnknownOrAnyAnnotation(ident.typeAnnotation)
-    ) {
-      return true;
+function isMemberWritten(identifier, sourceCode) {
+  return (findVariable(sourceCode, identifier)?.references ?? []).some(
+    (ref) => {
+      const member = ref.identifier.parent;
+      const write = member?.parent;
+      return (
+        member?.type === "MemberExpression" &&
+        member.object === ref.identifier &&
+        ((write?.type === "AssignmentExpression" && write.left === member) ||
+          write?.type === "UpdateExpression" ||
+          (write?.type === "UnaryExpression" && write.operator === "delete"))
+      );
     }
-  }
-  return false;
-}
-
-function constInitOfVariable(binding) {
-  const def = binding?.defs?.[0];
-  if (def?.type !== "Variable") return null;
-  const decl = def.node;
-  if (decl?.type !== "VariableDeclarator" || decl.parent?.kind !== "const") {
-    return null;
-  }
-  if (isUnknownOrAnyAnnotation(decl.id?.typeAnnotation)) return null;
-  return decl.init ?? null;
-}
-
-function hasKnownValueOrigin(sourceCode, expr, seen = new Set()) {
-  if (!expr) return false;
-  if (isKnownEvidenceExpression(expr)) return !isContractFreeLiteral(expr);
-  const rootIdent = rootIdentifierOf(expr);
-  if (!rootIdent) return false;
-  const binding = findVariable(sourceCode, rootIdent);
-  if (!binding || seen.has(binding)) return false;
-  seen.add(binding);
-  if (hasKnownAnnotation(binding.identifiers)) return true;
-  const init = constInitOfVariable(binding);
-  return init ? hasKnownValueOrigin(sourceCode, init, seen) : false;
-}
-
-function erasedUnknownInitializer(sourceCode, node) {
-  if (isAsUnknownExpression(node.init)) {
-    const inner = node.init.expression;
-    return isContractFreeLiteral(inner) ? null : inner;
-  }
-  if (node.id?.typeAnnotation?.typeAnnotation?.type === "TSUnknownKeyword") {
-    return hasKnownValueOrigin(sourceCode, node.init) ? node.init : null;
-  }
-  return null;
-}
-
-function isContractFreeLiteral(expr) {
-  const unwrapped = unwrapExpression(expr);
-  return (
-    (unwrapped?.type === "ObjectExpression" &&
-      unwrapped.properties.length === 0) ||
-    (unwrapped?.type === "ArrayExpression" && unwrapped.elements.length === 0)
   );
 }
 
-function isReestablishingRef(ident) {
-  const parent = ident.parent;
+function checkCaseTableAnnotation(node, context) {
+  const sourceCode = context.sourceCode;
+  const annotation = node.id?.typeAnnotation?.typeAnnotation;
+  const init = unwrapExpression(node.init);
   if (
-    parent?.type === "TSAsExpression" &&
-    parent.expression === ident &&
-    parent.typeAnnotation?.type === "TSTypeReference"
+    node.parent?.kind !== "const" ||
+    node.id.type !== "Identifier" ||
+    annotation?.type !== "TSTypeReference" ||
+    annotation.typeName?.name !== "Record" ||
+    init?.type !== "ObjectExpression" ||
+    init.properties.length === 0 ||
+    !isClosedKeyType(annotation.typeArguments?.params?.[0], sourceCode) ||
+    isMemberWritten(node.id, sourceCode)
   ) {
-    return true;
+    return;
   }
-  if (
-    parent?.type === "CallExpression" &&
-    parent.arguments[0] === ident &&
-    parent.callee?.type === "MemberExpression" &&
-    parent.callee.property?.type === "Identifier" &&
-    /^(?:parse|safeParse|parseAsync|decodeUnknownSync|decodeUnknownEither)$/u.test(
-      parent.callee.property.name
-    )
-  ) {
-    return true;
-  }
-  return false;
+  const typeText = sourceCode.getText(annotation);
+  context.report({
+    node: node.id,
+    message: `Case table '${node.id.name}' is annotated \`${typeText}\`, which erases each entry's own type; write \`{ ... } satisfies ${typeText}\` instead.`,
+  });
 }
 
 export const noAppeasementErasureRule = {
@@ -180,39 +111,19 @@ export const noAppeasementErasureRule = {
     type: "problem",
     docs: {
       description:
-        "Disallow widening known values to `unknown` only to re-assert or re-parse a narrower contract.",
+        "Disallow widening known values to `unknown` only to re-assert or re-parse a narrower contract, `Record<ClosedKey, V>` case-table annotations, and unknown-error helpers applied to known errors.",
     },
-    schema: [
-      {
-        type: "object",
-        properties: scopeProperties,
-        additionalProperties: false,
-      },
-    ],
+    schema: SCOPE_SCHEMA,
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-    const sourceCode = context.sourceCode;
     return {
+      CallExpression(node) {
+        checkRedundantUnknownHelper(node, context);
+      },
       VariableDeclarator(node) {
-        if (node.id?.type !== "Identifier" || node.parent?.kind !== "const") {
-          return;
-        }
-        const init = erasedUnknownInitializer(sourceCode, node);
-        if (!init) return;
-        const binding = findVariable(sourceCode, node.id);
-        if (!binding) return;
-        if (
-          binding.references.some(
-            (ref) => ref.isRead() && isReestablishingRef(ref.identifier)
-          )
-        ) {
-          context.report({
-            node: node.id,
-            message:
-              "Appeasement erasure: widening a known value to `unknown` only makes the parse or cast below look earned. Keep the precise type and validate at the real boundary.",
-          });
-        }
+        checkCaseTableAnnotation(node, context);
+        checkErasedUnknownReparse(node, context);
       },
     };
   },
@@ -314,6 +225,129 @@ function checkNullableFailureBag(properties, node, context) {
   }
 }
 
+function returnedObjects(fnNode, sourceCode) {
+  if (fnNode.body?.type !== "BlockStatement") return null;
+  const returnedLiterals = [];
+  let complete = true;
+  forEachOwnNode(fnNode.body, sourceCode, (node) => {
+    if (node.type !== "ReturnStatement") return;
+    const argument = unwrapExpression(node.argument);
+    if (argument?.type === "ObjectExpression") returnedLiterals.push(argument);
+    else complete = false;
+  });
+  return complete && returnedLiterals.length >= 2 ? returnedLiterals : null;
+}
+
+export function constantEntries(objectNode) {
+  return new Map(
+    objectNode.properties.flatMap((property) => {
+      const key = staticPropertyKey(property);
+      const literal = property.value;
+      return key && literal?.type === "Literal" && !literal.regex
+        ? [[key, String(literal.raw)]]
+        : [];
+    })
+  );
+}
+
+function checkConstantReturnField(returnedLiterals, context) {
+  const entries = returnedLiterals.map(constantEntries);
+  if (
+    returnedLiterals.some((objectNode) => objectNode.properties.length < 2) ||
+    returnedLiterals.every(
+      (objectNode, index) =>
+        objectNode.properties.length === entries[index].size
+    )
+  ) {
+    return;
+  }
+  const constant = [...entries[0]].find(
+    ([key, raw]) =>
+      /^(?:true|false|null)$/u.test(raw) &&
+      !RESULT_TAGS.has(key) &&
+      entries.every((entry) => entry.get(key) === raw)
+  );
+  if (constant) {
+    context.report({
+      node: returnedLiterals[0],
+      message: `Every return path hardcodes '${constant[0]}: ${constant[1]}'; compute the real value per branch or remove the dead contract field.`,
+    });
+  }
+}
+
+function outcomeFlag(objectNode) {
+  const flag = objectNode.properties.find(
+    (property) =>
+      (staticPropertyKey(property) === "ok" ||
+        staticPropertyKey(property) === "success") &&
+      typeof property.value?.value === "boolean"
+  );
+  return flag ? flag.value.value : null;
+}
+
+function nullishKeys(objectNode) {
+  return objectNode.properties
+    .filter(
+      (property) =>
+        property.value?.raw === "null" ||
+        (property.value?.type === "Identifier" &&
+          property.value.name === "undefined")
+    )
+    .map(staticPropertyKey);
+}
+
+function keySignature(objectNode) {
+  return objectNode.properties.map(staticPropertyKey).sort().join(",");
+}
+
+function checkOutcomeFlagErasure(returnedLiterals, context) {
+  const success = returnedLiterals.find(
+    (objectNode) => outcomeFlag(objectNode) === true
+  );
+  const failure =
+    success &&
+    returnedLiterals.find(
+      (objectNode) =>
+        outcomeFlag(objectNode) === false &&
+        keySignature(objectNode) === keySignature(success)
+    );
+  if (!failure) return;
+  const successNulls = nullishKeys(success);
+  const failureNulls = nullishKeys(failure);
+  if (
+    successNulls.some((key) => !failureNulls.includes(key)) &&
+    failureNulls.some((key) => !successNulls.includes(key))
+  ) {
+    context.report({
+      node: success,
+      message: `Success and failure returns (lines ${success.loc.start.line} and ${failure.loc.start.line}) build the same object with complementary flag and error fields; return a discriminated union so consumers never read a nullable error behind a boolean flag.`,
+    });
+  }
+}
+
+export function checkReturnContracts(fnNode, context) {
+  const returnedLiterals = returnedObjects(fnNode, context.sourceCode);
+  if (!returnedLiterals) return;
+  checkConstantReturnField(returnedLiterals, context);
+  checkOutcomeFlagErasure(returnedLiterals, context);
+}
+
+export function checkResultProductType(node, context) {
+  const names = new Set(node.members.map(staticPropertyKey));
+  if (
+    (names.has("ok") || names.has("success")) &&
+    (names.has("data") || names.has("value")) &&
+    names.has("error") &&
+    names.size <= 4
+  ) {
+    context.report({
+      node,
+      message:
+        "Do not model fallible results as a single `{ ok, data, error }` product type; use a discriminated union (`{ ok: true; data: T } | { ok: false; error: E }`).",
+    });
+  }
+}
+
 export const noNullablePositionalTupleRule = {
   meta: {
     type: "problem",
@@ -368,40 +402,13 @@ export const noRedundantTypePredicateRule = {
     type: "problem",
     docs: {
       description:
-        "Disallow type predicates `x is T` whose parameter is already annotated with the same type `T`.",
+        "Disallow type predicates that restate the parameter type, that TypeScript infers from a nullish callback check, or that conflate a root discriminator with facet narrowing.",
     },
     schema: SCOPE_SCHEMA,
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-    const sourceCode = context.sourceCode;
-
-    function checkFunction(node) {
-      const pred = node.returnType?.typeAnnotation;
-      if (pred?.type !== "TSTypePredicate" || !pred.typeAnnotation) return;
-      const paramName =
-        pred.parameterName?.type === "Identifier"
-          ? pred.parameterName.name
-          : null;
-      if (!paramName) return;
-      const parameter = node.params.find(
-        (candidate) =>
-          candidate.type === "Identifier" && candidate.name === paramName
-      );
-      const paramType = parameter?.typeAnnotation?.typeAnnotation;
-      if (!paramType) return;
-      const targetType = pred.typeAnnotation.typeAnnotation;
-      if (
-        targetType &&
-        sourceCode.getText(paramType) === sourceCode.getText(targetType)
-      ) {
-        context.report({
-          node: pred,
-          message: `Type predicate '${paramName} is ${sourceCode.getText(targetType)}' is redundant because '${paramName}' is already typed as '${sourceCode.getText(paramType)}'.`,
-        });
-      }
-    }
-
+    const checkFunction = (node) => checkRedundantPredicate(node, context);
     return {
       FunctionDeclaration: checkFunction,
       FunctionExpression: checkFunction,
@@ -410,104 +417,18 @@ export const noRedundantTypePredicateRule = {
   },
 };
 
-function extractRequiredFields(members) {
-  const fields = [];
-  for (const member of members ?? []) {
-    if (
-      member.type === "TSPropertySignature" &&
-      !member.optional &&
-      member.key?.type === "Identifier"
-    ) {
-      fields.push(member.key.name);
-    }
-  }
-  return fields;
-}
-
-function checkUndercheckedPredicate(node, typeFields, context) {
-  const sourceCode = context.sourceCode;
-  const pred = node.returnType?.typeAnnotation;
-  if (pred?.type !== "TSTypePredicate" || pred.asserts) return;
-  const paramName =
-    pred.parameterName?.type === "Identifier" ? pred.parameterName.name : null;
-  if (!paramName) return;
-  const parameter = node.params.find(
-    (candidate) =>
-      candidate.type === "Identifier" && candidate.name === paramName
-  );
-  if (parameter?.typeAnnotation?.typeAnnotation?.type !== "TSUnknownKeyword") {
-    return;
-  }
-  const target = pred.typeAnnotation?.typeAnnotation;
-  if (
-    target?.type !== "TSTypeReference" ||
-    target.typeName?.type !== "Identifier"
-  ) {
-    return;
-  }
-  const required = typeFields.get(target.typeName.name);
-  if (!required || required.length < 2) return;
-  const bodyText = sourceCode.getText(node.body);
-  if (
-    bodyText.includes("instanceof") ||
-    bodyText.includes("safeParse") ||
-    bodyText.includes("Symbol.for")
-  ) {
-    return;
-  }
-  const checkedCount = required.filter(
-    (field) =>
-      bodyText.includes(`"${field}"`) ||
-      bodyText.includes(`'${field}'`) ||
-      bodyText.includes(`.${field}`)
-  ).length;
-  if (checkedCount < required.length) {
-    context.report({
-      node: pred,
-      message: `Type predicate for '${target.typeName.name}' only checks ${checkedCount}/${required.length} required fields on an 'unknown' value; validate the full contract or use a schema decoder.`,
-    });
-  }
-}
-
 export const noUndercheckedTypePredicateRule = {
   meta: {
     type: "problem",
     docs: {
       description:
-        "Disallow user-defined type predicates on `unknown` inputs that return a boolean without checking required fields of the target contract.",
+        "Disallow `x is T` / `asserts x is T` predicates on broad inputs (`unknown`, `any`, `object`, `Record`) that do not read every required field of the target contract.",
     },
     schema: SCOPE_SCHEMA,
   },
   create(context) {
-    if (!isRuleFile(context)) return {};
-    const typeFields = new Map();
-    const checkFunction = (node) =>
-      checkUndercheckedPredicate(node, typeFields, context);
-    return {
-      Program(node) {
-        for (const stmt of node.body) {
-          const decl =
-            stmt.type === "ExportNamedDeclaration" ? stmt.declaration : stmt;
-          if (decl?.type === "TSInterfaceDeclaration" && decl.id?.name) {
-            typeFields.set(
-              decl.id.name,
-              extractRequiredFields(decl.body?.body)
-            );
-          } else if (
-            decl?.type === "TSTypeAliasDeclaration" &&
-            decl.id?.name &&
-            decl.typeAnnotation?.type === "TSTypeLiteral"
-          ) {
-            typeFields.set(
-              decl.id.name,
-              extractRequiredFields(decl.typeAnnotation.members)
-            );
-          }
-        }
-      },
-      FunctionDeclaration: checkFunction,
-      FunctionExpression: checkFunction,
-      ArrowFunctionExpression: checkFunction,
-    };
+    return isRuleFile(context)
+      ? createUndercheckedPredicateVisitors(context)
+      : {};
   },
 };
