@@ -1,5 +1,5 @@
 export const filenameForContext = (context) =>
-  (context.filename ?? context.getFilename?.() ?? "").replaceAll("\\", "/");
+  (context.filename ?? "").replaceAll("\\", "/");
 export const isAstNode = (node) =>
   typeof node === "object" &&
   node !== null &&

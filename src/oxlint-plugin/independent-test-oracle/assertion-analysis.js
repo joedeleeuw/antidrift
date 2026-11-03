@@ -367,17 +367,22 @@ function classifyAssertion(record, facts, sourceCode) {
       node: record.node,
     };
   }
-  return (
-    classifyMockAssertion(record, facts) ??
-    classifyLengthAssertion(record, facts, sourceCode) ??
-    classifyOutcomeAssertion(record, facts) ??
-    classifyInputEcho(record, facts, sourceCode) ??
-    classifyExistenceAssertion(record, sourceCode) ?? {
-      independent: true,
-      messageId: null,
-      node: record.node,
-    }
-  );
+  const classifiers = [
+    () => classifyMockAssertion(record, facts),
+    () => classifyLengthAssertion(record, facts, sourceCode),
+    () => classifyOutcomeAssertion(record, facts),
+    () => classifyInputEcho(record, facts, sourceCode),
+    () => classifyExistenceAssertion(record, sourceCode),
+  ];
+  for (const classify of classifiers) {
+    const verdict = classify();
+    if (verdict !== null) return verdict;
+  }
+  return {
+    independent: true,
+    messageId: null,
+    node: record.node,
+  };
 }
 
 function fullEqualityCollectionReference(record, sourceCode) {

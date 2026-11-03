@@ -111,6 +111,7 @@ import {
 } from "./portable/type-forks.js";
 import ruleNoCallingComponentsAsFunctions from "./rules/no-calling-components-as-functions.js";
 import ruleNoDuplicatedConditionalClassnames from "./rules/no-duplicated-conditional-classnames.js";
+import ruleNoFallbackChain from "./rules/no-fallback-chain.js";
 import ruleNoNonindependentTestOracle from "./rules/no-nonindependent-test-oracle.js";
 import ruleNoRedeclaredOwnedUnion from "./rules/no-redeclared-owned-union.js";
 import ruleNoRepoStateMirrorAssertion from "./rules/no-repo-state-mirror-assertion.js";
@@ -193,6 +194,7 @@ const rawRules = {
   "no-explicit-type-arguments-on-owned-api":
     noExplicitTypeArgumentsOnOwnedApiRule,
   "no-external-decode-in-tsx": noExternalDecodeInTsxRule,
+  "no-fallback-chain": ruleNoFallbackChain(),
   "no-handrolled-resource-lifecycle-cells":
     noHandrolledResourceLifecycleCellsRule,
   "no-hookless-use-function": noHooklessUseFunctionRule,

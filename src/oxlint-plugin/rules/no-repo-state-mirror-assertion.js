@@ -144,10 +144,7 @@ function collectTemplatePathSegments(
 ) {
   const segments = [];
   for (let index = 0; index < templateNode.quasis.length; index += 1) {
-    const cooked =
-      templateNode.quasis[index]?.value?.cooked ??
-      templateNode.quasis[index]?.value?.raw ??
-      "";
+    const cooked = templateNode.quasis[index]?.value?.cooked ?? "";
     if (cooked) segments.push(cooked);
     if (index < templateNode.expressions.length) {
       segments.push(

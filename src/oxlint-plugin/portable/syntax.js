@@ -29,7 +29,7 @@ export const getCommentText = (candidate) => {
   if (!node) {
     return "";
   }
-  return getString(node.value) ?? getString(node.raw) ?? "";
+  return getString(node.value) ?? "";
 };
 export const getIdentifierName = (candidate) => {
   const node = toNode(candidate);

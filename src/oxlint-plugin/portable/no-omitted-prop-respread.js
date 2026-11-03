@@ -10,8 +10,7 @@ const EMPTY_SPREAD_KEYWORDS = new Set([
   "TSUndefinedKeyword",
   "TSVoidKeyword",
 ]);
-const typeArgumentsOf = (typeNode) =>
-  typeNode?.typeArguments?.params ?? typeNode?.typeParameters?.params ?? [];
+const typeArgumentsOf = (typeNode) => typeNode?.typeArguments?.params ?? [];
 const typeReferenceName = (typeName) => {
   if (isIdentifier(typeName)) {
     return typeName.name;

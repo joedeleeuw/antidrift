@@ -51,12 +51,18 @@ function recordExportedSymbol(expSymbol, fileName, checker, index) {
 }
 
 function nodeImplementationId(tsNode, fileName) {
-  return `${fileName}:${tsNode.name?.text ?? tsNode.pos ?? 0}`;
+  const label =
+    typeof tsNode.name?.text === "string"
+      ? tsNode.name.text
+      : String(tsNode.pos ?? 0);
+  return `${fileName}:${label}`;
 }
 
 function heritageTargetName(heritageType) {
   const expr = heritageType?.expression;
-  return expr?.text ?? expr?.name?.text ?? null;
+  return typeof expr?.text === "string"
+    ? expr.text
+    : (expr?.name?.text ?? null);
 }
 
 function recordHeritageAndAnnotations(tsNode, fileName, index) {
@@ -73,7 +79,10 @@ function recordHeritageAndAnnotations(tsNode, fileName, index) {
     }
   }
   const typeName = tsNode.type?.typeName;
-  const typeRefName = typeName?.text ?? typeName?.right?.text ?? null;
+  const typeRefName =
+    typeof typeName?.text === "string"
+      ? typeName.text
+      : (typeName?.right?.text ?? null);
   if (typeRefName && Array.isArray(tsNode.initializer?.properties)) {
     addSetEntry(index.implementedSeams, typeRefName, implId);
   }
@@ -88,7 +97,9 @@ function recordCallNode(tsNode, inTestFile, index) {
     return;
   }
   const calleeName =
-    tsNode.expression.text ?? tsNode.expression.name?.text ?? null;
+    typeof tsNode.expression.text === "string"
+      ? tsNode.expression.text
+      : (tsNode.expression.name?.text ?? null);
   if (typeof calleeName !== "string" || calleeName.length === 0) return;
   const argCount = tsNode.arguments.length;
   let stats = index.callStats.get(calleeName);

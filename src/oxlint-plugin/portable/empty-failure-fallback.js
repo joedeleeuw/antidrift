@@ -22,9 +22,6 @@ function isEmptyCollection(node) {
   );
 }
 
-// The failure path that owns a return: the nearest catch clause, or the
-// promise `.catch` handler whose own body holds the return. Returns inside
-// any other nested function belong to that function.
 function enclosingFailurePath(node) {
   for (let current = node.parent; current; current = current.parent) {
     if (FUNCTION_TYPES.has(current.type)) {
@@ -60,22 +57,13 @@ function rethrows(body, sourceCode) {
   return false;
 }
 
-function isSilent(handler, sourceCode) {
-  return (
-    sourceCode
-      .getDeclaredVariables(handler)
-      .every((binding) => binding.references.length === 0) &&
-    !rethrows(handler.body, sourceCode)
-  );
-}
-
 export function emptyFailureFallbackVisitors(context) {
   const { sourceCode } = context;
   return {
     ReturnStatement(node) {
       if (!isEmptyCollection(node.argument)) return;
       const handler = enclosingFailurePath(node);
-      if (handler && isSilent(handler, sourceCode)) {
+      if (handler && !rethrows(handler.body, sourceCode)) {
         context.report({ node, messageId: "fallback" });
       }
     },
@@ -83,7 +71,7 @@ export function emptyFailureFallbackVisitors(context) {
       if (
         isEmptyCollection(node.body) &&
         isPromiseCatchHandler(node) &&
-        isSilent(node, sourceCode)
+        !rethrows(node.body, sourceCode)
       ) {
         context.report({ node, messageId: "fallback" });
       }

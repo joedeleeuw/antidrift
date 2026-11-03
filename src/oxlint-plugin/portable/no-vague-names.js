@@ -231,10 +231,13 @@ class BindingNames {
   };
 
   isComponent = (node) => {
-    const name =
-      node.id?.name ??
-      (node.parent.type === "VariableDeclarator" ? node.parent.id.name : "");
-    return /^[A-Z]/.test(name ?? "") || this.returnsJsx(node);
+    const declName =
+      node.parent.type === "VariableDeclarator" &&
+      node.parent.id?.type === "Identifier"
+        ? node.parent.id.name
+        : "";
+    const name = node.id?.name ?? declName;
+    return /^[A-Z]/.test(name) || this.returnsJsx(node);
   };
 
   checkFunction = (node) => {

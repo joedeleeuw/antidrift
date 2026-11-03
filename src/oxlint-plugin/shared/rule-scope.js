@@ -38,10 +38,7 @@ function hasGeneratedHeader(sourceCode) {
 }
 
 export function ruleFilename(context) {
-  return (context.filename ?? context.getFilename?.() ?? "").replaceAll(
-    "\\",
-    "/"
-  );
+  return (context.filename ?? "").replaceAll("\\", "/");
 }
 
 export function isRuleFile(context, inferredScope) {
@@ -49,7 +46,7 @@ export function isRuleFile(context, inferredScope) {
   const filename = ruleFilename(context);
   if (IGNORED_PATH_RE.test(filename)) return false;
   if (hasGeneratedHeader(context.sourceCode)) return false;
-  const cwd = context.cwd ?? context.getCwd?.() ?? process.cwd();
+  const cwd = context.cwd ?? process.cwd();
   const local = isAbsolute(filename)
     ? relative(cwd, filename).replaceAll("\\", "/")
     : filename;
