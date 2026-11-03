@@ -332,8 +332,9 @@ export const noNullablePositionalTupleRule = {
         checkNullableTuple(node, aliases, context);
       },
       TSInterfaceDeclaration(node) {
-        if (!node.extends?.length)
+        if (!node.extends?.length) {
           checkNullableFailureBag(node.body.body, node, context);
+        }
       },
       TSTypeAliasDeclaration(node) {
         if (node.typeAnnotation.type === "TSTypeLiteral") {

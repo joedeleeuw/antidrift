@@ -54,8 +54,9 @@ function isRawDeserializeCall(node) {
   if (
     callee.property.name === "parse" &&
     /^(?:JSON|YAML)$/u.test(callee.object.name)
-  )
+  ) {
     return true;
+  }
   return (
     callee.property.name === "json" &&
     /^(?:res|response|req|request)$/iu.test(callee.object.name)
@@ -83,8 +84,9 @@ function checkJsonStringFields(node, context) {
   if (
     builder?.method !== "object" ||
     builder.args[0]?.type !== "ObjectExpression"
-  )
+  ) {
     return;
+  }
   for (const property of builder.args[0].properties) {
     const name = staticPropertyName(property);
     if (
@@ -152,8 +154,9 @@ function isFallbackLiteral(node) {
 function collectFallbackReturns(node, sourceCode, returns) {
   if (!node || isFunctionLike(node)) return true;
   if (node.type === "ThrowStatement") return false;
-  if (node.type === "ReturnStatement")
+  if (node.type === "ReturnStatement") {
     returns.push(unwrapExpression(node.argument));
+  }
   return (sourceCode.visitorKeys[node.type] ?? []).every((key) => {
     const children = Array.isArray(node[key]) ? node[key] : [node[key]];
     return children.every((child) =>
@@ -349,8 +352,9 @@ function isMappedSchemaDecode(node, sourceCode) {
   } else if (
     callback?.type !== "ArrowFunctionExpression" ||
     callback.body !== node
-  )
+  ) {
     return false;
+  }
   const call = callback?.parent;
   if (
     call?.type !== "CallExpression" ||

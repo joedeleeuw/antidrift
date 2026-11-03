@@ -459,8 +459,9 @@ function isInside(node, ancestor) {
 function isLoopBinding(identifier, loop, sourceCode) {
   const binding = findVariable(sourceCode, identifier);
   if (!binding) return false;
-  if (binding.defs.some((definition) => isInside(definition.node, loop)))
+  if (binding.defs.some((definition) => isInside(definition.node, loop))) {
     return true;
+  }
   if (
     loop.type === "ForOfStatement" &&
     loop.left.type === "Identifier" &&

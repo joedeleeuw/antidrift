@@ -198,8 +198,9 @@ function objectSchemaTags(expression, sourceCode, seen = new Set()) {
   if (
     builder?.method !== "object" ||
     builder.args[0]?.type !== "ObjectExpression"
-  )
+  ) {
     return [];
+  }
   return builder.args[0].properties.flatMap((property) => {
     const name = staticPropertyName(property);
     if (!schemaDiscriminantKeys.has(name)) return [];
@@ -218,8 +219,9 @@ function unionDiscriminants(expression, sourceCode) {
   if (!builder) return [];
   const tagged = builder.method === "discriminatedUnion";
   let variants = [];
-  if (tagged && builder.args[1]?.type === "ArrayExpression")
+  if (tagged && builder.args[1]?.type === "ArrayExpression") {
     variants = builder.args[1].elements;
+  }
   if (builder.method === "union") variants = builder.args;
   if (variants.length < 2) return [];
   const tags = variants.map((variant) => objectSchemaTags(variant, sourceCode));
@@ -283,8 +285,9 @@ function checkSchemaRename(node, context) {
   if (
     node.callee?.type !== "MemberExpression" ||
     node.callee.property?.name !== "extend"
-  )
+  ) {
     return;
+  }
   const chain = resolveSchemaMemberChain(node, context.sourceCode);
   const extended = chain?.steps.at(-1);
   const omitted = chain?.steps.at(-2);

@@ -104,12 +104,14 @@ export function resolveSchemaBuilderCall(node, sourceCode) {
   if (
     node?.type !== "CallExpression" ||
     !hasRuntimeSchemaProvenance(node, sourceCode)
-  )
+  ) {
     return null;
+  }
   const callee = node.callee;
   let method = null;
-  if (callee.type === "MemberExpression" && !callee.computed)
+  if (callee.type === "MemberExpression" && !callee.computed) {
     method = callee.property.name;
+  }
   if (callee.type === "Identifier") method = callee.name;
   return method ? { method, args: node.arguments } : null;
 }

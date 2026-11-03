@@ -72,6 +72,16 @@ interface DuplicateContract {
   count: number;
 }
 
+interface UntaggedFailureBag {
+  target: string | null;
+  unavailableReason: string | null;
+}
+
+const BaseItemSchema = z.object({ oldField: z.string(), payloadJson: z.string().catch("default") });
+export const RenamedItemSchema = BaseItemSchema.omit({ oldField: true }).extend({
+  newField: z.string(),
+});
+
 const outerGreeting = "Hello";
 
 export function BrokenWidget() {
@@ -111,15 +121,56 @@ export function processLegacyData(
   return [chosen, z.object({ id: z.string() }).parse(parsed)];
 }
 
-export async function runInParallel(urls: string[]) {
+export async function runInParallel(urls: string[], children: { parentId: string; id: string }[]) {
+  for (const url of urls) {
+    children.find((child) => child.parentId === url.trim);
+  }
   urls.forEach(async (url) => {
     await fetch(url);
   });
 }
 
+let globalUiOpen = false;
+
 export function BadComponent({ items = [] }: { items?: string[] }) {
+  globalUiOpen = items?.length !== 0;
   const randomId = Math.random();
   return <div>{randomId}{items.length}</div>;
+}
+
+export function shredUnionAndRepeatNullable(
+  scope: { kind: "machine"; machineId: string } | { kind: "project"; projectId: string },
+  entry: { a: string; b: number; c: boolean } | null,
+  bag: {
+    setA: () => void;
+    setB: () => void;
+    getC: () => string;
+  },
+  wide: {
+    p1: number;
+    p2: number;
+    p3: number;
+    p4: number;
+    p5: number;
+    p6: number;
+    p7: number;
+    p8: number;
+    p9: number;
+    p10: number;
+    p11: number;
+  }
+) {
+  const machineId = scope.kind === "machine" ? scope.machineId : null;
+  const projectId = scope.kind === "project" ? scope.projectId : null;
+  return {
+    machineId,
+    projectId,
+    a: entry ? entry.a : "",
+    b: entry ? entry.b : 0,
+    c: entry ? entry.c : false,
+    bag,
+    wide,
+  };
 }
 
 declare const ipcMain: {
@@ -238,6 +289,15 @@ const expectedRules = [
   "antidrift/require-authz-check",
   "antidrift/no-handrolled-resource-lifecycle-cells",
   "antidrift/no-appeasement-erasure",
+  "antidrift/no-optional-chain-zero-length-inequality",
+  "antidrift/no-module-mutable-ui-state",
+  "antidrift/no-shredded-discriminated-union",
+  "antidrift/no-repeated-nullable-ternaries",
+  "antidrift/no-wide-parameter-bags",
+  "antidrift/no-foreign-state-callbacks",
+  "antidrift/no-nullable-positional-tuple",
+  "antidrift/unknown-input-must-be-decoded",
+  "antidrift/no-query-join-or-tree-reshape",
 ];
 
 const workDir = mkdtempSync(join(tmpdir(), "antidrift-smoke-"));

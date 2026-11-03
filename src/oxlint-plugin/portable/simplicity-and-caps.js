@@ -517,15 +517,34 @@ export const noReexportOnlyModuleRule = {
               stmt.source !== null &&
               stmt.declaration === null)
         );
-        if (!allReexports) return;
-        if (node.body.every((stmt) => isOwnSliceReexport(stem, stmt))) {
+        if (allReexports) {
+          if (node.body.every((stmt) => isOwnSliceReexport(stem, stmt))) {
+            return;
+          }
+          context.report({
+            node,
+            message:
+              "Module only re-exports symbols from other modules; import from the owning module directly.",
+          });
           return;
         }
-        context.report({
-          node,
-          message:
-            "Module only re-exports symbols from other modules; import from the owning module directly.",
-        });
+        for (const stmt of node.body) {
+          if (
+            stmt.type === "ExportNamedDeclaration" &&
+            stmt.declaration === null &&
+            stmt.exportKind !== "type" &&
+            typeof stmt.source?.value === "string" &&
+            stmt.source.value.startsWith("./") &&
+            !isOwnSliceReexport(stem, stmt) &&
+            stmt.specifiers.some((spec) => spec.exportKind !== "type")
+          ) {
+            context.report({
+              node: stmt,
+              message:
+                "Do not re-export runtime symbols from a relative sibling in a non-index module; import from the owning module directly.",
+            });
+          }
+        }
       },
     };
   },
