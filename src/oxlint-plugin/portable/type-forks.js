@@ -1,5 +1,106 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
-import { isFunctionLike, unwrapExpression } from "../shared/scope.js";
+import {
+  extractObjectFieldNames,
+  resolveSchemaBuilderCall,
+  resolveSchemaMemberChain,
+  schemaDiscriminantKeys,
+  staticPropertyName,
+} from "../shared/runtime-schema-libraries.js";
+import {
+  findVariable,
+  isFunctionLike,
+  unwrapExpression,
+} from "../shared/scope.js";
+
+function enclosingSingleReturnFunction(objNode) {
+  const parent = objNode.parent;
+  if (isFunctionLike(parent) && parent.body === objNode) return parent;
+  if (
+    parent?.type === "ReturnStatement" &&
+    parent.parent?.type === "BlockStatement" &&
+    parent.parent.body.length === 1 &&
+    isFunctionLike(parent.parent.parent)
+  ) {
+    return parent.parent.parent;
+  }
+  return null;
+}
+
+function isExportedFunction(fnNode) {
+  const p = fnNode.parent;
+  return (
+    p?.type === "ExportNamedDeclaration" ||
+    p?.type === "ExportDefaultDeclaration" ||
+    p?.parent?.parent?.type === "ExportNamedDeclaration"
+  );
+}
+
+function isUnexportedContractProjectionFunction(objNode, sourceIdent, context) {
+  const fnNode = enclosingSingleReturnFunction(objNode);
+  if (!fnNode || fnNode.params.length !== 1 || isExportedFunction(fnNode)) {
+    return false;
+  }
+  const param = fnNode.params[0];
+  if (param.type !== "Identifier" || param.name !== sourceIdent) {
+    return false;
+  }
+  const paramType = param.typeAnnotation?.typeAnnotation;
+  const returnType = fnNode.returnType?.typeAnnotation;
+  if (
+    paramType?.type !== "TSTypeReference" ||
+    returnType?.type !== "TSTypeReference"
+  ) {
+    return false;
+  }
+  return (
+    context.sourceCode.getText(paramType.typeName) !==
+    context.sourceCode.getText(returnType.typeName)
+  );
+}
+
+function checkContractProjection(node, context) {
+  if (node.properties.length < 3) return;
+  let sourceIdent = null;
+  let allSameSource = true;
+  for (const prop of node.properties) {
+    if (
+      prop.type !== "Property" ||
+      prop.computed ||
+      prop.shorthand ||
+      prop.key?.type !== "Identifier"
+    ) {
+      allSameSource = false;
+      break;
+    }
+    const val = unwrapExpression(prop.value);
+    if (
+      val?.type !== "MemberExpression" ||
+      val.computed ||
+      val.object?.type !== "Identifier" ||
+      val.property?.type !== "Identifier" ||
+      val.property.name !== prop.key.name
+    ) {
+      allSameSource = false;
+      break;
+    }
+    if (sourceIdent === null) {
+      sourceIdent = val.object.name;
+    } else if (sourceIdent !== val.object.name) {
+      allSameSource = false;
+      break;
+    }
+  }
+  if (
+    allSameSource &&
+    sourceIdent &&
+    isUnexportedContractProjectionFunction(node, sourceIdent, context)
+  ) {
+    context.report({
+      node,
+      message: `Object literal restates ${node.properties.length} properties verbatim from '${sourceIdent}'; pass '${sourceIdent}' directly instead of reshaping a parallel bag.`,
+    });
+  }
+}
 
 export const noContractAppeasementProjectionRule = {
   meta: {
@@ -18,95 +119,10 @@ export const noContractAppeasementProjectionRule = {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-    function enclosingSingleReturnFunction(objNode) {
-      const parent = objNode.parent;
-      if (isFunctionLike(parent) && parent.body === objNode) return parent;
-      if (
-        parent?.type === "ReturnStatement" &&
-        parent.parent?.type === "BlockStatement" &&
-        parent.parent.body.length === 1 &&
-        isFunctionLike(parent.parent.parent)
-      ) {
-        return parent.parent.parent;
-      }
-      return null;
-    }
-
-    function isExportedFunction(fnNode) {
-      const p = fnNode.parent;
-      return (
-        p?.type === "ExportNamedDeclaration" ||
-        p?.type === "ExportDefaultDeclaration" ||
-        p?.parent?.parent?.type === "ExportNamedDeclaration"
-      );
-    }
-
-    function isUnexportedContractProjectionFunction(objNode, sourceIdent) {
-      const fnNode = enclosingSingleReturnFunction(objNode);
-      if (!fnNode || fnNode.params.length !== 1 || isExportedFunction(fnNode)) {
-        return false;
-      }
-      const param = fnNode.params[0];
-      if (param.type !== "Identifier" || param.name !== sourceIdent) {
-        return false;
-      }
-      const paramType = param.typeAnnotation?.typeAnnotation;
-      const returnType = fnNode.returnType?.typeAnnotation;
-      if (
-        paramType?.type !== "TSTypeReference" ||
-        returnType?.type !== "TSTypeReference"
-      ) {
-        return false;
-      }
-      return (
-        context.sourceCode.getText(paramType.typeName) !==
-        context.sourceCode.getText(returnType.typeName)
-      );
-    }
 
     return {
       ObjectExpression(node) {
-        if (node.properties.length < 3) return;
-        let sourceIdent = null;
-        let allSameSource = true;
-        for (const prop of node.properties) {
-          if (
-            prop.type !== "Property" ||
-            prop.computed ||
-            prop.shorthand ||
-            prop.key?.type !== "Identifier"
-          ) {
-            allSameSource = false;
-            break;
-          }
-          const val = unwrapExpression(prop.value);
-          if (
-            val?.type !== "MemberExpression" ||
-            val.computed ||
-            val.object?.type !== "Identifier" ||
-            val.property?.type !== "Identifier" ||
-            val.property.name !== prop.key.name
-          ) {
-            allSameSource = false;
-            break;
-          }
-          if (sourceIdent === null) {
-            sourceIdent = val.object.name;
-          } else if (sourceIdent !== val.object.name) {
-            allSameSource = false;
-            break;
-          }
-        }
-        if (
-          allSameSource &&
-          sourceIdent &&
-          isUnexportedContractProjectionFunction(node, sourceIdent)
-        ) {
-          context.report({
-            node,
-            message: `Object literal restates ${node.properties.length} properties verbatim from '${sourceIdent}'; pass '${sourceIdent}' directly instead of reshaping a parallel bag.`,
-          });
-        }
+        checkContractProjection(node, context);
       },
       TSTypeLiteral(node) {
         const names = new Set();
@@ -135,6 +151,165 @@ export const noContractAppeasementProjectionRule = {
   },
 };
 
+function shapeSignature(members, sourceCode) {
+  if (!Array.isArray(members) || members.length < 3) return null;
+  const fields = [];
+  for (const member of members) {
+    if (
+      member.type !== "TSPropertySignature" ||
+      member.computed ||
+      member.key?.type !== "Identifier" ||
+      !member.typeAnnotation?.typeAnnotation
+    ) {
+      return null;
+    }
+    const optional = member.optional ? "?" : "";
+    const annotation = sourceCode
+      .getText(member.typeAnnotation.typeAnnotation)
+      .replace(/\s+/gu, " ");
+    fields.push(`${member.key.name}${optional}:${annotation}`);
+  }
+  return fields.sort().join(";");
+}
+
+function checkShape(context, seenShapes, name, members, reportNode) {
+  const signature = shapeSignature(members, context.sourceCode);
+  if (!signature) return;
+  const existing = seenShapes.get(signature);
+  if (existing && existing !== name) {
+    context.report({
+      node: reportNode,
+      message: `Type '${name}' duplicates the exact ${members.length}-field shape of '${existing}'; reuse '${existing}' instead of forking a parallel contract.`,
+    });
+    return;
+  }
+  seenShapes.set(signature, name);
+}
+
+function objectSchemaTags(expression, sourceCode, seen = new Set()) {
+  const node = unwrapExpression(expression);
+  if (node?.type === "Identifier") {
+    const definition = findVariable(sourceCode, node)?.defs?.[0];
+    if (definition?.parent?.kind !== "const" || seen.has(definition)) return [];
+    seen.add(definition);
+    return objectSchemaTags(definition.node.init, sourceCode, seen);
+  }
+  const builder = resolveSchemaBuilderCall(node, sourceCode);
+  if (
+    builder?.method !== "object" ||
+    builder.args[0]?.type !== "ObjectExpression"
+  )
+    return [];
+  return builder.args[0].properties.flatMap((property) => {
+    const name = staticPropertyName(property);
+    if (!schemaDiscriminantKeys.has(name)) return [];
+    const literal = resolveSchemaBuilderCall(property.value, sourceCode);
+    return literal?.method === "literal" && literal.args[0]?.type === "Literal"
+      ? [name]
+      : [];
+  });
+}
+
+function unionDiscriminants(expression, sourceCode) {
+  const builder = resolveSchemaBuilderCall(
+    unwrapExpression(expression),
+    sourceCode
+  );
+  if (!builder) return [];
+  const tagged = builder.method === "discriminatedUnion";
+  let variants = [];
+  if (tagged && builder.args[1]?.type === "ArrayExpression")
+    variants = builder.args[1].elements;
+  if (builder.method === "union") variants = builder.args;
+  if (variants.length < 2) return [];
+  const tags = variants.map((variant) => objectSchemaTags(variant, sourceCode));
+  const candidates =
+    tagged && builder.args[0]?.type === "Literal"
+      ? [builder.args[0].value]
+      : tags[0];
+  return candidates.filter(
+    (key) =>
+      schemaDiscriminantKeys.has(key) &&
+      tags.every((keys) => keys.includes(key))
+  );
+}
+
+function checkSchemaExports(program, context) {
+  const declarations = program.body
+    .map((statement) =>
+      statement.type === "ExportNamedDeclaration"
+        ? statement.declaration
+        : statement
+    )
+    .filter((declaration) => declaration?.type === "VariableDeclaration");
+  const tags = new Set(
+    declarations.flatMap((declaration) =>
+      declaration.declarations.flatMap((binding) =>
+        unionDiscriminants(binding.init, context.sourceCode)
+      )
+    )
+  );
+  if (tags.size === 0) return;
+  for (const declaration of declarations) {
+    if (
+      declaration.kind !== "const" ||
+      declaration.parent?.type !== "ExportNamedDeclaration"
+    ) {
+      continue;
+    }
+    for (const binding of declaration.declarations) {
+      if (
+        resolveSchemaBuilderCall(
+          unwrapExpression(binding.init),
+          context.sourceCode
+        )?.method !== "object"
+      ) {
+        continue;
+      }
+      const tag = objectSchemaTags(binding.init, context.sourceCode).find(
+        (key) => tags.has(key)
+      );
+      if (tag) {
+        context.report({
+          node: binding.id,
+          message: `Exported variant schema duplicates the '${tag}' discriminant of a union in this module; derive variants from the canonical union instead of exporting parallel object schemas.`,
+        });
+      }
+    }
+  }
+}
+
+function checkSchemaRename(node, context) {
+  if (
+    node.callee?.type !== "MemberExpression" ||
+    node.callee.property?.name !== "extend"
+  )
+    return;
+  const chain = resolveSchemaMemberChain(node, context.sourceCode);
+  const extended = chain?.steps.at(-1);
+  const omitted = chain?.steps.at(-2);
+  if (
+    omitted?.method !== "omit" ||
+    extended?.node !== node ||
+    unwrapExpression(node.callee.object) !== omitted.node
+  ) {
+    return;
+  }
+  const omittedNames = extractObjectFieldNames(omitted.args[0]);
+  const extendedNames = extractObjectFieldNames(extended.args[0]);
+  if (
+    omittedNames.length > 0 &&
+    extendedNames.length > 0 &&
+    omittedNames.every((name) => !extendedNames.includes(name))
+  ) {
+    context.report({
+      node,
+      message:
+        "Schema `.omit().extend()` forks the schema shape by renaming fields; share a base schema or transform at the boundary.",
+    });
+  }
+}
+
 export const noStructuralTypeForkRule = {
   meta: {
     type: "problem",
@@ -152,54 +327,34 @@ export const noStructuralTypeForkRule = {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-    const sourceCode = context.sourceCode;
     const seenShapes = new Map();
-
-    function shapeSignature(members) {
-      if (!Array.isArray(members) || members.length < 3) return null;
-      const fields = [];
-      for (const m of members) {
-        if (
-          m.type !== "TSPropertySignature" ||
-          m.computed ||
-          m.key?.type !== "Identifier" ||
-          !m.typeAnnotation?.typeAnnotation
-        ) {
-          return null;
-        }
-        const opt = m.optional ? "?" : "";
-        const ty = sourceCode
-          .getText(m.typeAnnotation.typeAnnotation)
-          .replace(/\s+/gu, " ");
-        fields.push(`${m.key.name}${opt}:${ty}`);
-      }
-      fields.sort();
-      return fields.join(";");
-    }
-
-    function checkShape(name, members, reportNode) {
-      const sig = shapeSignature(members);
-      if (!sig) return;
-      const existing = seenShapes.get(sig);
-      if (existing && existing !== name) {
-        context.report({
-          node: reportNode,
-          message: `Type '${name}' duplicates the exact ${members.length}-field shape of '${existing}'; reuse '${existing}' instead of forking a parallel contract.`,
-        });
-        return;
-      }
-      seenShapes.set(sig, name);
-    }
-
     return {
+      Program(node) {
+        checkSchemaExports(node, context);
+      },
+      CallExpression(node) {
+        checkSchemaRename(node, context);
+      },
       TSInterfaceDeclaration(node) {
         if (node.id?.name && (!node.extends || node.extends.length === 0)) {
-          checkShape(node.id.name, node.body?.body, node.id);
+          checkShape(
+            context,
+            seenShapes,
+            node.id.name,
+            node.body?.body,
+            node.id
+          );
         }
       },
       TSTypeAliasDeclaration(node) {
         if (node.id?.name && node.typeAnnotation?.type === "TSTypeLiteral") {
-          checkShape(node.id.name, node.typeAnnotation.members, node.id);
+          checkShape(
+            context,
+            seenShapes,
+            node.id.name,
+            node.typeAnnotation.members,
+            node.id
+          );
         }
       },
     };

@@ -5,6 +5,7 @@ const runtimeSchemaLibrarySources = [
   "@effect/schema",
   "@sinclair/typebox",
   "arktype",
+  "convex/values",
   "effect/Schema",
   "superstruct",
   "valibot",
@@ -12,6 +13,17 @@ const runtimeSchemaLibrarySources = [
   "zod",
 ];
 const provenanceDepthLimit = 12;
+export const schemaDiscriminantKeys = new Set([
+  "kind",
+  "type",
+  "status",
+  "tag",
+  "_tag",
+  "state",
+  "mode",
+  "phase",
+  "variant",
+]);
 
 export function isRuntimeSchemaLibrarySource(value) {
   if (typeof value !== "string") return false;
@@ -20,8 +32,6 @@ export function isRuntimeSchemaLibrarySource(value) {
   );
 }
 
-// A declaration file installed from a runtime-schema package, e.g.
-// `node_modules/.pnpm/zod@4/node_modules/zod/v4/classic/schemas.d.ts`.
 export function isRuntimeSchemaLibraryFile(fileName) {
   const normalized = fileName.replaceAll("\\", "/");
   const marker = "/node_modules/";
@@ -56,8 +66,6 @@ function constInitializer(identifier, sourceCode) {
   return definition.node.init ?? null;
 }
 
-// True when the expression is built from a runtime-schema library binding
-// through local const aliases, member reads, and calls.
 export function hasRuntimeSchemaProvenance(
   expression,
   sourceCode,
@@ -90,4 +98,59 @@ export function hasRuntimeSchemaProvenance(
     );
   }
   return false;
+}
+
+export function resolveSchemaBuilderCall(node, sourceCode) {
+  if (
+    node?.type !== "CallExpression" ||
+    !hasRuntimeSchemaProvenance(node, sourceCode)
+  )
+    return null;
+  const callee = node.callee;
+  let method = null;
+  if (callee.type === "MemberExpression" && !callee.computed)
+    method = callee.property.name;
+  if (callee.type === "Identifier") method = callee.name;
+  return method ? { method, args: node.arguments } : null;
+}
+
+export function resolveSchemaMemberChain(node, sourceCode) {
+  if (!hasRuntimeSchemaProvenance(node, sourceCode)) return null;
+  const steps = [];
+  let root = unwrapExpression(node);
+  while (root?.type === "CallExpression" || root?.type === "MemberExpression") {
+    if (root.type === "MemberExpression") {
+      root = unwrapExpression(root.object);
+      continue;
+    }
+    const builder = resolveSchemaBuilderCall(root, sourceCode);
+    if (!builder) return null;
+    steps.unshift({ ...builder, node: root });
+    root = unwrapExpression(
+      root.callee.type === "MemberExpression" ? root.callee.object : root.callee
+    );
+  }
+  return steps.length > 0 ? { root, steps } : null;
+}
+
+export function extractObjectFieldNames(objectExpr) {
+  if (objectExpr?.type !== "ObjectExpression") return [];
+  return objectExpr.properties
+    .map(staticPropertyName)
+    .filter((name) => name !== null);
+}
+
+export function staticPropertyName(property) {
+  if (
+    (property?.type !== "Property" &&
+      property?.type !== "TSPropertySignature") ||
+    property.computed
+  ) {
+    return null;
+  }
+  if (property.key.type === "Identifier") return property.key.name;
+  return property.key.type === "Literal" &&
+    typeof property.key.value === "string"
+    ? property.key.value
+    : null;
 }

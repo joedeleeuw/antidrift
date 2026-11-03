@@ -1,5 +1,11 @@
 import { isKnownEvidenceExpression } from "../anti-slop/shared/dictionary-types.js";
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
+import {
+  resolveSchemaBuilderCall,
+  resolveSchemaMemberChain,
+  schemaDiscriminantKeys,
+  staticPropertyName,
+} from "../shared/runtime-schema-libraries.js";
 import { findVariable, unwrapExpression } from "../shared/scope.js";
 
 export const noAppeasementCastRule = {
@@ -210,6 +216,89 @@ export const noAppeasementErasureRule = {
   },
 };
 
+function isNullableType(typeNode, aliases, seen = new Set()) {
+  if (!typeNode) return false;
+  if (
+    typeNode.type === "TSNullKeyword" ||
+    typeNode.type === "TSUndefinedKeyword"
+  ) {
+    return true;
+  }
+  if (typeNode.type === "TSOptionalType") return true;
+  if (typeNode.type === "TSUnionType") {
+    return typeNode.types.some((t) => isNullableType(t, aliases, seen));
+  }
+  if (
+    typeNode.type === "TSTypeReference" &&
+    typeNode.typeName?.type === "Identifier" &&
+    !seen.has(typeNode.typeName.name)
+  ) {
+    seen.add(typeNode.typeName.name);
+    return isNullableType(aliases.get(typeNode.typeName.name), aliases, seen);
+  }
+  return false;
+}
+
+function checkNullableTuple(node, aliases, context) {
+  const elements = node.elementTypes ?? [];
+  let nullableCount = 0;
+  for (const elem of elements) {
+    const inner = elem.type === "TSNamedTupleMember" ? elem.elementType : elem;
+    if (elem.type === "TSNamedTupleMember" && elem.optional) {
+      nullableCount += 1;
+    } else if (isNullableType(inner, aliases)) {
+      nullableCount += 1;
+    }
+  }
+  if (nullableCount >= 2) {
+    context.report({
+      node,
+      message:
+        "Do not model multi-field nullable state as a positional tuple. Use a named object or explicit state union.",
+    });
+  }
+}
+
+const FAILURE_FIELDS = new Set([
+  "error",
+  "err",
+  "failure",
+  "unavailableReason",
+  "fault",
+]);
+const RESULT_TAGS = new Set(["ok", "success", ...schemaDiscriminantKeys]);
+
+function explicitlyNullable(property, sourceCode) {
+  if (property.type === "TSPropertySignature") {
+    const annotation = property.typeAnnotation?.typeAnnotation;
+    return (
+      annotation?.type === "TSUnionType" &&
+      annotation.types.some((type) => type.type === "TSNullKeyword")
+    );
+  }
+  const chain = resolveSchemaMemberChain(property.value, sourceCode);
+  return chain?.steps.some((step) => step.method === "nullable") ?? false;
+}
+
+function checkNullableFailureBag(properties, node, context) {
+  if (properties.length < 2 || properties.length > 4) return;
+  const names = properties.map(staticPropertyName);
+  if (names.some((name) => name === null || RESULT_TAGS.has(name))) return;
+  const nullableNames = properties
+    .filter((property) => explicitlyNullable(property, context.sourceCode))
+    .map(staticPropertyName);
+  if (
+    nullableNames.some((name) => FAILURE_FIELDS.has(name)) &&
+    nullableNames.some((name) => !FAILURE_FIELDS.has(name))
+  ) {
+    context.report({
+      node,
+      message:
+        "Untagged nullable failure and payload fields admit contradictory states; use a discriminated success/failure union.",
+    });
+  }
+}
+
 export const noNullablePositionalTupleRule = {
   meta: {
     type: "problem",
@@ -229,29 +318,6 @@ export const noNullablePositionalTupleRule = {
     if (!isRuleFile(context)) return {};
     const aliases = new Map();
 
-    function isNullableType(typeNode, seen = new Set()) {
-      if (!typeNode) return false;
-      if (
-        typeNode.type === "TSNullKeyword" ||
-        typeNode.type === "TSUndefinedKeyword"
-      ) {
-        return true;
-      }
-      if (typeNode.type === "TSOptionalType") return true;
-      if (typeNode.type === "TSUnionType") {
-        return typeNode.types.some((t) => isNullableType(t, seen));
-      }
-      if (
-        typeNode.type === "TSTypeReference" &&
-        typeNode.typeName?.type === "Identifier" &&
-        !seen.has(typeNode.typeName.name)
-      ) {
-        seen.add(typeNode.typeName.name);
-        return isNullableType(aliases.get(typeNode.typeName.name), seen);
-      }
-      return false;
-    }
-
     return {
       Program(node) {
         for (const stmt of node.body) {
@@ -263,23 +329,24 @@ export const noNullablePositionalTupleRule = {
         }
       },
       TSTupleType(node) {
-        const elements = node.elementTypes ?? [];
-        let nullableCount = 0;
-        for (const elem of elements) {
-          const inner =
-            elem.type === "TSNamedTupleMember" ? elem.elementType : elem;
-          if (elem.type === "TSNamedTupleMember" && elem.optional) {
-            nullableCount += 1;
-          } else if (isNullableType(inner)) {
-            nullableCount += 1;
-          }
+        checkNullableTuple(node, aliases, context);
+      },
+      TSInterfaceDeclaration(node) {
+        if (!node.extends?.length)
+          checkNullableFailureBag(node.body.body, node, context);
+      },
+      TSTypeAliasDeclaration(node) {
+        if (node.typeAnnotation.type === "TSTypeLiteral") {
+          checkNullableFailureBag(node.typeAnnotation.members, node, context);
         }
-        if (nullableCount >= 2) {
-          context.report({
-            node,
-            message:
-              "Do not model multi-field nullable state as a positional tuple. Use a named object or explicit state union.",
-          });
+      },
+      CallExpression(node) {
+        const builder = resolveSchemaBuilderCall(node, context.sourceCode);
+        if (
+          builder?.method === "object" &&
+          builder.args[0]?.type === "ObjectExpression"
+        ) {
+          checkNullableFailureBag(builder.args[0].properties, node, context);
         }
       },
     };
@@ -338,6 +405,64 @@ export const noRedundantTypePredicateRule = {
   },
 };
 
+function extractRequiredFields(members) {
+  const fields = [];
+  for (const m of members ?? []) {
+    if (
+      m.type === "TSPropertySignature" &&
+      !m.optional &&
+      m.key?.type === "Identifier"
+    ) {
+      fields.push(m.key.name);
+    }
+  }
+  return fields;
+}
+
+function checkUndercheckedPredicate(node, typeFields, context) {
+  const sourceCode = context.sourceCode;
+  const pred = node.returnType?.typeAnnotation;
+  if (pred?.type !== "TSTypePredicate" || pred.asserts) return;
+  const paramName =
+    pred.parameterName?.type === "Identifier" ? pred.parameterName.name : null;
+  if (!paramName) return;
+  const param = node.params.find(
+    (p) => p.type === "Identifier" && p.name === paramName
+  );
+  if (param?.typeAnnotation?.typeAnnotation?.type !== "TSUnknownKeyword") {
+    return;
+  }
+  const target = pred.typeAnnotation?.typeAnnotation;
+  if (
+    target?.type !== "TSTypeReference" ||
+    target.typeName?.type !== "Identifier"
+  ) {
+    return;
+  }
+  const required = typeFields.get(target.typeName.name);
+  if (!required || required.length < 2) return;
+  const bodyText = sourceCode.getText(node.body);
+  if (
+    bodyText.includes("instanceof") ||
+    bodyText.includes("safeParse") ||
+    bodyText.includes("Symbol.for")
+  ) {
+    return;
+  }
+  const checkedCount = required.filter(
+    (f) =>
+      bodyText.includes(`"${f}"`) ||
+      bodyText.includes(`'${f}'`) ||
+      bodyText.includes(`.${f}`)
+  ).length;
+  if (checkedCount < required.length) {
+    context.report({
+      node: pred,
+      message: `Type predicate for '${target.typeName.name}' only checks ${checkedCount}/${required.length} required fields on an 'unknown' value; validate the full contract or use a schema decoder.`,
+    });
+  }
+}
+
 export const noUndercheckedTypePredicateRule = {
   meta: {
     type: "problem",
@@ -355,67 +480,10 @@ export const noUndercheckedTypePredicateRule = {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-    const sourceCode = context.sourceCode;
+
     const typeFields = new Map();
-
-    function extractRequiredFields(members) {
-      const fields = [];
-      for (const m of members ?? []) {
-        if (
-          m.type === "TSPropertySignature" &&
-          !m.optional &&
-          m.key?.type === "Identifier"
-        ) {
-          fields.push(m.key.name);
-        }
-      }
-      return fields;
-    }
-
-    function checkFunction(node) {
-      const pred = node.returnType?.typeAnnotation;
-      if (pred?.type !== "TSTypePredicate" || pred.asserts) return;
-      const paramName =
-        pred.parameterName?.type === "Identifier"
-          ? pred.parameterName.name
-          : null;
-      if (!paramName) return;
-      const param = node.params.find(
-        (p) => p.type === "Identifier" && p.name === paramName
-      );
-      if (param?.typeAnnotation?.typeAnnotation?.type !== "TSUnknownKeyword") {
-        return;
-      }
-      const target = pred.typeAnnotation?.typeAnnotation;
-      if (
-        target?.type !== "TSTypeReference" ||
-        target.typeName?.type !== "Identifier"
-      ) {
-        return;
-      }
-      const required = typeFields.get(target.typeName.name);
-      if (!required || required.length < 2) return;
-      const bodyText = sourceCode.getText(node.body);
-      if (
-        bodyText.includes("instanceof") ||
-        bodyText.includes("safeParse") ||
-        bodyText.includes("Symbol.for")
-      ) {
-        return;
-      }
-      const checkedCount = required.filter(
-        (f) =>
-          bodyText.includes(`"${f}"`) ||
-          bodyText.includes(`'${f}'`) ||
-          bodyText.includes(`.${f}`)
-      ).length;
-      if (checkedCount < required.length) {
-        context.report({
-          node: pred,
-          message: `Type predicate for '${target.typeName.name}' only checks ${checkedCount}/${required.length} required fields on an 'unknown' value; validate the full contract or use a schema decoder.`,
-        });
-      }
-    }
+    const checkFunction = (node) =>
+      checkUndercheckedPredicate(node, typeFields, context);
 
     return {
       Program(node) {

@@ -6,6 +6,10 @@ import {
   unwrapExpression,
 } from "../shared/scope.js";
 
+const SCOPE_SCHEMA = [
+  { type: "object", properties: scopeProperties, additionalProperties: false },
+];
+
 const HOOK_NAME = /^use[A-Z0-9]/u;
 const HOOK_CALL_NAME = /^(?:use|use[A-Z0-9])/u;
 const QUERY_HOOK_NAME =
@@ -52,13 +56,7 @@ export const noHooklessUseFunctionRule = {
       description:
         "Disallow functions named `use*` that never call another React hook.",
     },
-    schema: [
-      {
-        type: "object",
-        properties: scopeProperties,
-        additionalProperties: false,
-      },
-    ],
+    schema: SCOPE_SCHEMA,
   },
   create(context) {
     if (!isRuleFile(context)) return {};
@@ -115,13 +113,7 @@ export const noUnstableRenderDefaultCollectionRule = {
       description:
         "Disallow unstable default collection literals (`= []`, `= {}`, `= new Map()`, `= new Set()`) in React component parameter destructuring.",
     },
-    schema: [
-      {
-        type: "object",
-        properties: scopeProperties,
-        additionalProperties: false,
-      },
-    ],
+    schema: SCOPE_SCHEMA,
   },
   create(context) {
     if (!isRuleFile(context)) return {};
@@ -167,6 +159,59 @@ export const noUnstableRenderDefaultCollectionRule = {
   },
 };
 
+function isQueryHookCall(expr, convexDirectValueHooks) {
+  const node = unwrapExpression(expr);
+  if (node?.type !== "CallExpression") return false;
+  const callee = unwrapExpression(node.callee);
+  if (
+    callee?.type !== "Identifier" ||
+    !QUERY_HOOK_NAME.test(callee.name) ||
+    convexDirectValueHooks.has(callee.name)
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function isEnvelopeObject(expr) {
+  const node = unwrapExpression(expr);
+  if (node?.type !== "ObjectExpression") return false;
+  let hits = 0;
+  let hasLifecycleKey = false;
+  for (const prop of node.properties) {
+    if (prop.type === "Property" && prop.key?.type === "Identifier") {
+      const keyName = prop.key.name;
+      if (ENVELOPE_KEYS.has(keyName)) hits += 1;
+      if (LIFECYCLE_ENVELOPE_KEYS.has(keyName)) hasLifecycleKey = true;
+    }
+  }
+  return hasLifecycleKey && hits >= 2 && hits === node.properties.length;
+}
+
+function checkReturnedExpr(expr, reportNode, context, convexDirectValueHooks) {
+  const node = unwrapExpression(expr);
+  if (!node) return;
+  if (isEnvelopeObject(node)) {
+    context.report({
+      node: reportNode,
+      message:
+        "Custom hook leaks a raw query lifecycle envelope; return narrowed domain data or handle lifecycle states inside the boundary.",
+    });
+    return;
+  }
+  if (node.type === "Identifier") {
+    const v = findVariable(context.sourceCode, node);
+    const init = v?.defs?.[0]?.node?.init;
+    if (init && isQueryHookCall(init, convexDirectValueHooks)) {
+      context.report({
+        node: reportNode,
+        message:
+          "Custom hook returns a raw query result directly; return domain data instead of forwarding the query envelope.",
+      });
+    }
+  }
+}
+
 export const noQueryEnvelopeLeakRule = {
   meta: {
     type: "problem",
@@ -174,82 +219,33 @@ export const noQueryEnvelopeLeakRule = {
       description:
         "Disallow custom `use*` hooks that leak raw query lifecycle envelopes (`{ data, isLoading, error }`) instead of returning domain state.",
     },
-    schema: [
-      {
-        type: "object",
-        properties: scopeProperties,
-        additionalProperties: false,
-      },
-    ],
+    schema: SCOPE_SCHEMA,
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-    const sourceCode = context.sourceCode;
+
     const convexDirectValueHooks = new Set();
-
-    function isQueryHookCall(expr) {
-      const node = unwrapExpression(expr);
-      if (node?.type !== "CallExpression") return false;
-      const callee = unwrapExpression(node.callee);
-      if (
-        callee?.type !== "Identifier" ||
-        !QUERY_HOOK_NAME.test(callee.name) ||
-        convexDirectValueHooks.has(callee.name)
-      ) {
-        return false;
-      }
-      return true;
-    }
-
-    function isEnvelopeObject(expr) {
-      const node = unwrapExpression(expr);
-      if (node?.type !== "ObjectExpression") return false;
-      let hits = 0;
-      let hasLifecycleKey = false;
-      for (const prop of node.properties) {
-        if (prop.type === "Property" && prop.key?.type === "Identifier") {
-          const keyName = prop.key.name;
-          if (ENVELOPE_KEYS.has(keyName)) hits += 1;
-          if (LIFECYCLE_ENVELOPE_KEYS.has(keyName)) hasLifecycleKey = true;
-        }
-      }
-      return hasLifecycleKey && hits >= 2 && hits === node.properties.length;
-    }
-
-    function checkReturnedExpr(expr, reportNode) {
-      const node = unwrapExpression(expr);
-      if (!node) return;
-      if (isEnvelopeObject(node)) {
-        context.report({
-          node: reportNode,
-          message:
-            "Custom hook leaks a raw query lifecycle envelope; return narrowed domain data or handle lifecycle states inside the boundary.",
-        });
-        return;
-      }
-      if (node.type === "Identifier") {
-        const v = findVariable(sourceCode, node);
-        const init = v?.defs?.[0]?.node?.init;
-        if (init && isQueryHookCall(init)) {
-          context.report({
-            node: reportNode,
-            message:
-              "Custom hook returns a raw query result directly; return domain data instead of forwarding the query envelope.",
-          });
-        }
-      }
-    }
 
     function checkFunction(node) {
       const name = functionNameOf(node);
       if (!name || !HOOK_NAME.test(name) || QUERY_HOOK_NAME.test(name)) return;
       if (node.body?.type !== "BlockStatement") {
-        checkReturnedExpr(node.body, node.body);
+        checkReturnedExpr(
+          node.body,
+          node.body,
+          context,
+          convexDirectValueHooks
+        );
         return;
       }
       for (const stmt of node.body.body) {
         if (stmt.type === "ReturnStatement" && stmt.argument) {
-          checkReturnedExpr(stmt.argument, stmt);
+          checkReturnedExpr(
+            stmt.argument,
+            stmt,
+            context,
+            convexDirectValueHooks
+          );
         }
       }
     }
@@ -274,6 +270,51 @@ export const noQueryEnvelopeLeakRule = {
   },
 };
 
+function isUnshadowedGlobal(ident, sourceCode) {
+  const variable = findVariable(sourceCode, ident);
+  return !variable || variable.defs.length === 0;
+}
+
+function isImpureCall(node, sourceCode) {
+  if (node.type === "NewExpression") {
+    return (
+      node.callee?.type === "Identifier" &&
+      node.callee.name === "Date" &&
+      node.arguments.length === 0 &&
+      isUnshadowedGlobal(node.callee, sourceCode)
+    );
+  }
+  if (node.type !== "CallExpression") return false;
+  const callee = node.callee;
+  if (
+    callee?.type === "MemberExpression" &&
+    !callee.computed &&
+    callee.object?.type === "Identifier" &&
+    callee.property?.type === "Identifier"
+  ) {
+    const pair = `${callee.object.name}.${callee.property.name}`;
+    if (
+      pair !== "Date.now" &&
+      pair !== "Math.random" &&
+      pair !== "crypto.randomUUID" &&
+      pair !== "performance.now"
+    ) {
+      return false;
+    }
+    return isUnshadowedGlobal(callee.object, sourceCode);
+  }
+  return false;
+}
+
+function enclosingComponentIfInRender(node) {
+  for (let cur = node.parent; cur; cur = cur.parent) {
+    if (isFunctionLike(cur)) {
+      return functionReturnsJsx(cur) ? cur : null;
+    }
+  }
+  return null;
+}
+
 export const noImpureRenderCallRule = {
   meta: {
     type: "problem",
@@ -281,65 +322,14 @@ export const noImpureRenderCallRule = {
       description:
         "Disallow impure calls (`Date.now()`, `Math.random()`, `crypto.randomUUID()`, `new Date()`) directly during React component render.",
     },
-    schema: [
-      {
-        type: "object",
-        properties: scopeProperties,
-        additionalProperties: false,
-      },
-    ],
+    schema: SCOPE_SCHEMA,
   },
   create(context) {
     if (!isRuleFile(context)) return {};
     const sourceCode = context.sourceCode;
 
-    function isUnshadowedGlobal(ident) {
-      const variable = findVariable(sourceCode, ident);
-      return !variable || variable.defs.length === 0;
-    }
-
-    function isImpureCall(node) {
-      if (node.type === "NewExpression") {
-        return (
-          node.callee?.type === "Identifier" &&
-          node.callee.name === "Date" &&
-          node.arguments.length === 0 &&
-          isUnshadowedGlobal(node.callee)
-        );
-      }
-      if (node.type !== "CallExpression") return false;
-      const callee = node.callee;
-      if (
-        callee?.type === "MemberExpression" &&
-        !callee.computed &&
-        callee.object?.type === "Identifier" &&
-        callee.property?.type === "Identifier"
-      ) {
-        const pair = `${callee.object.name}.${callee.property.name}`;
-        if (
-          pair !== "Date.now" &&
-          pair !== "Math.random" &&
-          pair !== "crypto.randomUUID" &&
-          pair !== "performance.now"
-        ) {
-          return false;
-        }
-        return isUnshadowedGlobal(callee.object);
-      }
-      return false;
-    }
-
-    function enclosingComponentIfInRender(node) {
-      for (let cur = node.parent; cur; cur = cur.parent) {
-        if (isFunctionLike(cur)) {
-          return functionReturnsJsx(cur) ? cur : null;
-        }
-      }
-      return null;
-    }
-
     function check(node) {
-      if (!isImpureCall(node)) return;
+      if (!isImpureCall(node, sourceCode)) return;
       if (enclosingComponentIfInRender(node)) {
         context.report({
           node,
@@ -356,6 +346,57 @@ export const noImpureRenderCallRule = {
   },
 };
 
+function isExternalPayloadDecodeCall(node) {
+  const callee = unwrapExpression(node.callee);
+  if (
+    callee?.type !== "MemberExpression" ||
+    callee.computed ||
+    callee.property?.type !== "Identifier"
+  ) {
+    return false;
+  }
+  const method = callee.property.name;
+  if (
+    callee.object?.type === "Identifier" &&
+    callee.object.name === "JSON" &&
+    method === "parse"
+  ) {
+    return true;
+  }
+  if (
+    method === "parseAsync" ||
+    method === "decodeUnknownSync" ||
+    method === "decodeUnknownEither"
+  ) {
+    return true;
+  }
+  if (method === "parse") {
+    if (
+      callee.object?.type === "Identifier" &&
+      /^(?:Date|URL|path)$/u.test(callee.object.name)
+    ) {
+      return false;
+    }
+    const arg = unwrapExpression(node.arguments[0]);
+    return (
+      arg?.type === "MemberExpression" ||
+      arg?.type === "CallExpression" ||
+      (arg?.type === "Identifier" &&
+        /^(?:raw|payload|response|res|body|json|data)$/iu.test(arg.name))
+    );
+  }
+  return false;
+}
+
+function isDirectComponentRender(node) {
+  for (let cur = node.parent; cur; cur = cur.parent) {
+    if (isFunctionLike(cur)) {
+      return functionReturnsJsx(cur);
+    }
+  }
+  return false;
+}
+
 export const noExternalDecodeInTsxRule = {
   meta: {
     type: "problem",
@@ -363,13 +404,7 @@ export const noExternalDecodeInTsxRule = {
       description:
         "Disallow boundary schema decoding or JSON.parse inside .tsx component files.",
     },
-    schema: [
-      {
-        type: "object",
-        properties: scopeProperties,
-        additionalProperties: false,
-      },
-    ],
+    schema: SCOPE_SCHEMA,
   },
   create(context) {
     if (!isRuleFile(context)) return {};
@@ -379,57 +414,6 @@ export const noExternalDecodeInTsxRule = {
       ""
     ).replaceAll("\\", "/");
     if (!filename.endsWith(".tsx")) return {};
-
-    function isExternalPayloadDecodeCall(node) {
-      const callee = unwrapExpression(node.callee);
-      if (
-        callee?.type !== "MemberExpression" ||
-        callee.computed ||
-        callee.property?.type !== "Identifier"
-      ) {
-        return false;
-      }
-      const method = callee.property.name;
-      if (
-        callee.object?.type === "Identifier" &&
-        callee.object.name === "JSON" &&
-        method === "parse"
-      ) {
-        return true;
-      }
-      if (
-        method === "parseAsync" ||
-        method === "decodeUnknownSync" ||
-        method === "decodeUnknownEither"
-      ) {
-        return true;
-      }
-      if (method === "parse") {
-        if (
-          callee.object?.type === "Identifier" &&
-          /^(?:Date|URL|path)$/u.test(callee.object.name)
-        ) {
-          return false;
-        }
-        const arg = unwrapExpression(node.arguments[0]);
-        return (
-          arg?.type === "MemberExpression" ||
-          arg?.type === "CallExpression" ||
-          (arg?.type === "Identifier" &&
-            /^(?:raw|payload|response|res|body|json|data)$/iu.test(arg.name))
-        );
-      }
-      return false;
-    }
-
-    function isDirectComponentRender(node) {
-      for (let cur = node.parent; cur; cur = cur.parent) {
-        if (isFunctionLike(cur)) {
-          return functionReturnsJsx(cur);
-        }
-      }
-      return false;
-    }
 
     return {
       CallExpression(node) {
@@ -446,75 +430,140 @@ export const noExternalDecodeInTsxRule = {
   },
 };
 
+const OUTER_METHODS = new Set(["map", "flatMap", "filter"]);
+const INNER_METHODS = new Set(["find", "filter"]);
+const LOOP_TYPES = new Set([
+  "ForOfStatement",
+  "ForStatement",
+  "WhileStatement",
+]);
+
+function isIterationCall(node, methods) {
+  return (
+    node?.type === "CallExpression" &&
+    node.callee?.type === "MemberExpression" &&
+    !node.callee.computed &&
+    methods.has(node.callee.property?.name) &&
+    isFunctionLike(unwrapExpression(node.arguments[0]))
+  );
+}
+
+function isInside(node, ancestor) {
+  for (let current = node; current; current = current.parent) {
+    if (current === ancestor) return true;
+    if (isFunctionLike(current)) return false;
+  }
+  return false;
+}
+
+function isLoopBinding(identifier, loop, sourceCode) {
+  const binding = findVariable(sourceCode, identifier);
+  if (!binding) return false;
+  if (binding.defs.some((definition) => isInside(definition.node, loop)))
+    return true;
+  if (
+    loop.type === "ForOfStatement" &&
+    loop.left.type === "Identifier" &&
+    findVariable(sourceCode, loop.left) === binding
+  ) {
+    return true;
+  }
+  return binding.references.some(
+    (reference) =>
+      isInside(reference.identifier, loop.test) ||
+      (reference.isWrite() && isInside(reference.identifier, loop))
+  );
+}
+
+function iterationOwns(identifier, call, sourceCode) {
+  for (let current = call.parent; current; current = current.parent) {
+    if (isFunctionLike(current)) {
+      const outerCall = current.parent;
+      const parameter = current.params[0];
+      return (
+        isIterationCall(outerCall, OUTER_METHODS) &&
+        outerCall.arguments[0] === current &&
+        parameter?.type === "Identifier" &&
+        findVariable(sourceCode, parameter) ===
+          findVariable(sourceCode, identifier)
+      );
+    }
+    if (
+      LOOP_TYPES.has(current.type) &&
+      isInside(call, current.body) &&
+      isLoopBinding(identifier, current, sourceCode)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function propertyOwner(expression) {
+  const member = unwrapExpression(expression);
+  if (member?.type !== "MemberExpression" || member.computed) return null;
+  const owner = unwrapExpression(member.object);
+  return owner?.type === "Identifier" ? owner : null;
+}
+
+function isForeignKeyComparison(node, parameter, call, sourceCode) {
+  if (node.type !== "BinaryExpression" || node.operator !== "===") return false;
+  const left = propertyOwner(node.left);
+  const right = propertyOwner(node.right);
+  if (!left || !right) return false;
+  const innerBinding = findVariable(sourceCode, parameter);
+  if (!innerBinding) return false;
+  const leftInner = findVariable(sourceCode, left) === innerBinding;
+  const rightInner = findVariable(sourceCode, right) === innerBinding;
+  return (
+    leftInner !== rightInner &&
+    iterationOwns(leftInner ? right : left, call, sourceCode)
+  );
+}
+
+function containsForeignKeyComparison(node, parameter, call, sourceCode) {
+  if (!node || isFunctionLike(node)) return false;
+  if (isForeignKeyComparison(node, parameter, call, sourceCode)) return true;
+  return (sourceCode.visitorKeys[node.type] ?? []).some((key) => {
+    const children = Array.isArray(node[key]) ? node[key] : [node[key]];
+    return children.some((child) =>
+      containsForeignKeyComparison(child, parameter, call, sourceCode)
+    );
+  });
+}
+
 export const noQueryJoinOrTreeReshapeRule = {
   meta: {
     type: "problem",
     docs: {
       description:
-        "Disallow O(N*M) nested `.find()` or `.filter()` equijoins inside outer `.map()` or `.filter()` callbacks.",
+        "Disallow O(N*M) `.find()` or `.filter()` equijoins inside iteration callbacks or loop bodies.",
     },
-    schema: [
-      {
-        type: "object",
-        properties: scopeProperties,
-        additionalProperties: false,
-      },
-    ],
+    schema: SCOPE_SCHEMA,
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-    const OUTER_METHODS = new Set(["map", "flatMap", "filter"]);
-    const INNER_METHODS = new Set(["find", "filter"]);
-
-    function isMethodCall(node, methods) {
-      return (
-        node?.type === "CallExpression" &&
-        node.callee?.type === "MemberExpression" &&
-        !node.callee.computed &&
-        node.callee.property?.type === "Identifier" &&
-        methods.has(node.callee.property.name) &&
-        isFunctionLike(unwrapExpression(node.arguments[0]))
-      );
-    }
-
     return {
       CallExpression(node) {
-        if (!isMethodCall(node, INNER_METHODS)) return;
-        const innerCb = unwrapExpression(node.arguments[0]);
-        const innerParam = innerCb?.params?.[0];
-        if (innerParam?.type !== "Identifier") return;
-
-        for (let cur = node.parent; cur; cur = cur.parent) {
-          if (!isFunctionLike(cur)) continue;
-          const outerCall =
-            cur.parent?.type === "CallExpression"
-              ? cur.parent
-              : cur.parent?.parent;
-          if (
-            isMethodCall(outerCall, OUTER_METHODS) &&
-            unwrapExpression(outerCall.arguments[0]) === cur
-          ) {
-            const outerParam = cur.params?.[0];
-            if (
-              outerParam?.type === "Identifier" &&
-              outerParam.name !== innerParam.name
-            ) {
-              const text = context.sourceCode.getText(innerCb.body);
-              if (
-                text.includes(`${innerParam.name}.`) &&
-                text.includes(`${outerParam.name}.`) &&
-                text.includes("===")
-              ) {
-                context.report({
-                  node,
-                  message:
-                    "Nested `.find()` / `.filter()` equijoin inside an iteration callback runs in O(N*M); pre-index the inner collection with a Map or Set before iterating.",
-                });
-              }
-            }
-            return;
-          }
+        if (!isIterationCall(node, INNER_METHODS)) return;
+        const callback = unwrapExpression(node.arguments[0]);
+        const parameter = callback.params[0];
+        if (
+          parameter?.type !== "Identifier" ||
+          !containsForeignKeyComparison(
+            callback.body,
+            parameter,
+            node,
+            context.sourceCode
+          )
+        ) {
+          return;
         }
+        context.report({
+          node,
+          message:
+            "Nested `.find()` / `.filter()` equijoin inside an iteration runs in O(N*M); pre-index the inner collection with a Map or Set before iterating.",
+        });
       },
     };
   },
