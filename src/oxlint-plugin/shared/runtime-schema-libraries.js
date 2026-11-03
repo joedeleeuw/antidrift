@@ -161,17 +161,153 @@ function objectFieldNames(objectExpression) {
 }
 
 export function isObjectSchemaMethod(method) {
-  return method === "object" || method === "Object" || method === "Struct";
+  return (
+    method === "object" ||
+    method === "Object" ||
+    method === "Struct" ||
+    method === "strictObject" ||
+    method === "looseObject"
+  );
 }
 
 function isUnionSchemaMethod(method) {
   return (
-    method === "union" || method === "Union" || method === "discriminatedUnion"
+    method === "union" ||
+    method === "Union" ||
+    method === "discriminatedUnion" ||
+    method === "variant" ||
+    method === "variants" ||
+    method === "or"
   );
 }
 
 function isLiteralSchemaMethod(method) {
   return method === "literal" || method === "Literal";
+}
+
+const openEndedSchemaMethods = new Set([
+  "json",
+  "unknown",
+  "Unknown",
+  "any",
+  "Any",
+  "record",
+  "Record",
+]);
+
+export function isSchemaUnionCall(expression, sourceCode) {
+  const builder = resolveSchemaBuilderCall(
+    unwrapAwaitedExpression(expression),
+    sourceCode
+  );
+  if (!isUnionSchemaMethod(builder?.method)) return null;
+  const tagged =
+    builder.method === "discriminatedUnion" || builder.method === "variant";
+  if (tagged && builder.args[1]?.type === "ArrayExpression") {
+    const discriminantKey =
+      builder.args[0]?.type === "Literal" &&
+      typeof builder.args[0].value === "string"
+        ? builder.args[0].value
+        : null;
+    return {
+      method: builder.method,
+      discriminantKey,
+      branches: builder.args[1].elements.filter(Boolean),
+    };
+  }
+  const branches =
+    builder.args[0]?.type === "ArrayExpression"
+      ? builder.args[0].elements.filter(Boolean)
+      : builder.args.filter(Boolean);
+  return {
+    method: builder.method,
+    discriminantKey: null,
+    branches,
+  };
+}
+
+export function isSchemaObjectOrExtendCall(expression, sourceCode) {
+  const node = unwrapAwaitedExpression(expression);
+  const builder = resolveSchemaBuilderCall(node, sourceCode);
+  if (!builder) return null;
+  if (
+    isObjectSchemaMethod(builder.method) &&
+    builder.args[0]?.type === "ObjectExpression"
+  ) {
+    return {
+      method: builder.method,
+      shapeNode: builder.args[0],
+      baseSchemaNode: null,
+    };
+  }
+  if (
+    (builder.method === "extend" || builder.method === "merge") &&
+    builder.args[0]?.type === "ObjectExpression" &&
+    node?.callee?.type === "MemberExpression"
+  ) {
+    return {
+      method: builder.method,
+      shapeNode: builder.args[0],
+      baseSchemaNode: node.callee.object,
+    };
+  }
+  return null;
+}
+
+export function isSchemaLiteralCall(expression, sourceCode) {
+  const builder = resolveSchemaBuilderCall(
+    unwrapAwaitedExpression(expression),
+    sourceCode
+  );
+  if (
+    !isLiteralSchemaMethod(builder?.method) ||
+    builder.args[0]?.type !== "Literal"
+  ) {
+    return null;
+  }
+  return {
+    literalValue: builder.args[0].value,
+    raw: builder.args[0].raw,
+    argNode: builder.args[0],
+  };
+}
+
+export function isOpenEndedJsonSchema(
+  expression,
+  sourceCode,
+  seen = new Set()
+) {
+  const node = unwrapAwaitedExpression(expression);
+  if (!node || seen.has(node)) return false;
+  seen.add(node);
+  if (node.type === "Identifier") {
+    const initializer = constInitializer(sourceCode, node);
+    return initializer
+      ? isOpenEndedJsonSchema(initializer, sourceCode, seen)
+      : false;
+  }
+  if (node.type === "MemberExpression" && !node.computed) {
+    if (
+      openEndedSchemaMethods.has(node.property?.name) &&
+      hasRuntimeSchemaProvenance(node, sourceCode)
+    ) {
+      return true;
+    }
+    return isOpenEndedJsonSchema(node.object, sourceCode, seen);
+  }
+  const builder = resolveSchemaBuilderCall(node, sourceCode);
+  if (!builder) return false;
+  if (openEndedSchemaMethods.has(builder.method)) return true;
+  if (
+    builder.method === "fromJsonString" &&
+    builder.args[0] &&
+    isOpenEndedJsonSchema(builder.args[0], sourceCode, seen)
+  ) {
+    return true;
+  }
+  return node.callee?.type === "MemberExpression"
+    ? isOpenEndedJsonSchema(node.callee.object, sourceCode, seen)
+    : false;
 }
 
 export function objectSchemaTagPairs(expression, sourceCode, seen = new Set()) {
