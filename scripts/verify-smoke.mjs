@@ -16,6 +16,7 @@ import {
   recommendedRules,
   rules,
 } from "../src/index.js";
+import { runTypedEslintSmoke } from "./typed-eslint-smoke.mjs";
 
 const repoRoot = resolve(import.meta.dirname, "..");
 const expectedRuleCount = 103;
@@ -515,6 +516,15 @@ try {
     );
   }
 
+  await runTypedEslintSmoke({
+    workDir,
+    repoRoot,
+    goodFile,
+    badFile,
+    expectedRules,
+    expectedDiagnostics,
+  });
+
   const packOut = execFileSync(
     "pnpm",
     ["pack", "--pack-destination", workDir],
@@ -529,7 +539,7 @@ try {
   );
 
   process.stdout.write(
-    `Smoke passed: ${ruleNames.length} host-agnostic rules verified in Oxlint, ESLint, and packed tarball.\n`
+    `Smoke passed: ${ruleNames.length} host-agnostic rules verified in Oxlint, ESLint, typed ESLint, and packed tarball.\n`
   );
 } finally {
   rmSync(workDir, { recursive: true, force: true });

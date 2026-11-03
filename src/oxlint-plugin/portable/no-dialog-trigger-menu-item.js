@@ -1,5 +1,10 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
-import { isAstNode } from "./ast.js";
+import {
+  jsxChildElements,
+  jsxOpeningElement,
+  jsxRenderElement,
+  nameOfJsxElement,
+} from "./ast.js";
 
 const TRIGGER_NAMES = new Set([
   "AlertDialogTrigger",
@@ -13,70 +18,14 @@ const MENU_ITEM_NAMES = new Set([
   "ContextMenuItem",
   "DropdownMenuItem",
 ]);
-const jsxElementName = (node) => {
-  if (!isAstNode(node)) {
-    return null;
-  }
-  if (node.type === "JSXIdentifier" && typeof node.name === "string") {
-    return node.name;
-  }
-  if (node.type === "JSXMemberExpression") {
-    return jsxElementName(node.property);
-  }
-  if (node.type === "JSXNamespacedName") {
-    return jsxElementName(node.name);
-  }
-  return null;
-};
-const getOpeningElement = (element) => {
-  if (!isAstNode(element) || element.type !== "JSXElement") {
-    return null;
-  }
-  return isAstNode(element.openingElement) ? element.openingElement : null;
-};
-const nameOfJsxElement = (element) =>
-  jsxElementName(getOpeningElement(element)?.name);
-const getAttribute = (openingElement, name) => {
-  if (!isAstNode(openingElement) || !Array.isArray(openingElement.attributes)) {
-    return null;
-  }
-  return (
-    openingElement.attributes.find(
-      (attribute) =>
-        isAstNode(attribute) &&
-        attribute.type === "JSXAttribute" &&
-        jsxElementName(attribute.name) === name
-    ) ?? null
-  );
-};
-const getRenderTarget = (openingElement) => {
-  const attributeInitializer = getAttribute(openingElement, "render")?.value;
-  if (!isAstNode(attributeInitializer)) {
-    return null;
-  }
-  const expression =
-    attributeInitializer.type === "JSXExpressionContainer"
-      ? attributeInitializer.expression
-      : attributeInitializer;
-  return isAstNode(expression) && expression.type === "JSXElement"
-    ? expression
-    : null;
-};
-const getChildElements = (element) => {
-  if (!isAstNode(element) || !Array.isArray(element.children)) {
-    return [];
-  }
-  return element.children.filter(
-    (child) => isAstNode(child) && child.type === "JSXElement"
-  );
-};
 const mountsMenuItem = (triggerElement) => {
-  const openingElement = getOpeningElement(triggerElement);
-  const renderName = nameOfJsxElement(getRenderTarget(openingElement));
+  const renderName = nameOfJsxElement(
+    jsxRenderElement(jsxOpeningElement(triggerElement))
+  );
   if (renderName !== null && MENU_ITEM_NAMES.has(renderName)) {
     return true;
   }
-  return getChildElements(triggerElement).some((child) => {
+  return jsxChildElements(triggerElement).some((child) => {
     const childName = nameOfJsxElement(child);
     return childName !== null && MENU_ITEM_NAMES.has(childName);
   });

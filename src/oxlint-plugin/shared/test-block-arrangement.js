@@ -1,10 +1,9 @@
-import { staticPropertyName } from "./test-files.js";
+import { staticPropertyName, unwrapExpression } from "./scope.js";
 import {
   isFunctionNode,
   literalContainerTypes,
   nearestFunction,
   resolveStaticShape,
-  unwrapExpression,
 } from "./test-block-shapes.js";
 
 const booleanValues = new Set([true, false]);

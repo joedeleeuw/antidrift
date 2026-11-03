@@ -1,5 +1,8 @@
-import { findVariable } from "./scope.js";
-import { unwrapExpression, staticPropertyName } from "./test-files.js";
+import {
+  findVariable,
+  staticPropertyName,
+  unwrapAwaitedExpression,
+} from "./scope.js";
 
 const mutatingMethods = new Set([
   "push",
@@ -68,14 +71,16 @@ function enqueueBindingDependencies(
 
 function enqueueCallDependencies(call, sourceCode, pending) {
   for (const argument of call.arguments) pending.push(argument);
-  const callee = unwrapExpression(call.callee);
+  const callee = unwrapAwaitedExpression(call.callee);
   if (callee.type === "MemberExpression") {
     pending.push(callee.object);
     if (callee.computed) pending.push(callee.property);
   }
   if (callee.type !== "Identifier") return;
   const definition = findVariable(sourceCode, callee)?.defs[0];
-  const callable = unwrapExpression(definition?.node.init ?? definition?.node);
+  const callable = unwrapAwaitedExpression(
+    definition?.node.init ?? definition?.node
+  );
   if (
     [
       "FunctionDeclaration",
@@ -93,7 +98,7 @@ function expressionDependencies(expression, sourceCode) {
   const visited = new Set();
 
   while (pending.length > 0) {
-    const node = unwrapExpression(pending.pop());
+    const node = unwrapAwaitedExpression(pending.pop());
     if (!node || visited.has(node)) continue;
     visited.add(node);
     dependencies.add(node);
@@ -159,7 +164,7 @@ function objectLiteralIdentity(node, sourceCode, ancestors) {
 }
 
 function literalIdentity(expression, sourceCode, ancestors = new Set()) {
-  const node = unwrapExpression(expression);
+  const node = unwrapAwaitedExpression(expression);
   if (!node || ancestors.has(node)) return null;
   const visited = new Set(ancestors).add(node);
   if (node.type === "Identifier") {

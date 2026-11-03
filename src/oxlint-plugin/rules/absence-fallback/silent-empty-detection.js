@@ -1,3 +1,5 @@
+import { unwrapExpression } from "../../shared/scope.js";
+
 const detectionNameTokens = new Set([
   "detect",
   "discover",
@@ -63,20 +65,6 @@ function isEmptyString(node) {
       node.quasis.length === 1 &&
       node.quasis[0].value.cooked === "")
   );
-}
-
-function unwrapExpression(node) {
-  let current = node;
-  while (
-    current?.type === "ChainExpression" ||
-    current?.type === "TSAsExpression" ||
-    current?.type === "TSSatisfiesExpression" ||
-    current?.type === "TSNonNullExpression" ||
-    current?.type === "TSTypeAssertion"
-  ) {
-    current = current.expression;
-  }
-  return current;
 }
 
 function containsEmptyString(node) {

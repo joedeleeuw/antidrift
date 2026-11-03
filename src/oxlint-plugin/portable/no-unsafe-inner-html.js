@@ -1,10 +1,7 @@
-import {
-  importedOwner,
-  importedOwnerSchema,
-  findVariable,
-} from "./imported-owner.js";
+import { importedOwner, importedOwnerSchema } from "./imported-owner.js";
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
-import { getPropertyName, isIdentifier, unwrapExpression } from "./ast.js";
+import { findVariable, unwrapExpression } from "../shared/scope.js";
+import { getPropertyName, isIdentifier } from "./ast.js";
 
 const isJsxIdentifier = (node, name) =>
   typeof node === "object" &&
@@ -66,7 +63,7 @@ class HtmlProvenance {
     if (node?.type === "CallExpression") {
       return importedOwner(this.context, node.callee, this.sanitizers);
     }
-    const binding = findVariable(this.context, node);
+    const binding = findVariable(this.context.sourceCode, node);
     if (!binding || seen.has(binding)) return false;
     seen.add(binding);
     const definition = binding.defs[0];

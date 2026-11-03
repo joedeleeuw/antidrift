@@ -1,5 +1,6 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import { findVariable, unwrapExpression } from "../shared/scope.js";
+import { findDescendant, isMemberAccess } from "./ast.js";
 
 class ConvexRegistrations {
   constructor(context) {
@@ -34,33 +35,13 @@ class ConvexRegistrations {
     return null;
   };
 
-  containsVAny = (node) => {
-    let found = false;
-    function visit(cur) {
-      if (found || !cur || typeof cur !== "object") return;
-      if (
-        cur.type === "CallExpression" &&
-        cur.callee?.type === "MemberExpression" &&
-        cur.callee.object?.type === "Identifier" &&
-        cur.callee.object.name === "v" &&
-        cur.callee.property?.type === "Identifier" &&
-        cur.callee.property.name === "any"
-      ) {
-        found = true;
-        return;
-      }
-      for (const [k, child] of Object.entries(cur)) {
-        if (k === "parent" || k === "range" || k === "loc") continue;
-        if (Array.isArray(child)) {
-          for (const element of child) visit(element);
-        } else if (child && typeof child === "object") {
-          visit(child);
-        }
-      }
-    }
-    visit(node);
-    return found;
-  };
+  containsVAny = (node) =>
+    findDescendant(
+      node,
+      (candidate) =>
+        candidate.type === "CallExpression" &&
+        isMemberAccess(candidate.callee, "v", "any")
+    ) !== null;
 
   visitImportDeclaration = (node) => {
     const src = node.source?.value;

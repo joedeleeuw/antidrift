@@ -1,6 +1,10 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
-import { findVariable, isFunctionLike } from "../shared/scope.js";
-import { getImportedName, isIdentifier, unwrapExpression } from "./ast.js";
+import {
+  findVariable,
+  isFunctionLike,
+  unwrapExpression,
+} from "../shared/scope.js";
+import { getImportedName, isIdentifier } from "./ast.js";
 
 const REACT_MODULE = "react";
 const HOOK_NAME = "useSyncExternalStore";

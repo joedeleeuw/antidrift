@@ -1,4 +1,4 @@
-import { isClassValue } from "./class-value.js";
+import { classValueVisitors } from "./class-value.js";
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 
 const SPLIT = /[\s"'`{}()]+/;
@@ -55,22 +55,10 @@ export default {
   create(context) {
     if (!isRuleFile(context)) return {};
 
-    return {
-      Literal(node) {
-        if (!isClassValue(node, context)) return;
-        if (typeof node.value !== "string") {
-          return;
-        }
-        if (isCenteredScrollColumn(node.value)) {
-          context.report({ node, messageId: "centeredScrollColumn" });
-        }
-      },
-      TemplateElement(node) {
-        if (!isClassValue(node, context)) return;
-        if (isCenteredScrollColumn(node.value.raw)) {
-          context.report({ node, messageId: "centeredScrollColumn" });
-        }
-      },
-    };
+    return classValueVisitors(context, (node, classNames) => {
+      if (isCenteredScrollColumn(classNames)) {
+        context.report({ node, messageId: "centeredScrollColumn" });
+      }
+    });
   },
 };

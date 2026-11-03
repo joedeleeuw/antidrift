@@ -1,5 +1,6 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
-import { isIdentifier, isStringLiteral, unwrapExpression } from "./ast.js";
+import { unwrapExpression } from "../shared/scope.js";
+import { isIdentifier, isStringLiteral } from "./ast.js";
 
 const isAstNode = (node) =>
   typeof node === "object" &&

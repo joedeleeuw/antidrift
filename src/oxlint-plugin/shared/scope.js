@@ -31,7 +31,40 @@ export function unwrapExpression(node) {
   while (current && EXPRESSION_WRAPPERS.has(current.type)) {
     current = current.expression;
   }
+  return current ?? null;
+}
+
+export function unwrapAwaitedExpression(node) {
+  let current = unwrapExpression(node);
+  while (current?.type === "AwaitExpression") {
+    current = unwrapExpression(current.argument);
+  }
   return current;
+}
+
+export function staticPropertyName(member) {
+  if (member?.type !== "MemberExpression") return "";
+  const property = member.property;
+  if (!member.computed && property?.type === "Identifier") return property.name;
+  if (property?.type === "Literal" && typeof property.value === "string") {
+    return property.value;
+  }
+  return "";
+}
+
+export function staticPropertyKey(property) {
+  if (
+    (property?.type !== "Property" &&
+      property?.type !== "TSPropertySignature") ||
+    property.computed
+  ) {
+    return null;
+  }
+  if (property.key.type === "Identifier") return property.key.name;
+  return property.key.type === "Literal" &&
+    typeof property.key.value === "string"
+    ? property.key.value
+    : null;
 }
 
 export function isTypeOnlyModule(node) {
@@ -69,6 +102,18 @@ export function findVariable(sourceCode, identifier) {
     scope = scope.upper;
   }
   return null;
+}
+
+export function constInitializer(sourceCode, identifier) {
+  const definition = findVariable(sourceCode, identifier)?.defs?.[0];
+  if (
+    definition?.type !== "Variable" ||
+    definition.node?.type !== "VariableDeclarator" ||
+    definition.parent?.kind !== "const"
+  ) {
+    return null;
+  }
+  return definition.node.init ?? null;
 }
 
 export function splitIdentifierWords(name) {
@@ -150,15 +195,8 @@ const TYPE_DECLARATION_TYPES = new Set([
   "TSInterfaceDeclaration",
 ]);
 
-export function normalizedContextName(contextName) {
+function normalizedContextName(contextName) {
   return (contextName ?? "").replace(/[^a-z0-9]/giu, "").toLowerCase();
-}
-
-export function isStatusContextName(contextName, statusName) {
-  const normalized = normalizedContextName(contextName);
-  return (
-    normalized.length > 0 && normalized === normalizedContextName(statusName)
-  );
 }
 
 function nodeKeyName(node) {

@@ -1,6 +1,6 @@
 {
   "name": "@joedeleeuw/antidrift",
-  "version": "0.24.0",
+  "version": "0.25.0",
   "type": "module",
   "license": "MIT",
   "description": "Host-agnostic Oxlint and ESLint rules for TypeScript, React, boundary decoding, and AI-agent drift prevention.",
@@ -65,8 +65,9 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --pretty false",
     "lint": "oxlint -c oxlint.config.mts src scripts oxlint.config.mts",
+    "fallow": "fallow dead-code && fallow dupes --fail-on-issues",
     "smoke": "node scripts/verify-smoke.mjs",
-    "check": "pnpm typecheck && pnpm lint && pnpm smoke",
+    "check": "pnpm typecheck && pnpm lint && pnpm fallow && pnpm smoke",
     "prepare": "simple-git-hooks"
   },
   "devDependencies": {
@@ -74,12 +75,14 @@
     "@types/node": "^26.6.6",
     "@typescript-eslint/parser": "^8.72.0",
     "eslint": "^10.13.0",
+    "fallow": "3.38.1",
     "lint-staged": "^15.3.0",
     "oxlint": "^1.89.0",
     "oxlint-tsgolint": "^7.0.2005",
     "prettier": "^3.4.2",
     "simple-git-hooks": "^2.11.1",
-    "typescript": "6.0.3"
+    "typescript": "6.0.3",
+    "zod": "4.6.7"
   },
   "lint-staged": {
     "*.{js,cjs,mjs,ts,tsx,mts}": [

@@ -1,9 +1,9 @@
-import { findVariable } from "./imported-owner.js";
+import { findVariable } from "../shared/scope.js";
 
 function isClassExpression(node, context, seen = new Set()) {
   for (let current = node.parent; current; current = current.parent) {
     if (current.type === "VariableDeclarator") {
-      const binding = findVariable(context, current.id);
+      const binding = findVariable(context.sourceCode, current.id);
       if (!binding || seen.has(binding)) return false;
       seen.add(binding);
       return binding.references.some(
@@ -40,4 +40,17 @@ function isClassExpression(node, context, seen = new Set()) {
   return false;
 }
 
-export { isClassExpression as isClassValue };
+export function classValueVisitors(context, onClassString) {
+  return {
+    Literal(node) {
+      if (typeof node.value === "string" && isClassExpression(node, context)) {
+        onClassString(node, node.value);
+      }
+    },
+    TemplateElement(node) {
+      if (isClassExpression(node, context)) {
+        onClassString(node, node.value.raw);
+      }
+    },
+  };
+}

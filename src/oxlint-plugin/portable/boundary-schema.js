@@ -3,12 +3,13 @@ import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import {
   hasRuntimeSchemaProvenance,
   resolveSchemaBuilderCall,
-  staticPropertyName,
+  schemaReceiverVerdict,
 } from "../shared/runtime-schema-libraries.js";
 import {
   findVariable,
   isFunctionLike,
   isTestFile,
+  staticPropertyKey,
   unwrapExpression,
 } from "../shared/scope.js";
 
@@ -53,20 +54,22 @@ function isRawDeserializeCall(node) {
   );
 }
 
-function isPassedToDecoder(node) {
+function isPassedToDecoder(node, sourceCode) {
   const parent = node.parent;
-  if (parent?.type === "CallExpression" && parent.arguments.includes(node)) {
-    const callee = unwrapExpression(parent.callee);
-    if (
-      callee?.type === "MemberExpression" &&
-      callee.property?.type === "Identifier" &&
-      SCHEMA_DECODE_METHODS.has(callee.property.name)
-    ) {
-      return true;
-    }
-    if (callee?.type === "Identifier") return true;
+  if (parent?.type !== "CallExpression" || !parent.arguments.includes(node)) {
+    return false;
   }
-  return false;
+  const callee = unwrapExpression(parent.callee);
+  if (callee?.type === "Identifier") return true;
+  if (
+    callee?.type !== "MemberExpression" ||
+    callee.property?.type !== "Identifier" ||
+    !SCHEMA_DECODE_METHODS.has(callee.property.name) ||
+    (callee.object?.type === "Identifier" && callee.object.name === "JSON")
+  ) {
+    return false;
+  }
+  return schemaReceiverVerdict(callee.object, sourceCode) !== "disproven";
 }
 
 function checkJsonStringFields(node, context) {
@@ -78,7 +81,7 @@ function checkJsonStringFields(node, context) {
     return;
   }
   for (const property of builder.args[0].properties) {
-    const name = staticPropertyName(property);
+    const name = staticPropertyKey(property);
     if (
       name &&
       /[A-Za-z0-9]Json$|^json[A-Z]/u.test(name) &&
@@ -122,7 +125,7 @@ export const noUnsafeDeserializeRule = {
         if (!node.init || !isRawDeserializeCall(node.init)) return;
         const ann = node.id?.typeAnnotation?.typeAnnotation;
         if (!ann || ann.type === "TSUnknownKeyword") return;
-        if (isPassedToDecoder(node.init)) return;
+        if (isPassedToDecoder(node.init, context.sourceCode)) return;
         context.report({
           node,
           message:
@@ -408,7 +411,8 @@ export const noIdentitySchemaTransformRule = {
           node.callee?.type !== "MemberExpression" ||
           node.callee.computed ||
           node.callee.property?.type !== "Identifier" ||
-          node.callee.property.name !== "transform"
+          node.callee.property.name !== "transform" ||
+          schemaReceiverVerdict(node.callee, context.sourceCode) === "disproven"
         ) {
           return;
         }

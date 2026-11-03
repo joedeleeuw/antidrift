@@ -1,4 +1,5 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
+import { findVariable } from "../shared/scope.js";
 import { getPropertyName, isIdentifier } from "./ast.js";
 
 const OMIT_TYPE = "Omit";
@@ -339,21 +340,12 @@ class OmittedProps {
     }
   };
 
-  omittedKeysForSpread = (identifier) => {
-    let scope = this.context.sourceCode.getScope(identifier);
-    while (scope !== null) {
-      const binding = scope.set.get(identifier.name);
-      if (binding !== undefined) {
-        return binding.defs
-          .map((definition) =>
-            this.omittedByBinding.get(definition.name.range[0])
-          )
-          .find((keys) => keys !== undefined);
-      }
-      scope = scope.upper;
-    }
-    return undefined;
-  };
+  omittedKeysForSpread = (identifier) =>
+    findVariable(this.context.sourceCode, identifier)
+      ?.defs.map((definition) =>
+        this.omittedByBinding.get(definition.name.range[0])
+      )
+      .find((keys) => keys !== undefined);
 
   reportElement = (node) => {
     const attributes = node.openingElement.attributes;

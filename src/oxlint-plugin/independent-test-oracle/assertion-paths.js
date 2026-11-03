@@ -2,12 +2,12 @@ import {
   equalityMatcherMethods,
   equalityMethods,
 } from "../shared/test-block-arrangement.js";
+import { resolutionDepthLimit } from "../shared/test-block-shapes.js";
 import {
-  resolutionDepthLimit,
+  staticPropertyName,
   unwrapAwaitedExpression,
   unwrapExpression,
-} from "../shared/test-block-shapes.js";
-import { staticPropertyName } from "../shared/test-files.js";
+} from "../shared/scope.js";
 
 const outcomeFlagProperties = new Set(["success", "ok"]);
 const outcomeFlagMethods = new Set(["isOk", "isErr", "isSuccess", "isFailure"]);

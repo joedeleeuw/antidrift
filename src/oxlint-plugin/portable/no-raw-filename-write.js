@@ -1,11 +1,6 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
-import {
-  getPropertyName,
-  isAstNode,
-  isCallTo,
-  isIdentifier,
-  unwrapExpression,
-} from "./ast.js";
+import { findVariable, unwrapExpression } from "../shared/scope.js";
+import { getPropertyName, isAstNode, isCallTo, isIdentifier } from "./ast.js";
 
 const RAW_INPUT_OBJECTS = new Set(["file", "body", "query", "part"]);
 const RAW_NAME_PROPS = new Set(["name", "filename", "fileName"]);
@@ -14,18 +9,6 @@ class RawFilenameWrites {
   constructor(context) {
     this.context = context;
   }
-  resolveVariable = (identifier) => {
-    let scope = this.context.sourceCode.getScope(identifier);
-    while (scope !== null) {
-      const binding = scope.set.get(identifier.name);
-      if (binding !== undefined) {
-        return binding;
-      }
-      scope = scope.upper;
-    }
-    return null;
-  };
-
   isRawDestructuredFilename = (declaration, identifierName) => {
     const init = unwrapExpression(declaration.init);
     if (
@@ -98,7 +81,7 @@ class RawFilenameWrites {
     if (!isIdentifier(expression)) {
       return false;
     }
-    const binding = this.resolveVariable(expression);
+    const binding = findVariable(this.context.sourceCode, expression);
     if (binding === null || seenVariables.has(binding)) {
       return false;
     }

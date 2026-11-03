@@ -1,18 +1,23 @@
-import { findVariable } from "./scope.js";
-import { unwrapExpression } from "./test-files.js";
+import {
+  constInitializer,
+  findVariable,
+  staticPropertyKey,
+  unwrapAwaitedExpression,
+} from "./scope.js";
+import { hasTypeChecker, resolvedDeclarationFiles } from "./type-services.js";
 
-const runtimeSchemaLibrarySources = [
+const runtimeSchemaPackages = [
   "@effect/schema",
   "@sinclair/typebox",
   "arktype",
   "convex/values",
-  "effect",
-  "effect/Schema",
   "superstruct",
   "valibot",
   "yup",
   "zod",
 ];
+const effectSchemaModules = new Set(["Schema", "ParseResult"]);
+const declarationFileSuffix = /\.d\.[cm]?ts$/u;
 const provenanceDepthLimit = 12;
 export const schemaDiscriminantKeys = new Set([
   "kind",
@@ -26,45 +31,53 @@ export const schemaDiscriminantKeys = new Set([
   "variant",
 ]);
 
-export function isRuntimeSchemaLibrarySource(specifier) {
+export function isRuntimeSchemaLibrarySource(specifier, importedName = null) {
   if (typeof specifier !== "string") return false;
-  return runtimeSchemaLibrarySources.some(
+  if (specifier === "effect") return effectSchemaModules.has(importedName);
+  if (specifier.startsWith("effect/")) {
+    return effectSchemaModules.has(specifier.slice("effect/".length));
+  }
+  return runtimeSchemaPackages.some(
     (source) => specifier === source || specifier.startsWith(`${source}/`)
   );
 }
 
-export function isRuntimeSchemaLibraryFile(fileName) {
+function isRuntimeSchemaLibraryFile(fileName) {
   const normalized = fileName.replaceAll("\\", "/");
   const marker = "/node_modules/";
   const index = normalized.lastIndexOf(marker);
-  return (
-    index !== -1 &&
-    isRuntimeSchemaLibrarySource(normalized.slice(index + marker.length))
-  );
+  if (index === -1) return false;
+  const packagePath = normalized.slice(index + marker.length);
+  if (packagePath.startsWith("effect/")) {
+    const moduleName = packagePath
+      .slice(packagePath.lastIndexOf("/") + 1)
+      .replace(declarationFileSuffix, "");
+    return effectSchemaModules.has(moduleName);
+  }
+  return isRuntimeSchemaLibrarySource(packagePath);
 }
 
-function importSource(identifier, sourceCode) {
+function importedSchemaLibrary(identifier, sourceCode) {
   const definition = findVariable(sourceCode, identifier)?.defs?.[0];
   if (
     definition?.type !== "ImportBinding" ||
     definition.parent?.type !== "ImportDeclaration"
   ) {
-    return null;
+    return false;
   }
-  const source = definition.parent.source?.value;
-  return typeof source === "string" ? source : null;
+  const imported = definition.node?.imported;
+  const importedName =
+    imported?.type === "Identifier" ? imported.name : (imported?.value ?? null);
+  return isRuntimeSchemaLibrarySource(
+    definition.parent.source?.value,
+    importedName
+  );
 }
 
-function constInitializer(identifier, sourceCode) {
-  const definition = findVariable(sourceCode, identifier)?.defs?.[0];
-  if (
-    definition?.type !== "Variable" ||
-    definition.node?.type !== "VariableDeclarator" ||
-    definition.parent?.kind !== "const"
-  ) {
-    return null;
-  }
-  return definition.node.init ?? null;
+function hasTypedSchemaDeclaration(node, sourceCode) {
+  return resolvedDeclarationFiles(node, sourceCode).some(
+    isRuntimeSchemaLibraryFile
+  );
 }
 
 export function hasRuntimeSchemaProvenance(
@@ -74,14 +87,13 @@ export function hasRuntimeSchemaProvenance(
   seen = new Set()
 ) {
   if (depth > provenanceDepthLimit) return false;
-  const node = unwrapExpression(expression);
+  const node = unwrapAwaitedExpression(expression);
   if (!node || seen.has(node)) return false;
   seen.add(node);
+  if (hasTypedSchemaDeclaration(node, sourceCode)) return true;
   if (node.type === "Identifier") {
-    if (isRuntimeSchemaLibrarySource(importSource(node, sourceCode))) {
-      return true;
-    }
-    const initializer = constInitializer(node, sourceCode);
+    if (importedSchemaLibrary(node, sourceCode)) return true;
+    const initializer = constInitializer(sourceCode, node);
     return initializer
       ? hasRuntimeSchemaProvenance(initializer, sourceCode, depth + 1, seen)
       : false;
@@ -90,7 +102,7 @@ export function hasRuntimeSchemaProvenance(
     return hasRuntimeSchemaProvenance(node.object, sourceCode, depth + 1, seen);
   }
   if (node.type === "CallExpression" || node.type === "NewExpression") {
-    const callee = unwrapExpression(node.callee);
+    const callee = unwrapAwaitedExpression(node.callee);
     return hasRuntimeSchemaProvenance(
       callee?.type === "MemberExpression" ? callee.object : callee,
       sourceCode,
@@ -99,6 +111,11 @@ export function hasRuntimeSchemaProvenance(
     );
   }
   return false;
+}
+
+export function schemaReceiverVerdict(expression, sourceCode) {
+  if (hasRuntimeSchemaProvenance(expression, sourceCode)) return "proven";
+  return hasTypeChecker(sourceCode) ? "disproven" : "unknown";
 }
 
 export function resolveSchemaBuilderCall(node, sourceCode) {
@@ -120,42 +137,27 @@ export function resolveSchemaBuilderCall(node, sourceCode) {
 export function resolveSchemaMemberChain(node, sourceCode) {
   if (!hasRuntimeSchemaProvenance(node, sourceCode)) return null;
   const steps = [];
-  let root = unwrapExpression(node);
+  let root = unwrapAwaitedExpression(node);
   while (root?.type === "CallExpression" || root?.type === "MemberExpression") {
     if (root.type === "MemberExpression") {
-      root = unwrapExpression(root.object);
+      root = unwrapAwaitedExpression(root.object);
       continue;
     }
     const builder = resolveSchemaBuilderCall(root, sourceCode);
     if (!builder) return null;
     steps.unshift({ ...builder, node: root });
-    root = unwrapExpression(
+    root = unwrapAwaitedExpression(
       root.callee.type === "MemberExpression" ? root.callee.object : root.callee
     );
   }
   return steps.length > 0 ? { root, steps } : null;
 }
 
-export function extractObjectFieldNames(objectExpr) {
-  if (objectExpr?.type !== "ObjectExpression") return [];
-  return objectExpr.properties
-    .map(staticPropertyName)
+function objectFieldNames(objectExpression) {
+  if (objectExpression?.type !== "ObjectExpression") return [];
+  return objectExpression.properties
+    .map(staticPropertyKey)
     .filter((name) => name !== null);
-}
-
-export function staticPropertyName(property) {
-  if (
-    (property?.type !== "Property" &&
-      property?.type !== "TSPropertySignature") ||
-    property.computed
-  ) {
-    return null;
-  }
-  if (property.key.type === "Identifier") return property.key.name;
-  return property.key.type === "Literal" &&
-    typeof property.key.value === "string"
-    ? property.key.value
-    : null;
 }
 
 export function isObjectSchemaMethod(method) {
@@ -173,7 +175,7 @@ function isLiteralSchemaMethod(method) {
 }
 
 export function objectSchemaTagPairs(expression, sourceCode, seen = new Set()) {
-  const node = unwrapExpression(expression);
+  const node = unwrapAwaitedExpression(expression);
   if (node?.type === "Identifier") {
     const definition = findVariable(sourceCode, node)?.defs?.[0];
     if (definition?.parent?.kind !== "const" || seen.has(definition)) return [];
@@ -188,7 +190,7 @@ export function objectSchemaTagPairs(expression, sourceCode, seen = new Set()) {
     return [];
   }
   return builder.args[0].properties.flatMap((property) => {
-    const name = staticPropertyName(property);
+    const name = staticPropertyKey(property);
     if (!schemaDiscriminantKeys.has(name)) return [];
     const literal = resolveSchemaBuilderCall(property.value, sourceCode);
     return isLiteralSchemaMethod(literal?.method) &&
@@ -204,7 +206,7 @@ export function unionDiscriminantPairs(
   memberDeclarators
 ) {
   const builder = resolveSchemaBuilderCall(
-    unwrapExpression(expression),
+    unwrapAwaitedExpression(expression),
     sourceCode
   );
   if (!isUnionSchemaMethod(builder?.method)) return [];
@@ -219,7 +221,7 @@ export function unionDiscriminantPairs(
   }
   if (variants.length < 2) return [];
   for (const variant of variants) {
-    const unwrapped = unwrapExpression(variant);
+    const unwrapped = unwrapAwaitedExpression(variant);
     if (unwrapped?.type === "Identifier") {
       const def = findVariable(sourceCode, unwrapped)?.defs?.[0];
       if (def?.node) memberDeclarators.add(def.node);
@@ -246,7 +248,7 @@ export function unionDiscriminantPairs(
 
 function baseAndExtendedMatch(baseNode, extendedArg, omittedNames, sourceCode) {
   const baseBuilder = resolveSchemaBuilderCall(
-    unwrapExpression(baseNode),
+    unwrapAwaitedExpression(baseNode),
     sourceCode
   );
   if (
@@ -258,7 +260,7 @@ function baseAndExtendedMatch(baseNode, extendedArg, omittedNames, sourceCode) {
   }
   const baseTexts = new Map(
     baseBuilder.args[0].properties.flatMap((prop) => {
-      const name = staticPropertyName(prop);
+      const name = staticPropertyKey(prop);
       return name ? [[name, sourceCode.getText(prop.value).trim()]] : [];
     })
   );
@@ -284,12 +286,12 @@ export function isSchemaFieldRename(node, sourceCode) {
   if (
     omitted?.method !== "omit" ||
     extended?.node !== node ||
-    unwrapExpression(node.callee.object) !== omitted.node
+    unwrapAwaitedExpression(node.callee.object) !== omitted.node
   ) {
     return false;
   }
-  const omittedNames = extractObjectFieldNames(omitted.args[0]);
-  const extendedNames = extractObjectFieldNames(extended.args[0]);
+  const omittedNames = objectFieldNames(omitted.args[0]);
+  const extendedNames = objectFieldNames(extended.args[0]);
   if (
     omittedNames.length === 0 ||
     omittedNames.length !== extendedNames.length ||
@@ -299,7 +301,7 @@ export function isSchemaFieldRename(node, sourceCode) {
   }
   const baseNode =
     chain.root?.type === "Identifier"
-      ? constInitializer(chain.root, sourceCode)
+      ? constInitializer(sourceCode, chain.root)
       : chain.root;
   return baseAndExtendedMatch(
     baseNode,

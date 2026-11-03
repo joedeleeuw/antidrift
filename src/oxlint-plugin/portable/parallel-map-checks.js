@@ -17,16 +17,32 @@ const STOP_PREFIXES = new Set([
   "from",
 ]);
 
-function unwrapReadonlyType(typeNode) {
-  if (
-    typeNode?.type === "TSTypeReference" &&
-    typeNode.typeName?.type === "Identifier" &&
-    typeNode.typeName.name === "Readonly" &&
-    typeNode.typeArguments?.params?.length === 1
-  ) {
-    return typeNode.typeArguments.params[0];
+const MAP_WRAPPER_NAMES = new Set(["Readonly", "Partial", "Required"]);
+const ABSENT_TYPE_KINDS = new Set(["TSUndefinedKeyword", "TSNullKeyword"]);
+
+function unwrapMapKeyType(typeNode) {
+  let current = typeNode;
+  for (let step = 0; current && step < 8; step += 1) {
+    if (current.type === "TSUnionType") {
+      const present = current.types.filter(
+        (member) => !ABSENT_TYPE_KINDS.has(member.type)
+      );
+      if (present.length !== 1) return null;
+      current = present[0];
+      continue;
+    }
+    if (
+      current.type === "TSTypeReference" &&
+      current.typeName?.type === "Identifier" &&
+      MAP_WRAPPER_NAMES.has(current.typeName.name) &&
+      current.typeArguments?.params?.length === 1
+    ) {
+      current = current.typeArguments.params[0];
+      continue;
+    }
+    return current;
   }
-  return typeNode;
+  return null;
 }
 
 function mapKeyTypeText(member, sourceCode) {
@@ -38,7 +54,7 @@ function mapKeyTypeText(member, sourceCode) {
   ) {
     return null;
   }
-  const typeNode = unwrapReadonlyType(member.typeAnnotation?.typeAnnotation);
+  const typeNode = unwrapMapKeyType(member.typeAnnotation?.typeAnnotation);
   if (
     typeNode?.type !== "TSTypeReference" ||
     typeNode.typeName?.type !== "Identifier" ||

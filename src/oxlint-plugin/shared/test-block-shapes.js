@@ -1,5 +1,9 @@
-import { findVariable } from "./scope.js";
-import { staticPropertyName } from "./test-files.js";
+import {
+  constInitializer,
+  staticPropertyName,
+  unwrapAwaitedExpression,
+  unwrapExpression,
+} from "./scope.js";
 
 export const literalContainerTypes = new Set([
   "ObjectExpression",
@@ -14,27 +18,6 @@ const shapeMatcherMethods = new Set([
   "toStrictEqual",
 ]);
 const shapeFactories = new Set(["arrayContaining", "objectContaining"]);
-
-export function unwrapExpression(node) {
-  let current = node;
-  while (
-    current?.type === "ChainExpression" ||
-    current?.type === "TSNonNullExpression" ||
-    current?.type === "TSAsExpression" ||
-    current?.type === "TSSatisfiesExpression"
-  ) {
-    current = current.expression;
-  }
-  return current;
-}
-
-export function unwrapAwaitedExpression(node) {
-  let current = unwrapExpression(node);
-  while (current?.type === "AwaitExpression") {
-    current = unwrapExpression(current.argument);
-  }
-  return current;
-}
 
 export function isFunctionNode(node) {
   return (
@@ -55,23 +38,15 @@ export function nearestFunction(node) {
   return null;
 }
 
-export function constInitializer(sourceCode, identifier, callback = null) {
-  if (identifier?.type !== "Identifier") {
-    return null;
-  }
-  const scopeBinding = findVariable(sourceCode, identifier);
-  const definition = scopeBinding?.defs?.[0];
+function constInitializerWithin(sourceCode, identifier, callback) {
+  const initializer = constInitializer(sourceCode, identifier);
   if (
-    definition?.type !== "Variable" ||
-    definition.node?.type !== "VariableDeclarator" ||
-    definition.parent?.kind !== "const"
+    initializer === null ||
+    (callback && nearestFunction(initializer) !== callback)
   ) {
     return null;
   }
-  if (callback && nearestFunction(definition.node) !== callback) {
-    return null;
-  }
-  return definition.node.init ?? null;
+  return initializer;
 }
 
 export function templateText(template) {
@@ -190,7 +165,7 @@ export function resolveStaticShape(expression, state) {
   if (node.type !== "Identifier") {
     return null;
   }
-  const initializer = constInitializer(sourceCode, node, callback);
+  const initializer = constInitializerWithin(sourceCode, node, callback);
   return initializer
     ? resolveStaticShape(initializer, { ...nextState, depth: depth + 1 })
     : null;
@@ -278,7 +253,7 @@ function derivesFromResponseJson(expression, state) {
     return true;
   }
   if (node.type === "Identifier") {
-    const initializer = constInitializer(sourceCode, node, callback);
+    const initializer = constInitializerWithin(sourceCode, node, callback);
     return initializer
       ? derivesFromResponseJson(initializer, nextState)
       : false;

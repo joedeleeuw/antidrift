@@ -5,9 +5,12 @@ import {
   resolveSchemaBuilderCall,
   resolveSchemaMemberChain,
   schemaDiscriminantKeys,
-  staticPropertyName,
 } from "../shared/runtime-schema-libraries.js";
-import { findVariable, unwrapExpression } from "../shared/scope.js";
+import {
+  findVariable,
+  staticPropertyKey,
+  unwrapExpression,
+} from "../shared/scope.js";
 
 const SCOPE_SCHEMA = [
   { type: "object", properties: scopeProperties, additionalProperties: false },
@@ -293,11 +296,11 @@ function checkNullableFailureBag(properties, node, context) {
   ) {
     return;
   }
-  const names = properties.map(staticPropertyName);
+  const names = properties.map(staticPropertyKey);
   if (names.some((name) => name === null || RESULT_TAGS.has(name))) return;
   const nullableNames = properties
     .filter((property) => explicitlyNullable(property, context.sourceCode))
-    .map(staticPropertyName);
+    .map(staticPropertyKey);
   if (
     nullableNames.length === properties.length &&
     nullableNames.some((name) => FAILURE_FIELDS.has(name)) &&

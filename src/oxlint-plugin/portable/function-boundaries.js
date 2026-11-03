@@ -3,6 +3,7 @@ import {
   recordProgramTypeDeclarations,
 } from "./parameter-bag-checks.js";
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
+import { findDescendant } from "./ast.js";
 import {
   findVariable,
   isFunctionLike,
@@ -40,25 +41,14 @@ function unexportedFunctionName(node) {
 }
 
 function hasValueReturn(body) {
-  let found = false;
-  function visit(cur) {
-    if (found || !cur || typeof cur !== "object") return;
-    if (isFunctionLike(cur)) return;
-    if (cur.type === "ReturnStatement" && cur.argument !== null) {
-      found = true;
-      return;
-    }
-    for (const [k, child] of Object.entries(cur)) {
-      if (k === "parent" || k === "range" || k === "loc") continue;
-      if (Array.isArray(child)) {
-        for (const element of child) visit(element);
-      } else if (child && typeof child === "object") {
-        visit(child);
-      }
-    }
-  }
-  visit(body);
-  return found;
+  return (
+    findDescendant(
+      body,
+      (candidate) =>
+        candidate.type === "ReturnStatement" && candidate.argument !== null,
+      (candidate) => !isFunctionLike(candidate)
+    ) !== null
+  );
 }
 
 function conditionRootGroup(node) {

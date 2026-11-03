@@ -1,4 +1,4 @@
-import { findVariable } from "./imported-owner.js";
+import { findVariable } from "../shared/scope.js";
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import { getPropertyName, isIdentifier } from "./ast.js";
 
@@ -229,7 +229,7 @@ class FetchSignalAnalysis {
   fetchOrigin = (node, seen = new Set()) => {
     node = unwrapExpression(node);
     if (node?.type !== "Identifier") return isFetchCallee(node);
-    const bindingSymbol = findVariable(this.context, node);
+    const bindingSymbol = findVariable(this.context.sourceCode, node);
     if (!bindingSymbol?.defs.length) return node.name === "fetch";
     if (seen.has(bindingSymbol)) return false;
     seen.add(bindingSymbol);

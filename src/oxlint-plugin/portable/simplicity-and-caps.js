@@ -2,7 +2,11 @@ import { createBranchChecks } from "./branch-and-ternary-checks.js";
 import { createComponentPropChecks } from "./component-prop-checks.js";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
+import {
+  isRuleFile,
+  ruleFilename,
+  scopeProperties,
+} from "../shared/rule-scope.js";
 import {
   findVariable,
   functionReturnsJsx,
@@ -371,11 +375,7 @@ export const noReexportOnlyModuleRule = {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-    const filename = (
-      context.filename ??
-      context.getFilename?.() ??
-      ""
-    ).replaceAll("\\", "/");
+    const filename = ruleFilename(context);
     if (
       /\/index\.[cm]?[jt]sx?$/u.test(filename) ||
       /(?:^|\/)[^/]+\.config\.[cm]?[jt]sx?$/u.test(filename) ||

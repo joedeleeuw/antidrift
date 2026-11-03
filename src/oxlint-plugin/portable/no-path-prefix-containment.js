@@ -1,4 +1,5 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
+import { findVariable } from "../shared/scope.js";
 import {
   getImportedName,
   getPropertyName,
@@ -96,24 +97,12 @@ class PathContainment {
   constructor(context) {
     this.context = context;
   }
-  resolveVariable = (identifier) => {
-    let scope = this.context.sourceCode.getScope(identifier);
-    while (scope !== null) {
-      const binding = scope.set.get(identifier.name);
-      if (binding !== undefined) {
-        return binding;
-      }
-      scope = scope.upper;
-    }
-    return null;
-  };
-
   resolveStableExpression = (node, visited = new Set()) => {
     const expression = unwrapExpression(node);
     if (!isEstreeIdentifier(expression)) {
       return expression;
     }
-    const binding = this.resolveVariable(expression);
+    const binding = findVariable(this.context.sourceCode, expression);
     if (binding === null || visited.has(binding)) {
       return expression;
     }
@@ -130,7 +119,9 @@ class PathContainment {
     if (member === null || !isEstreeIdentifier(member.root)) {
       return null;
     }
-    const imported = importedPathBinding(this.resolveVariable(member.root));
+    const imported = importedPathBinding(
+      findVariable(this.context.sourceCode, member.root)
+    );
     if (imported === null) {
       return null;
     }
@@ -187,10 +178,10 @@ class PathContainment {
       return true;
     }
     if (isEstreeIdentifier(stableLeft) && isEstreeIdentifier(stableRight)) {
-      const leftVariable = this.resolveVariable(stableLeft);
+      const leftVariable = findVariable(this.context.sourceCode, stableLeft);
       return (
         leftVariable !== null &&
-        leftVariable === this.resolveVariable(stableRight)
+        leftVariable === findVariable(this.context.sourceCode, stableRight)
       );
     }
     return (

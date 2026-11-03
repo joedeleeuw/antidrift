@@ -2,9 +2,10 @@
 
 ## Commands
 
-- `pnpm check`: Run `tsc`, self-lint (`oxlint`), and the real-runtime Oxlint + ESLint + packed-tarball smoke (`scripts/verify-smoke.mjs`).
+- `pnpm check`: Run `tsc`, self-lint (`oxlint`), `fallow` (`dead-code` + `dupes --fail-on-issues`), and the real-runtime Oxlint + ESLint + packed-tarball smoke (`scripts/verify-smoke.mjs`).
 - `pnpm typecheck`: Typecheck `oxlint.config.mts` and package `.d.ts`/`.d.mts` declarations.
 - `pnpm lint`: Lint `src/`, `scripts/`, and `oxlint.config.mts` with `oxlint`.
+- `pnpm fallow`: Run `fallow dead-code && fallow dupes --fail-on-issues`.
 - `pnpm smoke`: Run `node scripts/verify-smoke.mjs`.
 
 ## Workspace Boundaries

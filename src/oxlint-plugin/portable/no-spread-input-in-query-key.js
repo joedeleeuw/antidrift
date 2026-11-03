@@ -1,22 +1,8 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
-import { getPropertyName, isIdentifier, unwrapExpression } from "./ast.js";
+import { unwrapExpression } from "../shared/scope.js";
+import { getPropertyName, isIdentifier } from "./ast.js";
+import { rootIdentifier } from "./static-resolution.js";
 
-const rootIdentifier = (node) => {
-  const unwrapped = unwrapExpression(node);
-  if (!unwrapped || typeof unwrapped.type !== "string") {
-    return null;
-  }
-  if (unwrapped.type === "Identifier") {
-    return unwrapped;
-  }
-  if (unwrapped.type === "MemberExpression") {
-    return rootIdentifier(unwrapped.object);
-  }
-  if (unwrapped.type === "CallExpression") {
-    return rootIdentifier(unwrapped.callee);
-  }
-  return null;
-};
 const isAllowedCompositionSpread = (node) => {
   const unwrapped = unwrapExpression(node);
   if (!unwrapped || typeof unwrapped.type !== "string") {

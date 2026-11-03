@@ -12,9 +12,8 @@ import {
   resolutionDepthLimit,
   resolveLiteralNode,
   templateText,
-  unwrapExpression,
 } from "../shared/test-block-shapes.js";
-import { staticPropertyName } from "../shared/test-files.js";
+import { staticPropertyName, unwrapExpression } from "../shared/scope.js";
 import {
   actForRoot,
   arrangedActForRoot,

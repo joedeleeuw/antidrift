@@ -1,5 +1,6 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
-import { getPropertyName, isAstNode, unwrapExpression } from "./ast.js";
+import { unwrapExpression } from "../shared/scope.js";
+import { getPropertyName, isAstNode } from "./ast.js";
 
 const CACHE_METHODS = new Set([
   "invalidateQueries",

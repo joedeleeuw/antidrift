@@ -3,6 +3,7 @@ node_modules
 dist
 coverage
 .tmp
+.fallow/
 .sudocode/
 .DS_Store
 .env

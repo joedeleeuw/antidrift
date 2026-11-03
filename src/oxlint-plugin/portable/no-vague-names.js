@@ -3,6 +3,7 @@ import {
   scopeProperties,
 } from "../../oxlint-plugin/shared/rule-scope.js";
 import { splitIdentifierWords } from "../../oxlint-plugin/shared/scope.js";
+import { patternIdentifiers } from "./static-resolution.js";
 
 const VAGUE_NOUN =
   /^(?:data|info|value|values|val|vals|obj|objects|objs|thing|things|stuff|temp|tmp|foo|bar|baz|res|ret|retval|misc|result|results|item|items|var|vars|variable|content|contents|param|params|parameters|arr|spam|ham|toto|tutu|tata)\d*$/i;
@@ -72,48 +73,6 @@ function duplicateContextWord(name) {
     if (previous && current && previous === current) return current;
   }
   return null;
-}
-
-function* patternIdentifiers(node) {
-  if (!node) return;
-  switch (node.type) {
-    case "Identifier":
-      yield node;
-      return;
-    case "AssignmentPattern":
-      yield* patternIdentifiers(node.left);
-      return;
-    case "RestElement":
-      yield* patternIdentifiers(node.argument);
-      return;
-    case "ArrayPattern":
-      for (const element of node.elements) yield* patternIdentifiers(element);
-      return;
-    case "ObjectPattern":
-      for (const property of node.properties) {
-        if (property.type === "RestElement") {
-          yield* patternIdentifiers(property);
-          continue;
-        }
-        if (
-          !property.computed &&
-          property.key?.type === "Identifier" &&
-          ((property.value?.type === "Identifier" &&
-            property.value.name === property.key.name) ||
-            (property.value?.type === "AssignmentPattern" &&
-              property.value.left?.type === "Identifier" &&
-              property.value.left.name === property.key.name))
-        ) {
-          continue;
-        }
-        yield* patternIdentifiers(property.value);
-      }
-      return;
-    case "TSParameterProperty":
-      yield* patternIdentifiers(node.parameter);
-      return;
-    default:
-  }
 }
 
 class BindingNames {
@@ -224,7 +183,9 @@ class BindingNames {
   };
 
   checkPattern = (pattern) => {
-    for (const identifier of patternIdentifiers(pattern)) {
+    for (const identifier of patternIdentifiers(pattern, {
+      skipShorthand: true,
+    })) {
       this.check(identifier);
     }
   };

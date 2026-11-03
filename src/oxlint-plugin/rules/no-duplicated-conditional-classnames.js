@@ -1,4 +1,5 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
+import { staticPropertyName, unwrapExpression } from "../shared/scope.js";
 
 const defaultAttributes = ["class", "className"];
 const defaultHelpers = [];
@@ -16,19 +17,6 @@ const optionKeys = new Set([
   "files",
   "excludeFiles",
 ]);
-
-function unwrapExpression(node) {
-  let current = node;
-  while (
-    current?.type === "ChainExpression" ||
-    current?.type === "TSNonNullExpression" ||
-    current?.type === "TSAsExpression" ||
-    current?.type === "TSSatisfiesExpression"
-  ) {
-    current = current.expression;
-  }
-  return current;
-}
 
 function staticString(node) {
   const expression = unwrapExpression(node);
@@ -50,16 +38,6 @@ function classTokens(classText) {
 
 function uniqueTokens(tokens) {
   return [...new Set(tokens)];
-}
-
-function staticPropertyName(member) {
-  if (member?.type !== "MemberExpression") return "";
-  const property = member.property;
-  if (!member.computed && property?.type === "Identifier") return property.name;
-  if (property?.type === "Literal" && typeof property.value === "string") {
-    return property.value;
-  }
-  return "";
 }
 
 function calleeName(callee) {

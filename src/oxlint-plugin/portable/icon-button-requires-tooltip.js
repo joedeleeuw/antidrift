@@ -1,4 +1,15 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
+import {
+  filenameForContext,
+  isAstNode,
+  jsxAttribute,
+  jsxAttributeName,
+  jsxAttributes,
+  jsxElementName,
+  jsxOpeningElement,
+  jsxRenderElement,
+  nameOfJsxElement,
+} from "./ast.js";
 
 const INTERACTIVE_ELEMENTS = new Set([
   "AlertDialogClose",
@@ -27,61 +38,9 @@ const AUTO_TOOLTIP_ELEMENTS = new Set([
 ]);
 const AUTO_TOOLTIP_ATTRS = new Set(["aria-label", "title"]);
 const NATIVE_TOOLTIP_ATTRS = new Set(["title"]);
-const isAstNode = (node) =>
-  typeof node === "object" &&
-  node !== null &&
-  "type" in node &&
-  typeof node.type === "string";
-const getJsxName = (node) => {
-  if (!isAstNode(node)) {
-    return null;
-  }
-  if (node.type === "JSXIdentifier" && typeof node.name === "string") {
-    return node.name;
-  }
-  if (node.type === "JSXMemberExpression") {
-    return getJsxName(node.property);
-  }
-  if (node.type === "JSXNamespacedName") {
-    return getJsxName(node.name);
-  }
-  return null;
-};
-const getElementName = (element) => {
-  if (!isAstNode(element) || element.type !== "JSXElement") {
-    return null;
-  }
-  const openingElement = element.openingElement;
-  if (!isAstNode(openingElement)) {
-    return null;
-  }
-  return getJsxName(openingElement.name);
-};
-const getOpeningElement = (element) => {
-  if (!isAstNode(element) || element.type !== "JSXElement") {
-    return null;
-  }
-  return isAstNode(element.openingElement) ? element.openingElement : null;
-};
-const getAttributes = (openingElement) => {
-  if (!isAstNode(openingElement) || !Array.isArray(openingElement.attributes)) {
-    return [];
-  }
-  return openingElement.attributes;
-};
-const getAttributeName = (attribute) => {
-  if (!isAstNode(attribute) || attribute.type !== "JSXAttribute") {
-    return null;
-  }
-  return getJsxName(attribute.name);
-};
-const findAttribute = (openingElement, name) =>
-  getAttributes(openingElement).find(
-    (attribute) => getAttributeName(attribute) === name
-  ) ?? null;
 const hasAttribute = (openingElement, names) =>
-  getAttributes(openingElement).some((attribute) => {
-    const name = getAttributeName(attribute);
+  jsxAttributes(openingElement).some((attribute) => {
+    const name = jsxAttributeName(attribute);
     return name !== null && names.has(name);
   });
 const getStaticText = (node) => {
@@ -102,11 +61,11 @@ const getStaticText = (node) => {
   return null;
 };
 const getClassName = (openingElement) => {
-  const className = findAttribute(openingElement, "className");
+  const className = jsxAttribute(openingElement, "className");
   return getStaticText(className?.value) ?? "";
 };
 const isScreenReaderOnly = (element) => {
-  const openingElement = getOpeningElement(element);
+  const openingElement = jsxOpeningElement(element);
   return getClassName(openingElement).split(/\s+/u).includes("sr-only");
 };
 const isLikelyIconExpression = (node) => {
@@ -175,7 +134,7 @@ const isIconElement = (node, icons) => {
   if (!isAstNode(node) || node.type !== "JSXElement") {
     return false;
   }
-  const name = getElementName(node);
+  const name = nameOfJsxElement(node);
   if (name === null) {
     return false;
   }
@@ -202,12 +161,12 @@ const hasIconChild = (node, icons) => {
   });
 };
 const isIconSizeButton = (node) => {
-  const openingElement = getOpeningElement(node);
-  const name = getJsxName(openingElement?.name);
+  const openingElement = jsxOpeningElement(node);
+  const name = jsxElementName(openingElement?.name);
   if (name !== "Button" && name !== "button") {
     return false;
   }
-  const size = findAttribute(openingElement, "size");
+  const size = jsxAttribute(openingElement, "size");
   const sizeName = getStaticText(size?.value);
   if (typeof sizeName === "string" && sizeName.startsWith("icon")) {
     return true;
@@ -216,26 +175,12 @@ const isIconSizeButton = (node) => {
     .split(/\s+/u)
     .some((className) => /^size-\d/u.test(className));
 };
-const getRenderElement = (openingElement) => {
-  const render = findAttribute(openingElement, "render");
-  if (!isAstNode(render)) {
-    return null;
-  }
-  const attributeInitializer = render.value;
-  if (!isAstNode(attributeInitializer)) {
-    return null;
-  }
-  if (attributeInitializer.type === "JSXExpressionContainer") {
-    return attributeInitializer.expression;
-  }
-  return attributeInitializer;
-};
 const hasTooltip = (node) => {
   let current = isAstNode(node) ? node : null;
   while (isAstNode(current)) {
     if (current.type === "JSXElement") {
-      const openingElement = getOpeningElement(current);
-      const name = getJsxName(openingElement?.name);
+      const openingElement = jsxOpeningElement(current);
+      const name = jsxElementName(openingElement?.name);
       if (name !== null && TOOLTIP_ELEMENTS.has(name)) {
         return true;
       }
@@ -255,12 +200,12 @@ const hasTooltip = (node) => {
       ) {
         return true;
       }
-      const renderElement = getRenderElement(openingElement);
-      const renderOpeningElement = getOpeningElement(renderElement);
+      const renderElement = jsxRenderElement(openingElement);
+      const renderOpeningElement = jsxOpeningElement(renderElement);
       if (hasAttribute(renderOpeningElement, TOOLTIP_ATTRS)) {
         return true;
       }
-      const renderElementName = getJsxName(renderOpeningElement?.name);
+      const renderElementName = jsxElementName(renderOpeningElement?.name);
       if (
         renderElementName !== null &&
         AUTO_TOOLTIP_ELEMENTS.has(renderElementName) &&
@@ -280,15 +225,15 @@ const hasTooltip = (node) => {
   return false;
 };
 const isIconOnlyInteractive = (node, icons) => {
-  const name = getElementName(node);
+  const name = nameOfJsxElement(node);
   if (name === null || !INTERACTIVE_ELEMENTS.has(name)) {
     return false;
   }
   if (hasVisibleText(node)) {
     return false;
   }
-  const openingElement = getOpeningElement(node);
-  const renderElement = getRenderElement(openingElement);
+  const openingElement = jsxOpeningElement(node);
+  const renderElement = jsxRenderElement(openingElement);
   if (isIconSizeButton(renderElement)) {
     return true;
   }
@@ -297,8 +242,6 @@ const isIconOnlyInteractive = (node, icons) => {
   }
   return hasIconChild(node, icons);
 };
-const filenameOf = (context) =>
-  context.filename ?? context.getFilename?.() ?? "";
 export default {
   meta: {
     schema: [
@@ -324,7 +267,7 @@ export default {
 
     if (
       (() => {
-        return filenameOf(context).endsWith(".tsx");
+        return filenameForContext(context).endsWith(".tsx");
       })() === false
     ) {
       return {};
@@ -337,7 +280,7 @@ export default {
         context.report({
           node,
           messageId: "missingTooltip",
-          data: { tag: getElementName(node) ?? "control" },
+          data: { tag: nameOfJsxElement(node) ?? "control" },
         });
       },
     };

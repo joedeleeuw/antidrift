@@ -1,5 +1,6 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
-import { getPropertyName, isAstNode, unwrapExpression } from "./ast.js";
+import { unwrapExpression } from "../shared/scope.js";
+import { getPropertyName, isAstNode } from "./ast.js";
 
 const HEX_IN_STRING = /#[0-9a-f]{3,8}\b/i;
 const COLOR_FUNC_IN_STRING = /\b(?:rgb|rgba|hsl|hsla)\s*\(/i;

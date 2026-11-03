@@ -1,4 +1,4 @@
-import { isClassValue } from "./class-value.js";
+import { classValueVisitors } from "./class-value.js";
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import {
   hasPhysicalProperty,
@@ -91,22 +91,10 @@ export default {
   create(context) {
     if (!isRuleFile(context)) return {};
 
-    return {
-      Literal(node) {
-        if (!isClassValue(node, context)) return;
-        if (typeof node.value !== "string") {
-          return;
-        }
-        if (hasPhysicalProperty(withoutSymmetricInsets(node.value))) {
-          reportPhysicalProperty(context, node);
-        }
-      },
-      TemplateElement(node) {
-        if (!isClassValue(node, context)) return;
-        if (hasPhysicalProperty(withoutSymmetricInsets(node.value.raw))) {
-          reportPhysicalProperty(context, node);
-        }
-      },
-    };
+    return classValueVisitors(context, (node, classNames) => {
+      if (hasPhysicalProperty(withoutSymmetricInsets(classNames))) {
+        reportPhysicalProperty(context, node);
+      }
+    });
   },
 };

@@ -1,5 +1,9 @@
 import { checkParallelSidecarMaps } from "./parallel-map-checks.js";
-import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
+import {
+  isRuleFile,
+  ruleFilename,
+  scopeProperties,
+} from "../shared/rule-scope.js";
 import {
   isObjectSchemaMethod,
   isSchemaFieldRename,
@@ -170,7 +174,6 @@ function shapeSignature(members, sourceCode) {
 }
 
 function checkShape(context, seenShapes, name, members, reportNode) {
-  checkParallelSidecarMaps(context, name, members, reportNode);
   const signature = shapeSignature(members, context.sourceCode);
   if (!signature) return;
   const existing = seenShapes.get(signature);
@@ -267,26 +270,23 @@ export const noStructuralTypeForkRule = {
         checkSchemaRename(node, context);
       },
       TSInterfaceDeclaration(node) {
-        if (node.id?.name && (!node.extends || node.extends.length === 0)) {
-          checkShape(
-            context,
-            seenShapes,
-            node.id.name,
-            node.body?.body,
-            node.id
-          );
-        }
+        if (!node.id?.name) return;
+        checkParallelSidecarMaps(
+          context,
+          node.id.name,
+          node.body?.body,
+          node.id
+        );
+        if ((node.extends?.length ?? 0) > 0) return;
+        checkShape(context, seenShapes, node.id.name, node.body?.body, node.id);
       },
       TSTypeAliasDeclaration(node) {
-        if (node.id?.name && node.typeAnnotation?.type === "TSTypeLiteral") {
-          checkShape(
-            context,
-            seenShapes,
-            node.id.name,
-            node.typeAnnotation.members,
-            node.id
-          );
+        if (!node.id?.name || node.typeAnnotation?.type !== "TSTypeLiteral") {
+          return;
         }
+        const members = node.typeAnnotation.members;
+        checkParallelSidecarMaps(context, node.id.name, members, node.id);
+        checkShape(context, seenShapes, node.id.name, members, node.id);
       },
       ClassDeclaration(node) {
         if (node.id?.name) {
@@ -410,11 +410,7 @@ export const noUnresolvedDependencyTypesRule = {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-    const filename = (
-      context.filename ??
-      context.getFilename?.() ??
-      ""
-    ).replaceAll("\\", "/");
+    const filename = ruleFilename(context);
     const importLines = new Set();
 
     function markImportNode(node) {

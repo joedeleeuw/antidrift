@@ -1,4 +1,5 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
+import { resolvedTypeTexts } from "../shared/type-services.js";
 
 const NUMERIC_WORDS = new Set([
   "count",
@@ -40,8 +41,18 @@ const segments = (name) =>
     .split(/\s+/);
 const isNumericName = (name) =>
   segments(name).some((specifier) => NUMERIC_WORDS.has(specifier));
-const isNumericExpr = (node) => {
-  if (!node) {
+const NUMERIC_TYPE_TEXT = /^(?:number\b|-?\d)/u;
+const STRING_TYPE_TEXT = /^(?:string\b|["'`])/u;
+const isProvablyString = (node, sourceCode) => {
+  const typeTexts = resolvedTypeTexts(node, sourceCode);
+  return (
+    typeTexts !== null &&
+    !typeTexts.some((typeText) => NUMERIC_TYPE_TEXT.test(typeText)) &&
+    typeTexts.some((typeText) => STRING_TYPE_TEXT.test(typeText))
+  );
+};
+const isNumericExpr = (node, sourceCode) => {
+  if (!node || isProvablyString(node, sourceCode)) {
     return false;
   }
   if (node.type === "Identifier") {
@@ -56,13 +67,14 @@ const isNumericExpr = (node) => {
   }
   return false;
 };
-const isStringCall = (node) =>
+const isStringCall = (node, sourceCode) =>
   node.type === "CallExpression" &&
   node.callee.type === "Identifier" &&
   node.callee.name === "String" &&
-  isNumericExpr(node.arguments[0]);
-const isNumericTemplate = (node) =>
-  node.type === "TemplateLiteral" && node.expressions.some(isNumericExpr);
+  isNumericExpr(node.arguments[0], sourceCode);
+const isNumericTemplate = (node, sourceCode) =>
+  node.type === "TemplateLiteral" &&
+  node.expressions.some((expression) => isNumericExpr(expression, sourceCode));
 const inNonDisplayAttr = (node) =>
   node.parent?.type === "JSXAttribute" &&
   node.parent.name?.type === "JSXIdentifier" &&
@@ -108,10 +120,11 @@ export default {
         const isTextChild =
           node.parent?.type === "JSXElement" ||
           node.parent?.type === "JSXFragment";
+        const sourceCode = context.sourceCode;
         if (
-          isStringCall(expr) ||
-          isNumericTemplate(expr) ||
-          (isTextChild && isNumericExpr(expr))
+          isStringCall(expr, sourceCode) ||
+          isNumericTemplate(expr, sourceCode) ||
+          (isTextChild && isNumericExpr(expr, sourceCode))
         ) {
           context.report({
             node,

@@ -1,5 +1,11 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
-import { filenameForContext, isAstNode, isStringLiteral } from "./ast.js";
+import {
+  filenameForContext,
+  isAstNode,
+  isStringLiteral,
+  jsxAttributeName,
+  jsxElementName,
+} from "./ast.js";
 
 const LOADER_ICON_NAMES = [
   "LoaderIcon",
@@ -23,25 +29,6 @@ const isAllowedFile = (context, allowedFiles) => {
     );
   });
 };
-const jsxElementName = (node) => {
-  if (!isAstNode(node)) {
-    return null;
-  }
-  if (node.type === "JSXIdentifier" && typeof node.name === "string") {
-    return node.name;
-  }
-  if (node.type === "JSXMemberExpression") {
-    return jsxElementName(node.property);
-  }
-  return null;
-};
-const jsxAttributeName = (node) =>
-  isAstNode(node) &&
-  isAstNode(node.name) &&
-  node.name.type === "JSXIdentifier" &&
-  typeof node.name.name === "string"
-    ? node.name.name
-    : null;
 const staticStrings = (node, out) => {
   if (!isAstNode(node)) {
     return;

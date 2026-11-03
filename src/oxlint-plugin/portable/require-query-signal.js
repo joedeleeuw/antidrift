@@ -1,4 +1,5 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
+import { findVariable } from "../shared/scope.js";
 import {
   getImportedName,
   getPropertyName,
@@ -6,6 +7,7 @@ import {
   isIdentifier,
   isStringLiteral,
 } from "./ast.js";
+import { isGlobalReference, rootIdentifier } from "./static-resolution.js";
 
 const FUNCTION_TYPES = new Set([
   "ArrowFunctionExpression",
@@ -107,22 +109,6 @@ const isFetchCallee = (callee, isGlobalReference) => {
     isGlobalReference(object, object.name)
   );
 };
-const rootIdentifier = (node) => {
-  const unwrapped = unwrapTS(node);
-  if (!unwrapped || typeof unwrapped.type !== "string") {
-    return null;
-  }
-  if (unwrapped.type === "Identifier") {
-    return unwrapped;
-  }
-  if (unwrapped.type === "MemberExpression") {
-    return rootIdentifier(unwrapped.object);
-  }
-  if (unwrapped.type === "CallExpression") {
-    return rootIdentifier(unwrapped.callee);
-  }
-  return null;
-};
 const HTTP_VERBS = new Set(["get", "post", "put", "patch", "delete", "head"]);
 const isEdenApiCallee = (callee, isEdenApiRoot) => {
   const unwrapped = unwrapTS(callee);
@@ -197,29 +183,11 @@ class QuerySignalAnalysis {
     this.context = context;
     this.networkCalls = [];
     this.queryFnReferences = [];
+    this.resolveVariable = findVariable.bind(null, context.sourceCode);
+    this.isGlobalReference = isGlobalReference.bind(null, context.sourceCode);
   }
   isEstreeIdentifier = (node) =>
     isIdentifier(node) && Array.isArray(node.range);
-
-  resolveVariable = (identifier) => {
-    let scope = this.context.sourceCode.getScope(identifier);
-    while (scope !== null) {
-      const bindingSymbol = scope.set.get(identifier.name);
-      if (bindingSymbol !== undefined) {
-        return bindingSymbol;
-      }
-      scope = scope.upper;
-    }
-    return null;
-  };
-
-  isGlobalReference = (node, name) => {
-    if (!this.isEstreeIdentifier(node) || node.name !== name) {
-      return false;
-    }
-    const bindingSymbol = this.resolveVariable(node);
-    return bindingSymbol === null || bindingSymbol.defs.length === 0;
-  };
 
   isEdenApiRoot = (node) => {
     if (!this.isEstreeIdentifier(node)) {

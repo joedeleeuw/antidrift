@@ -199,8 +199,7 @@ const NAMED_EXPORT_REGEX = /(?:^|[;\n])\s*export\s*\{([^}]+)\}(?!\s*from\b)/gu;
 const DEFAULT_EXPORT_REGEX =
   /(?:^|[;\n])\s*export\s+default\s+([A-Za-z_$][\w$]*)\b/gu;
 
-export function exportedArrays(filename, text) {
-  void filename;
+function exportedArrays(text) {
   const cleaned = stripCommentsPreserveStrings(text);
   const bindings = new Map();
   const exports = new Map();
@@ -297,7 +296,7 @@ export function importedArrays(filename, specifier, cache) {
   if (!target) return [];
   if (cache.has(target)) return cache.get(target);
   const text = readFileSync(target, "utf8");
-  const arrays = exportedArrays(target, text);
+  const arrays = exportedArrays(text);
   cache.set(target, arrays);
   return arrays;
 }
@@ -316,7 +315,7 @@ export function resolveOwnerStatusValues(statusName, entry) {
   if (!target) return [];
   let arrays = statusOwnerFileCache.get(target);
   if (!arrays) {
-    arrays = exportedArrays(target, readFileSync(target, "utf8"));
+    arrays = exportedArrays(readFileSync(target, "utf8"));
     statusOwnerFileCache.set(target, arrays);
   }
   const camel = statusName.charAt(0).toLowerCase() + statusName.slice(1);

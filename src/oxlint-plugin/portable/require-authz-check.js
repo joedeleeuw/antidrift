@@ -1,4 +1,5 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
+import { findDescendant } from "./ast.js";
 
 const REQUEST_PARAM_ROOTS = new Set([
   "req",
@@ -71,42 +72,37 @@ function isIpcMainRegistration(node) {
   );
 }
 
+function isSenderOrFrameAccess(candidate, eventParamName) {
+  return (
+    candidate.type === "MemberExpression" &&
+    !candidate.computed &&
+    candidate.object?.type === "Identifier" &&
+    candidate.object.name === eventParamName &&
+    candidate.property?.type === "Identifier" &&
+    (candidate.property.name === "sender" ||
+      candidate.property.name === "senderFrame")
+  );
+}
+
+function isGuardCallOnEvent(candidate, eventParamName) {
+  return (
+    candidate.type === "CallExpression" &&
+    GUARD_HELPER_PREFIX.test(calleeName(candidate.callee) ?? "") &&
+    candidate.arguments.some(
+      (arg) => arg.type === "Identifier" && arg.name === eventParamName
+    )
+  );
+}
+
 function referencesSenderOrFrame(node, eventParamName) {
-  let found = false;
-  function visit(cur) {
-    if (found || !cur || typeof cur !== "object") return;
-    if (
-      cur.type === "MemberExpression" &&
-      !cur.computed &&
-      cur.object?.type === "Identifier" &&
-      cur.object.name === eventParamName &&
-      cur.property?.type === "Identifier" &&
-      (cur.property.name === "sender" || cur.property.name === "senderFrame")
-    ) {
-      found = true;
-      return;
-    }
-    if (
-      cur.type === "CallExpression" &&
-      GUARD_HELPER_PREFIX.test(calleeName(cur.callee) ?? "") &&
-      cur.arguments.some(
-        (arg) => arg.type === "Identifier" && arg.name === eventParamName
-      )
-    ) {
-      found = true;
-      return;
-    }
-    for (const [k, child] of Object.entries(cur)) {
-      if (k === "parent" || k === "range" || k === "loc") continue;
-      if (Array.isArray(child)) {
-        for (const element of child) visit(element);
-      } else if (child && typeof child === "object") {
-        visit(child);
-      }
-    }
-  }
-  visit(node);
-  return found;
+  return (
+    findDescendant(
+      node,
+      (candidate) =>
+        isSenderOrFrameAccess(candidate, eventParamName) ||
+        isGuardCallOnEvent(candidate, eventParamName)
+    ) !== null
+  );
 }
 
 function terminatesControlFlow(stmt) {
@@ -183,24 +179,7 @@ function isPrivilegedCallNode(cur) {
 }
 
 function findPrivilegedCall(node) {
-  let found = null;
-  function visit(cur) {
-    if (found || !cur || typeof cur !== "object") return;
-    if (isPrivilegedCallNode(cur)) {
-      found = cur;
-      return;
-    }
-    for (const [k, child] of Object.entries(cur)) {
-      if (k === "parent" || k === "range" || k === "loc") continue;
-      if (Array.isArray(child)) {
-        for (const element of child) visit(element);
-      } else if (child && typeof child === "object") {
-        visit(child);
-      }
-    }
-  }
-  visit(node);
-  return found;
+  return findDescendant(node, isPrivilegedCallNode);
 }
 
 function isNegativeSenderCheck(test) {

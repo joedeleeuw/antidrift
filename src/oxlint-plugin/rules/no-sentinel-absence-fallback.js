@@ -1,5 +1,6 @@
 import { mergeVisitors } from "../shared/merge-visitors.js";
 import { silentEmptyDetectionVisitors } from "./absence-fallback/silent-empty-detection.js";
+import { unwrapExpression } from "../shared/scope.js";
 
 const sentinelLiterals = new Set([
   "unknown",
@@ -9,20 +10,6 @@ const sentinelLiterals = new Set([
   "error",
   "missing",
 ]);
-
-function unwrapExpression(node) {
-  let current = node;
-  while (
-    current?.type === "ChainExpression" ||
-    current?.type === "TSAsExpression" ||
-    current?.type === "TSSatisfiesExpression" ||
-    current?.type === "TSNonNullExpression" ||
-    current?.type === "TSTypeAssertion"
-  ) {
-    current = current.expression;
-  }
-  return current;
-}
 
 function isZeroLiteral(node) {
   const expr = unwrapExpression(node);

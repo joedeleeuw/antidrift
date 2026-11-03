@@ -2,7 +2,8 @@ import {
   isRuleFile,
   scopeProperties,
 } from "../../oxlint-plugin/shared/rule-scope.js";
-import { unwrapExpression } from "../shared/scope.js";
+import { findVariable, unwrapExpression } from "../shared/scope.js";
+import { patternIdentifiers } from "./static-resolution.js";
 
 const REMOVAL_VOCABULARY =
   /legacy|compat(?!ible)|deprecated|retire|no_?longer/i;
@@ -21,62 +22,95 @@ function isSnakeCamelAliasPair(leftKey, rightKey) {
   );
 }
 
+function memberReadKey(member) {
+  if (!member.computed && member.property?.type === "Identifier") {
+    return member.property.name;
+  }
+  if (
+    member.computed &&
+    member.property?.type === "Literal" &&
+    typeof member.property.value === "string"
+  ) {
+    return member.property.value;
+  }
+  return null;
+}
+
+function patternKeyName(key) {
+  if (key?.type === "Identifier") return key.name;
+  return key?.type === "Literal" && typeof key.value === "string"
+    ? key.value
+    : null;
+}
+
+function destructuredPropertyIn(pattern, boundName) {
+  const target = pattern?.type === "AssignmentPattern" ? pattern.left : pattern;
+  if (target?.type !== "ObjectPattern") return null;
+  for (const property of target.properties) {
+    if (property.type !== "Property" || property.computed) continue;
+    const bound =
+      property.value?.type === "AssignmentPattern"
+        ? property.value.left
+        : property.value;
+    if (bound?.type === "Identifier" && bound.name === boundName) {
+      return { source: target, key: patternKeyName(property.key) };
+    }
+  }
+  return null;
+}
+
+function destructuredRead(identifier, sourceCode) {
+  const definition = findVariable(sourceCode, identifier)?.defs?.[0];
+  let patterns = [];
+  if (definition?.node?.type === "VariableDeclarator") {
+    patterns = [definition.node.id];
+  } else if (definition?.type === "Parameter") {
+    patterns = definition.node?.params ?? [];
+  }
+  for (const pattern of patterns) {
+    const found = destructuredPropertyIn(pattern, identifier.name);
+    if (found) return found;
+  }
+  return null;
+}
+
+function dualReadSide(expression, sourceCode) {
+  const node = unwrapExpression(expression);
+  if (node?.type === "MemberExpression") {
+    const key = memberReadKey(node);
+    return key === null
+      ? null
+      : {
+          key,
+          source: sourceCode
+            .getText(unwrapExpression(node.object))
+            .replace(/\s+/gu, ""),
+        };
+  }
+  return node?.type === "Identifier"
+    ? destructuredRead(node, sourceCode)
+    : null;
+}
+
 function checkDualKeyAliasRead(node, context) {
   if (node.operator !== "??" && node.operator !== "||") return;
-  const left = unwrapExpression(node.left);
-  const right = unwrapExpression(node.right);
+  const sourceCode = context.sourceCode;
+  const left = dualReadSide(node.left, sourceCode);
+  const right = dualReadSide(node.right, sourceCode);
   if (
-    left?.type !== "MemberExpression" ||
-    right?.type !== "MemberExpression" ||
-    left.computed ||
-    right.computed ||
-    left.property?.type !== "Identifier" ||
-    right.property?.type !== "Identifier"
+    !left?.key ||
+    !right?.key ||
+    left.source !== right.source ||
+    !isSnakeCamelAliasPair(left.key, right.key)
   ) {
     return;
   }
-  const leftKey = left.property.name;
-  const rightKey = right.property.name;
-  if (!isSnakeCamelAliasPair(leftKey, rightKey)) return;
-  const leftReceiver = context.sourceCode
-    .getText(left.object)
-    .replace(/\s+/gu, "");
-  const rightReceiver = context.sourceCode
-    .getText(right.object)
-    .replace(/\s+/gu, "");
-  if (leftReceiver !== rightReceiver) return;
+  const leftText = sourceCode.getText(node.left).replace(/\s+/gu, " ");
+  const rightText = sourceCode.getText(node.right).replace(/\s+/gu, " ");
   context.report({
     node,
-    message: `Dual-key read '${leftReceiver}.${leftKey} ${node.operator} ${rightReceiver}.${rightKey}' probes both snake_case and camelCase spellings on the same receiver; normalize once at the boundary schema and read one canonical property.`,
+    message: `Dual-key read '${leftText} ${node.operator} ${rightText}' probes both snake_case and camelCase spellings on the same receiver; normalize once at the boundary schema and read one canonical property.`,
   });
-}
-
-function* patternIdentifiers(node) {
-  switch (node?.type) {
-    case "Identifier":
-      yield node;
-      return;
-    case "AssignmentPattern":
-      yield* patternIdentifiers(node.left);
-      return;
-    case "RestElement":
-      yield* patternIdentifiers(node.argument);
-      return;
-    case "ArrayPattern":
-      for (const element of node.elements) yield* patternIdentifiers(element);
-      return;
-    case "ObjectPattern":
-      for (const property of node.properties) {
-        yield* patternIdentifiers(
-          property.type === "RestElement" ? property : property.value
-        );
-      }
-      return;
-    case "TSParameterProperty":
-      yield* patternIdentifiers(node.parameter);
-      return;
-    default:
-  }
 }
 
 export default {

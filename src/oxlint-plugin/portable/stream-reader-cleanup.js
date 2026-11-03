@@ -12,7 +12,27 @@ const followsDeclaration = (identifier, definition) =>
   Array.isArray(definition.node.range) &&
   identifier.range[0] >= definition.node.range[1];
 
-export function canWriteBinding(resolveVariable, identifier) {
+const isAccessibleDefinition = (identifier, definition, allowConst) => {
+  if (definition.type === "Parameter" || definition.type === "CatchClause") {
+    return true;
+  }
+  if (
+    definition.type !== "Variable" ||
+    !isAstNode(definition.node) ||
+    !isAstNode(definition.parent)
+  ) {
+    return false;
+  }
+  if (definition.parent.kind === "var") {
+    return true;
+  }
+  const isAccessibleKind =
+    definition.parent.kind === "let" ||
+    (allowConst && definition.parent.kind === "const");
+  return isAccessibleKind && followsDeclaration(identifier, definition);
+};
+
+const hasAccessibleBinding = (resolveVariable, identifier, allowConst) => {
   if (!isIdentifier(identifier)) {
     return false;
   }
@@ -20,63 +40,21 @@ export function canWriteBinding(resolveVariable, identifier) {
   return (
     resolvedBinding !== null &&
     resolvedBinding.defs.length > 0 &&
-    resolvedBinding.defs.every((definition) => {
-      if (
-        definition.type === "Parameter" ||
-        definition.type === "CatchClause"
-      ) {
-        return true;
-      }
-      if (
-        definition.type !== "Variable" ||
-        !isAstNode(definition.node) ||
-        !isAstNode(definition.parent)
-      ) {
-        return false;
-      }
-      if (definition.parent.kind === "var") {
-        return true;
-      }
-      return (
-        definition.parent.kind === "let" &&
-        followsDeclaration(identifier, definition)
-      );
-    })
+    resolvedBinding.defs.every((definition) =>
+      isAccessibleDefinition(identifier, definition, allowConst)
+    )
   );
-}
+};
+
+export const canWriteBinding = (resolveVariable, identifier) =>
+  hasAccessibleBinding(resolveVariable, identifier, false);
 
 class ReaderCleanupPrefix {
   constructor(analysis) {
     this.analysis = analysis;
   }
-  canRead = (identifier) => {
-    const resolvedBinding = this.analysis.resolveVariable(identifier);
-    return (
-      resolvedBinding !== null &&
-      resolvedBinding.defs.length > 0 &&
-      resolvedBinding.defs.every((definition) => {
-        if (
-          definition.type === "Parameter" ||
-          definition.type === "CatchClause"
-        ) {
-          return true;
-        }
-        if (
-          definition.type !== "Variable" ||
-          !isAstNode(definition.node) ||
-          !isAstNode(definition.parent)
-        ) {
-          return false;
-        }
-        return (
-          definition.parent.kind === "var" ||
-          ((definition.parent.kind === "let" ||
-            definition.parent.kind === "const") &&
-            followsDeclaration(identifier, definition))
-        );
-      })
-    );
-  };
+  canRead = (identifier) =>
+    hasAccessibleBinding(this.analysis.resolveVariable, identifier, true);
   cannotThrow = (node) => {
     const expression = unwrapReaderExpression(node);
     if (expression === null) {

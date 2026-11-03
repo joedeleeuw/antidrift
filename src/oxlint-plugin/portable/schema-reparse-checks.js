@@ -1,4 +1,7 @@
-import { hasRuntimeSchemaProvenance } from "../shared/runtime-schema-libraries.js";
+import {
+  hasRuntimeSchemaProvenance,
+  schemaReceiverVerdict,
+} from "../shared/runtime-schema-libraries.js";
 import {
   findVariable,
   isFunctionLike,
@@ -62,7 +65,8 @@ function matchesInferredParameterSchema(def, schemaText, sourceCode) {
 }
 
 function isSchemaReceiver(expression, sourceCode) {
-  if (hasRuntimeSchemaProvenance(expression, sourceCode)) return true;
+  const verdict = schemaReceiverVerdict(expression, sourceCode);
+  if (verdict !== "unknown") return verdict === "proven";
   if (
     expression?.type !== "Identifier" ||
     /^(?:URL|Date|JSON|path)$/u.test(expression.name)

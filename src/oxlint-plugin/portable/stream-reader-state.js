@@ -1,4 +1,6 @@
+import { findVariable } from "../shared/scope.js";
 import { getPropertyName, isAstNode, isIdentifier } from "./ast.js";
+import { isGlobalReference } from "./static-resolution.js";
 import {
   isLiteralTrue,
   memberCall,
@@ -19,30 +21,12 @@ const isConstDeclarator = (definition) =>
 export class StreamReaderState {
   constructor(sourceCode) {
     this.sourceCode = sourceCode;
+    this.resolveVariable = findVariable.bind(null, sourceCode);
+    this.isGlobalReference = isGlobalReference.bind(null, sourceCode);
     this.canAssign = canWriteBinding.bind(null, this.resolveVariable);
   }
   isEstreeIdentifier = (node) =>
     isIdentifier(node) && Array.isArray(node.range);
-
-  resolveVariable = (identifier) => {
-    let scope = this.sourceCode.getScope(identifier);
-    while (scope !== null) {
-      const bindingSymbol = scope.set.get(identifier.name);
-      if (bindingSymbol !== undefined) {
-        return bindingSymbol;
-      }
-      scope = scope.upper;
-    }
-    return null;
-  };
-
-  isGlobalReference = (node, name) => {
-    if (!this.isEstreeIdentifier(node) || node.name !== name) {
-      return false;
-    }
-    const bindingSymbol = this.resolveVariable(node);
-    return bindingSymbol === null || bindingSymbol.defs.length === 0;
-  };
 
   namedType = (node, name) => {
     const typeNode = isAstNode(node) ? node : null;

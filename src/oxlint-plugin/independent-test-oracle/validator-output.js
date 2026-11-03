@@ -1,11 +1,14 @@
 import { hasIndependentExpectation } from "../shared/oracle-dependencies.js";
-import { findVariable } from "../shared/scope.js";
 import {
   hasRuntimeSchemaProvenance,
-  isRuntimeSchemaLibraryFile,
   isRuntimeSchemaLibrarySource,
 } from "../shared/runtime-schema-libraries.js";
-import { staticPropertyName, unwrapExpression } from "../shared/test-files.js";
+import {
+  constInitializer,
+  findVariable,
+  staticPropertyName,
+  unwrapAwaitedExpression,
+} from "../shared/scope.js";
 
 // Only runtime-schema libraries define these names, so the call proves a validator.
 const distinctiveValidatorMethods = new Set([
@@ -85,39 +88,12 @@ function importedNameForIdentifier(identifier, sourceCode) {
   return typeof imported?.value === "string" ? imported.value : null;
 }
 
-function constInitializer(identifier, sourceCode) {
-  if (identifier?.type !== "Identifier") return null;
-  const binding = findVariable(sourceCode, identifier);
-  const definition = binding?.defs?.[0];
-  if (
-    definition?.type !== "Variable" ||
-    definition.node?.type !== "VariableDeclarator" ||
-    definition.parent?.kind !== "const"
-  ) {
-    return null;
-  }
-  return definition.node.init ?? null;
-}
-
 function rootIdentifier(expression) {
-  let current = unwrapExpression(expression);
+  let current = unwrapAwaitedExpression(expression);
   while (current?.type === "MemberExpression") {
-    current = unwrapExpression(current.object);
+    current = unwrapAwaitedExpression(current.object);
   }
   return current?.type === "Identifier" ? current : null;
-}
-
-// With type information, a method declared by a runtime-schema package proves
-// the receiver even when the schema is imported from project code.
-function isTypedSchemaMethod(member, sourceCode) {
-  const services = sourceCode.parserServices;
-  if (!services?.program || !services.esTreeNodeToTSNodeMap) return false;
-  const tsNode = services.esTreeNodeToTSNodeMap.get(member.property);
-  const symbol =
-    tsNode && services.program.getTypeChecker().getSymbolAtLocation(tsNode);
-  return (symbol?.declarations ?? []).some((declaration) =>
-    isRuntimeSchemaLibraryFile(declaration.getSourceFile().fileName)
-  );
 }
 
 function isValidatorMember(member, sourceCode) {
@@ -126,8 +102,7 @@ function isValidatorMember(member, sourceCode) {
   if (distinctiveValidatorMethods.has(method)) return true;
   return (
     schemaValidatorMethods.has(method) &&
-    (isTypedSchemaMethod(member, sourceCode) ||
-      hasRuntimeSchemaProvenance(member.object, sourceCode))
+    hasRuntimeSchemaProvenance(member, sourceCode)
   );
 }
 
@@ -139,13 +114,13 @@ function isValidatorFunctionIdentifier(identifier, sourceCode, depth = 0) {
   if (source) {
     const importedName = importedNameForIdentifier(identifier, sourceCode);
     return (
-      isRuntimeSchemaLibrarySource(source) &&
+      isRuntimeSchemaLibrarySource(source, importedName) &&
       importedName !== null &&
       validatorFunctionNames.has(importedName)
     );
   }
-  const initializer = unwrapExpression(
-    constInitializer(identifier, sourceCode)
+  const initializer = unwrapAwaitedExpression(
+    constInitializer(sourceCode, identifier)
   );
   if (!initializer) return false;
   if (initializer.type === "Identifier") {
@@ -159,7 +134,7 @@ function isValidatorFunctionIdentifier(identifier, sourceCode, depth = 0) {
     initializer.callee.type === "MemberExpression" &&
     staticPropertyName(initializer.callee) === "bind"
   ) {
-    const callable = unwrapExpression(initializer.callee.object);
+    const callable = unwrapAwaitedExpression(initializer.callee.object);
     return (
       callable?.type === "MemberExpression" &&
       isValidatorMember(callable, sourceCode)
@@ -169,9 +144,9 @@ function isValidatorFunctionIdentifier(identifier, sourceCode, depth = 0) {
 }
 
 function isValidatorInvocation(expression, sourceCode) {
-  const node = unwrapExpression(expression);
+  const node = unwrapAwaitedExpression(expression);
   if (node?.type !== "CallExpression") return false;
-  const callee = unwrapExpression(node.callee);
+  const callee = unwrapAwaitedExpression(node.callee);
   if (callee?.type === "MemberExpression") {
     return isValidatorMember(callee, sourceCode);
   }
@@ -185,7 +160,7 @@ function isValidatorInvocation(expression, sourceCode) {
 }
 
 function isFunctionProjectionCall(node) {
-  const callee = unwrapExpression(node.callee);
+  const callee = unwrapAwaitedExpression(node.callee);
   if (callee?.type === "Identifier") {
     return functionProjectionNames.has(callee.name) ? node.arguments[0] : null;
   }
@@ -207,12 +182,12 @@ function isFunctionProjectionCall(node) {
 
 function validatorOrigin(expression, sourceCode, depth = 0, seen = new Set()) {
   if (depth > resolutionDepthLimit) return null;
-  const node = unwrapExpression(expression);
+  const node = unwrapAwaitedExpression(expression);
   if (!node || seen.has(node)) return null;
   seen.add(node);
   if (isValidatorInvocation(node, sourceCode)) return node;
   if (node.type === "Identifier") {
-    const initializer = constInitializer(node, sourceCode);
+    const initializer = constInitializer(sourceCode, node);
     return initializer
       ? validatorOrigin(initializer, sourceCode, depth + 1, seen)
       : null;
@@ -239,7 +214,7 @@ function validatorOrigin(expression, sourceCode, depth = 0, seen = new Set()) {
 }
 
 function expectRootCall(expression) {
-  const node = unwrapExpression(expression);
+  const node = unwrapAwaitedExpression(expression);
   return node?.type === "CallExpression" &&
     node.callee.type === "Identifier" &&
     node.callee.name === "expect"
@@ -257,11 +232,11 @@ function parseExpectAssertion(node) {
   const matcher = staticPropertyName(node.callee);
   if (!matcher) return null;
   const modifiers = new Set();
-  let current = unwrapExpression(node.callee.object);
+  let current = unwrapAwaitedExpression(node.callee.object);
   while (current?.type === "MemberExpression") {
     const modifier = staticPropertyName(current);
     if (modifier) modifiers.add(modifier);
-    current = unwrapExpression(current.object);
+    current = unwrapAwaitedExpression(current.object);
   }
   const expectCall = expectRootCall(current);
   if (!expectCall) return null;
@@ -270,7 +245,7 @@ function parseExpectAssertion(node) {
     matcher,
     modifiers,
     subject: expectCall.arguments[0]
-      ? unwrapExpression(expectCall.arguments[0])
+      ? unwrapAwaitedExpression(expectCall.arguments[0])
       : null,
   };
 }
@@ -290,7 +265,9 @@ function parseAssertAssertion(node) {
     kind: "assert",
     matcher,
     modifiers: new Set(),
-    subject: node.arguments[0] ? unwrapExpression(node.arguments[0]) : null,
+    subject: node.arguments[0]
+      ? unwrapAwaitedExpression(node.arguments[0])
+      : null,
   };
 }
 
@@ -339,8 +316,8 @@ const projectionRoots = new Set(["Array", "JSON", "Object"]);
 function isLocalFunction(identifier, sourceCode) {
   const definition = findVariable(sourceCode, identifier)?.defs?.[0];
   if (definition?.type === "FunctionName") return true;
-  const initializer = unwrapExpression(
-    constInitializer(identifier, sourceCode)
+  const initializer = unwrapAwaitedExpression(
+    constInitializer(sourceCode, identifier)
   );
   return (
     initializer?.type === "ArrowFunctionExpression" ||
@@ -361,7 +338,7 @@ function bindingSource(identifier, sourceCode) {
 // projection of one. A schema that only reads such output leaves the assertion
 // about application behaviour.
 function isActOutput(expression, sourceCode, depth = 0) {
-  const node = unwrapExpression(expression);
+  const node = unwrapAwaitedExpression(expression);
   if (!node || depth > resolutionDepthLimit) return false;
   if (node.type === "Identifier") {
     const source = bindingSource(node, sourceCode);
@@ -371,7 +348,7 @@ function isActOutput(expression, sourceCode, depth = 0) {
     return isActOutput(node.object, sourceCode, depth + 1);
   }
   if (node.type !== "CallExpression") return false;
-  const callee = unwrapExpression(node.callee);
+  const callee = unwrapAwaitedExpression(node.callee);
   const forwardsArguments =
     (callee?.type === "MemberExpression" &&
       projectionRoots.has(rootIdentifier(callee)?.name)) ||
@@ -400,10 +377,10 @@ function validatesArrangedInput(origin, sourceCode) {
 const acceptanceFields = new Set(["error", "issues", "success"]);
 
 function readsAcceptanceField(subject, origin) {
-  for (let node = unwrapExpression(subject); node && node !== origin; ) {
+  for (let node = unwrapAwaitedExpression(subject); node && node !== origin; ) {
     if (node.type !== "MemberExpression") return false;
     if (acceptanceFields.has(staticPropertyName(node))) return true;
-    node = unwrapExpression(node.object);
+    node = unwrapAwaitedExpression(node.object);
   }
   return false;
 }

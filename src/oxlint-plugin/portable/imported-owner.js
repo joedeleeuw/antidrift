@@ -1,3 +1,5 @@
+import { findVariable } from "../shared/scope.js";
+
 export const importedOwnerSchema = {
   type: "array",
   items: {
@@ -12,19 +14,6 @@ export const importedOwnerSchema = {
   },
 };
 
-export function findVariable(context, node) {
-  if (node?.type !== "Identifier") return null;
-  for (
-    let scope = context.sourceCode.getScope(node);
-    scope;
-    scope = scope.upper
-  ) {
-    const binding = scope.set.get(node.name);
-    if (binding) return binding;
-  }
-  return null;
-}
-
 export function importedOwner(context, node, owners, seen = new Set()) {
   if (node?.type === "MemberExpression" && !node.computed) {
     return importedOwner(
@@ -36,7 +25,7 @@ export function importedOwner(context, node, owners, seen = new Set()) {
       seen
     );
   }
-  const binding = findVariable(context, node);
+  const binding = findVariable(context.sourceCode, node);
   if (!binding || seen.has(binding)) return false;
   seen.add(binding);
   const definition = binding.defs[0];

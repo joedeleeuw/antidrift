@@ -1,79 +1,32 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
+import {
+  filenameForContext,
+  jsxAttribute,
+  jsxOpeningElement,
+  jsxRenderElement,
+  nameOfJsxElement,
+} from "./ast.js";
 
 const TOOLTIP_ELEMENTS = new Set(["Tooltip", "TooltipRoot", "TooltipTrigger"]);
 const MAX_RENDER_DEPTH = 8;
-const isAstNode = (node) =>
-  typeof node === "object" &&
-  node !== null &&
-  "type" in node &&
-  typeof node.type === "string";
-const getJsxName = (node) => {
-  if (!isAstNode(node)) {
-    return null;
-  }
-  if (node.type === "JSXIdentifier" && typeof node.name === "string") {
-    return node.name;
-  }
-  if (node.type === "JSXMemberExpression") {
-    return getJsxName(node.property);
-  }
-  if (node.type === "JSXNamespacedName") {
-    return getJsxName(node.name);
-  }
-  return null;
-};
-const getOpeningElement = (element) => {
-  if (!isAstNode(element) || element.type !== "JSXElement") {
-    return null;
-  }
-  return isAstNode(element.openingElement) ? element.openingElement : null;
-};
-const getAttribute = (openingElement, name) => {
-  if (!isAstNode(openingElement) || !Array.isArray(openingElement.attributes)) {
-    return null;
-  }
-  return (
-    openingElement.attributes.find(
-      (attribute) =>
-        isAstNode(attribute) &&
-        attribute.type === "JSXAttribute" &&
-        getJsxName(attribute.name) === name
-    ) ?? null
-  );
-};
-const getRenderElement = (openingElement) => {
-  const attributeInitializer = getAttribute(openingElement, "render")?.value;
-  if (!isAstNode(attributeInitializer)) {
-    return null;
-  }
-  const expression =
-    attributeInitializer.type === "JSXExpressionContainer"
-      ? attributeInitializer.expression
-      : attributeInitializer;
-  return isAstNode(expression) && expression.type === "JSXElement"
-    ? expression
-    : null;
-};
 const triggersDisabledButton = (tooltipElement) => {
-  let element = getRenderElement(getOpeningElement(tooltipElement));
+  let element = jsxRenderElement(jsxOpeningElement(tooltipElement));
   for (
     let depth = 0;
     element !== null && depth < MAX_RENDER_DEPTH;
     depth += 1
   ) {
-    const openingElement = getOpeningElement(element);
+    const openingElement = jsxOpeningElement(element);
     if (
-      getJsxName(openingElement?.name) === "Button" &&
-      getAttribute(openingElement, "disabled") !== null
+      nameOfJsxElement(element) === "Button" &&
+      jsxAttribute(openingElement, "disabled") !== null
     ) {
       return true;
     }
-    element = getRenderElement(openingElement);
+    element = jsxRenderElement(openingElement);
   }
   return false;
 };
-const filenameOf = (context) =>
-  context.filename ?? context.getFilename?.() ?? "";
 export default {
   meta: {
     schema: [
@@ -93,16 +46,12 @@ export default {
   create(context) {
     if (!isRuleFile(context)) return {};
 
-    if (
-      (() => {
-        return filenameOf(context).endsWith(".tsx");
-      })() === false
-    ) {
+    if (!filenameForContext(context).endsWith(".tsx")) {
       return {};
     }
     return {
       JSXElement(node) {
-        const name = getJsxName(getOpeningElement(node)?.name);
+        const name = nameOfJsxElement(node);
         if (
           name === null ||
           !TOOLTIP_ELEMENTS.has(name) ||

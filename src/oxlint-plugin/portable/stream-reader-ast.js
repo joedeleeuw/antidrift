@@ -1,9 +1,9 @@
+import { unwrapExpression } from "../shared/scope.js";
 import {
   getPropertyName,
   isAstNode,
   isIdentifier,
   isStringLiteral,
-  unwrapExpression,
 } from "./ast.js";
 
 export const unwrapReaderExpression = (node) => {
