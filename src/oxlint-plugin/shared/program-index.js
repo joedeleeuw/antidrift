@@ -1,5 +1,5 @@
 import { getTypeServices } from "./type-services.js";
-import { isTestFile } from "./test-files.js";
+import { isTestFile } from "./scope.js";
 
 const programIndexCache = new WeakMap();
 

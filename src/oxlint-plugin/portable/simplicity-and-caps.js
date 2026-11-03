@@ -1,7 +1,11 @@
 import { createBranchChecks } from "./branch-and-ternary-checks.js";
 import { createComponentPropChecks } from "./component-prop-checks.js";
-import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
+import {
+  checkReexports,
+  hasPlatformSibling,
+  isDeclaredPackageIndex,
+  nonBlankLineCount,
+} from "./reexport-and-ceremony-checks.js";
 import {
   isRuleFile,
   ruleFilename,
@@ -13,12 +17,50 @@ import {
   isFunctionLike,
 } from "../shared/scope.js";
 
-function nonBlankLineCount(text) {
-  let count = 0;
-  for (const line of text.split(/\r?\n/u)) {
-    if (line.trim().length > 0) count += 1;
+const SCRIPT_PATH_RE = /(?:^|\/)(?:scripts|bin)\//u;
+
+function createFunctionCapVisitors(
+  sourceCode,
+  filename,
+  max,
+  unitLabel,
+  filterNode,
+  context
+) {
+  function check(node) {
+    if (!filterNode(node)) return;
+    const count = nonBlankLineCount(sourceCode.getText(node));
+    if (count > max) {
+      context.report({
+        node,
+        message: `${unitLabel} has ${count} non-blank lines (max ${max}); split or deepen the module.`,
+      });
+    }
   }
-  return count;
+  function checkTopLevelScriptLoop(node) {
+    if (
+      unitLabel !== "Function" ||
+      node.parent?.type !== "Program" ||
+      !SCRIPT_PATH_RE.test(filename)
+    ) {
+      return;
+    }
+    const count = nonBlankLineCount(sourceCode.getText(node));
+    if (count > max) {
+      context.report({
+        node,
+        message: `${unitLabel} has ${count} non-blank lines (max ${max}); split or deepen the module.`,
+      });
+    }
+  }
+  return {
+    FunctionDeclaration: check,
+    FunctionExpression: check,
+    ArrowFunctionExpression: check,
+    ForOfStatement: checkTopLevelScriptLoop,
+    ForStatement: checkTopLevelScriptLoop,
+    WhileStatement: checkTopLevelScriptLoop,
+  };
 }
 
 function createBaseLineCapRule(cap, capSchema) {
@@ -45,21 +87,14 @@ function createBaseLineCapRule(cap, capSchema) {
           },
         };
       }
-      function check(node) {
-        if (!filterNode(node)) return;
-        const count = nonBlankLineCount(sourceCode.getText(node));
-        if (count > max) {
-          context.report({
-            node,
-            message: `${unitLabel} has ${count} non-blank lines (max ${max}); split or deepen the module.`,
-          });
-        }
-      }
-      return {
-        FunctionDeclaration: check,
-        FunctionExpression: check,
-        ArrowFunctionExpression: check,
-      };
+      return createFunctionCapVisitors(
+        sourceCode,
+        ruleFilename(context),
+        max,
+        unitLabel,
+        filterNode,
+        context
+      );
     },
   };
 }
@@ -254,6 +289,22 @@ function isOnlyConditionalWrite(write, declarationContainer) {
   return sawIf;
 }
 
+function isStagedConstAlias(writes, reads, declarationContainer) {
+  if (writes.length !== 1 || reads.length !== 1) return false;
+  const writeStmt = writes[0].identifier?.parent?.parent;
+  const readParent = reads[0].identifier?.parent;
+  const readStmt = readParent?.parent;
+  return (
+    writeStmt?.type === "ExpressionStatement" &&
+    writeStmt.parent === declarationContainer &&
+    readParent?.type === "VariableDeclarator" &&
+    readParent.init === reads[0].identifier &&
+    readStmt?.type === "VariableDeclaration" &&
+    readStmt.kind === "const" &&
+    readStmt.parent === declarationContainer
+  );
+}
+
 export const noMutableLetAliasRule = {
   meta: {
     type: "suggestion",
@@ -282,6 +333,9 @@ export const noMutableLetAliasRule = {
           const writes = binding.references.filter((reference) =>
             reference.isWrite()
           );
+          const reads = binding.references.filter(
+            (reference) => reference.isRead() && !reference.isWrite()
+          );
           if (
             writes.length >= 2 &&
             writes.every((write) => isOnlyConditionalWrite(write, node.parent))
@@ -290,73 +344,17 @@ export const noMutableLetAliasRule = {
               node: decl,
               message: `Mutable binding '${decl.id.name}' is only assigned across conditional branches; compute a const expression or helper instead.`,
             });
+          } else if (isStagedConstAlias(writes, reads, node.parent)) {
+            context.report({
+              node: decl,
+              message: `Mutable binding '${decl.id.name}' is only assigned once and aliased to a const; initialize the const binding directly.`,
+            });
           }
         }
       },
     };
   },
 };
-
-const PLATFORM_SUFFIXES = ["ios", "android", "native", "web", "electron"];
-const MODULE_EXTS = [".ts", ".tsx", ".js", ".jsx", ".mts", ".cts"];
-
-function hasPlatformSibling(filename, stem) {
-  if (!stem || !filename.startsWith("/")) return false;
-  const dir = dirname(filename);
-  for (const suffix of PLATFORM_SUFFIXES) {
-    for (const ext of MODULE_EXTS) {
-      if (existsSync(join(dir, `${stem}.${suffix}${ext}`))) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
-function isOwnSliceReexport(stem, stmt) {
-  if (!stem || typeof stmt.source?.value !== "string") return false;
-  const src = stmt.source.value;
-  return src.startsWith(`./${stem}.`) || src.startsWith(`./${stem}-`);
-}
-
-function checkReexports(node, stem, context) {
-  if (node.body.length === 0) return;
-  const allReexports = node.body.every(
-    (stmt) =>
-      stmt.type === "ExportAllDeclaration" ||
-      (stmt.type === "ExportNamedDeclaration" &&
-        stmt.source !== null &&
-        stmt.declaration === null)
-  );
-  if (allReexports) {
-    if (node.body.every((stmt) => isOwnSliceReexport(stem, stmt))) {
-      return;
-    }
-    context.report({
-      node,
-      message:
-        "Module only re-exports symbols from other modules; import from the owning module directly.",
-    });
-    return;
-  }
-  for (const stmt of node.body) {
-    if (
-      stmt.type === "ExportNamedDeclaration" &&
-      stmt.declaration === null &&
-      stmt.exportKind !== "type" &&
-      typeof stmt.source?.value === "string" &&
-      stmt.source.value.startsWith("./") &&
-      !isOwnSliceReexport(stem, stmt) &&
-      stmt.specifiers.some((spec) => spec.exportKind !== "type")
-    ) {
-      context.report({
-        node: stmt,
-        message:
-          "Do not re-export runtime symbols from a relative sibling in a non-index module; import from the owning module directly.",
-      });
-    }
-  }
-}
 
 export const noReexportOnlyModuleRule = {
   meta: {
@@ -377,7 +375,7 @@ export const noReexportOnlyModuleRule = {
     if (!isRuleFile(context)) return {};
     const filename = ruleFilename(context);
     if (
-      /\/index\.[cm]?[jt]sx?$/u.test(filename) ||
+      isDeclaredPackageIndex(filename) ||
       /(?:^|\/)[^/]+\.config\.[cm]?[jt]sx?$/u.test(filename) ||
       /\.(?:ios|android|native|web|electron)\.[cm]?[jt]sx?$/u.test(filename) ||
       /(?:^|\/)app\/.*\.[cm]?[jt]sx?$/u.test(filename)

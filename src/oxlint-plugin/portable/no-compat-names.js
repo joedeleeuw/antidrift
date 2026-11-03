@@ -1,3 +1,4 @@
+import { getProgramIndex } from "../shared/program-index.js";
 import {
   isRuleFile,
   scopeProperties,
@@ -6,7 +7,9 @@ import { findVariable, unwrapExpression } from "../shared/scope.js";
 import { patternIdentifiers } from "./static-resolution.js";
 
 const REMOVAL_VOCABULARY =
-  /legacy|compat(?!ible)|deprecated|retire|no_?longer/i;
+  /legacy|compat(?!ib)|deprecated|retired(?!At\b)|no_?longer/i;
+const AFFIX_STRIP_RE =
+  /^(?:legacy|deprecated|compat|retired|old)_?|(?:\s|_)?(?:Legacy|Deprecated|Compat|Retired|Old|Shims?|Fallback)$/giu;
 const SNAKE_KEY_PATTERN = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/u;
 const CAMEL_KEY_PATTERN = /^[a-z][a-zA-Z0-9]*$/u;
 
@@ -113,6 +116,55 @@ function checkDualKeyAliasRead(node, context) {
   });
 }
 
+function canonicalReplacementName(name, sourceCode) {
+  const index = getProgramIndex(sourceCode);
+  if (!index) return null;
+  const stripped = name.replace(AFFIX_STRIP_RE, "");
+  if (!stripped || stripped === name) return null;
+  const camel = stripped.charAt(0).toLowerCase() + stripped.slice(1);
+  if (index.declaredNames.has(stripped)) return stripped;
+  if (index.declaredNames.has(camel)) return camel;
+  return null;
+}
+
+function createNameVisitors(context) {
+  function check(node) {
+    if (node?.type === "Identifier" && REMOVAL_VOCABULARY.test(node.name)) {
+      const canonical = canonicalReplacementName(node.name, context.sourceCode);
+      context.report({
+        node,
+        messageId: canonical ? "compatNameWithCanonical" : "compatName",
+        data: canonical ? { name: node.name, canonical } : { name: node.name },
+      });
+    }
+  }
+  function checkPattern(pattern) {
+    for (const identifier of patternIdentifiers(pattern)) check(identifier);
+  }
+  function checkFunction(node) {
+    if (node.type === "FunctionDeclaration") check(node.id);
+    for (const parameter of node.params) checkPattern(parameter);
+  }
+  function checkKey(node) {
+    if (!node.computed) check(node.key);
+  }
+  return {
+    FunctionDeclaration: checkFunction,
+    FunctionExpression: checkFunction,
+    ArrowFunctionExpression: checkFunction,
+    VariableDeclarator: (node) => checkPattern(node.id),
+    ClassDeclaration: (node) => check(node.id),
+    TSInterfaceDeclaration: (node) => check(node.id),
+    TSTypeAliasDeclaration: (node) => check(node.id),
+    MethodDefinition: checkKey,
+    TSAbstractMethodDefinition: checkKey,
+    PropertyDefinition: checkKey,
+    TSAbstractPropertyDefinition: checkKey,
+    TSPropertySignature: checkKey,
+    LogicalExpression: (node) => checkDualKeyAliasRead(node, context),
+  };
+}
+
 export default {
   meta: {
     type: "suggestion",
@@ -130,57 +182,12 @@ export default {
     messages: {
       compatName:
         "'{{name}}' declares a compatibility or retirement path. Delete the old path instead of keeping or naming it.",
+      compatNameWithCanonical:
+        "'{{name}}' declares a compatibility or retirement path alongside '{{canonical}}'. Delete the old path and use '{{canonical}}' directly.",
     },
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-
-    function check(node) {
-      if (node?.type === "Identifier" && REMOVAL_VOCABULARY.test(node.name)) {
-        context.report({
-          node,
-          messageId: "compatName",
-          data: { name: node.name },
-        });
-      }
-    }
-    function checkPattern(pattern) {
-      for (const identifier of patternIdentifiers(pattern)) check(identifier);
-    }
-    function checkFunction(node) {
-      if (node.type === "FunctionDeclaration") check(node.id);
-      for (const parameter of node.params) {
-        checkPattern(parameter);
-      }
-    }
-    function checkKey(node) {
-      if (!node.computed) check(node.key);
-    }
-
-    return {
-      FunctionDeclaration: checkFunction,
-      FunctionExpression: checkFunction,
-      ArrowFunctionExpression: checkFunction,
-      VariableDeclarator(node) {
-        checkPattern(node.id);
-      },
-      ClassDeclaration(node) {
-        check(node.id);
-      },
-      TSInterfaceDeclaration(node) {
-        check(node.id);
-      },
-      TSTypeAliasDeclaration(node) {
-        check(node.id);
-      },
-      MethodDefinition: checkKey,
-      TSAbstractMethodDefinition: checkKey,
-      PropertyDefinition: checkKey,
-      TSAbstractPropertyDefinition: checkKey,
-      TSPropertySignature: checkKey,
-      LogicalExpression(node) {
-        checkDualKeyAliasRead(node, context);
-      },
-    };
+    return createNameVisitors(context);
   },
 };

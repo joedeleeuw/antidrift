@@ -149,7 +149,11 @@ class BindingNames {
 
   check = (identifier) => {
     if (identifier?.type !== "Identifier") return;
-    if (identifier.name === "ctx" && this.isParameterIdentifier(identifier)) {
+    if (
+      identifier.name === "ctx" &&
+      this.isParameterIdentifier(identifier) &&
+      identifier.typeAnnotation?.typeAnnotation?.type !== "TSTypeLiteral"
+    ) {
       return;
     }
     if (this.isQueryBuilderParam(identifier)) return;
@@ -161,6 +165,22 @@ class BindingNames {
         node: identifier,
         messageId: "vague",
         data: { name: identifier.name, reason },
+      });
+    }
+  };
+
+  visitImportSpecifier = (node) => {
+    const importedName = node.imported?.name;
+    const localName = node.local?.name;
+    if (
+      typeof importedName === "string" &&
+      typeof localName === "string" &&
+      localName === `${importedName}Type`
+    ) {
+      this.context.report({
+        node: node.local,
+        messageId: "vague",
+        data: { name: localName, reason: "a filler 'Type' alias suffix" },
       });
     }
   };
@@ -258,6 +278,7 @@ class BindingNames {
   };
   listeners() {
     return {
+      ImportSpecifier: this.visitImportSpecifier,
       VariableDeclarator: this.visitVariableDeclarator,
       FunctionDeclaration: this.checkFunction,
       FunctionExpression: this.checkFunction,
