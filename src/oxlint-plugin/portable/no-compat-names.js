@@ -2,9 +2,54 @@ import {
   isRuleFile,
   scopeProperties,
 } from "../../oxlint-plugin/shared/rule-scope.js";
+import { unwrapExpression } from "../shared/scope.js";
 
 const REMOVAL_VOCABULARY =
   /legacy|compat(?!ible)|deprecated|retire|no_?longer/i;
+const SNAKE_KEY_PATTERN = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/u;
+const CAMEL_KEY_PATTERN = /^[a-z][a-zA-Z0-9]*$/u;
+
+function isSnakeCamelAliasPair(leftKey, rightKey) {
+  const leftSnake = SNAKE_KEY_PATTERN.test(leftKey);
+  const rightSnake = SNAKE_KEY_PATTERN.test(rightKey);
+  if (leftSnake === rightSnake) return false;
+  const camelCandidate = leftSnake ? rightKey : leftKey;
+  if (!CAMEL_KEY_PATTERN.test(camelCandidate)) return false;
+  return (
+    leftKey.replaceAll("_", "").toLowerCase() ===
+    rightKey.replaceAll("_", "").toLowerCase()
+  );
+}
+
+function checkDualKeyAliasRead(node, context) {
+  if (node.operator !== "??" && node.operator !== "||") return;
+  const left = unwrapExpression(node.left);
+  const right = unwrapExpression(node.right);
+  if (
+    left?.type !== "MemberExpression" ||
+    right?.type !== "MemberExpression" ||
+    left.computed ||
+    right.computed ||
+    left.property?.type !== "Identifier" ||
+    right.property?.type !== "Identifier"
+  ) {
+    return;
+  }
+  const leftKey = left.property.name;
+  const rightKey = right.property.name;
+  if (!isSnakeCamelAliasPair(leftKey, rightKey)) return;
+  const leftReceiver = context.sourceCode
+    .getText(left.object)
+    .replace(/\s+/gu, "");
+  const rightReceiver = context.sourceCode
+    .getText(right.object)
+    .replace(/\s+/gu, "");
+  if (leftReceiver !== rightReceiver) return;
+  context.report({
+    node,
+    message: `Dual-key read '${leftReceiver}.${leftKey} ${node.operator} ${rightReceiver}.${rightKey}' probes both snake_case and camelCase spellings on the same receiver; normalize once at the boundary schema and read one canonical property.`,
+  });
+}
 
 function* patternIdentifiers(node) {
   switch (node?.type) {
@@ -99,6 +144,9 @@ export default {
       PropertyDefinition: checkKey,
       TSAbstractPropertyDefinition: checkKey,
       TSPropertySignature: checkKey,
+      LogicalExpression(node) {
+        checkDualKeyAliasRead(node, context);
+      },
     };
   },
 };

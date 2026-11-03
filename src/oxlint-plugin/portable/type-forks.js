@@ -1,3 +1,4 @@
+import { checkParallelSidecarMaps } from "./parallel-map-checks.js";
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import {
   isObjectSchemaMethod,
@@ -169,6 +170,7 @@ function shapeSignature(members, sourceCode) {
 }
 
 function checkShape(context, seenShapes, name, members, reportNode) {
+  checkParallelSidecarMaps(context, name, members, reportNode);
   const signature = shapeSignature(members, context.sourceCode);
   if (!signature) return;
   const existing = seenShapes.get(signature);
@@ -282,6 +284,16 @@ export const noStructuralTypeForkRule = {
             seenShapes,
             node.id.name,
             node.typeAnnotation.members,
+            node.id
+          );
+        }
+      },
+      ClassDeclaration(node) {
+        if (node.id?.name) {
+          checkParallelSidecarMaps(
+            context,
+            node.id.name,
+            node.body?.body,
             node.id
           );
         }

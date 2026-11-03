@@ -67,38 +67,22 @@ type HiddenUnknown = unknown;
 export const ORDER_MODES = ["fast", "slow"] as const;
 export type OrderMode = "fast" | "slow";
 
-interface FirstContract {
-  id: string;
-  title: string;
-  count: number;
+interface FirstContract { id: string; title: string; count: number; }
+interface DuplicateContract { id: string; title: string; count: number; }
+interface UntaggedFailureBag { target: string | null; unavailableReason: string | null; }
+export interface WorkspaceSidecarSlice {
+  tabsByWorkspace: Record<string, string[]>;
+  activeTabByWorkspace: Record<string, string>;
+  expandedDirsByWorkspace: Record<string, string[]>;
 }
-
-interface DuplicateContract {
-  id: string;
-  title: string;
-  count: number;
+export function readDualKeyAlias(input: { taskId?: string; task_id?: string }) {
+  return input.taskId ?? input.task_id;
 }
-
-interface UntaggedFailureBag {
-  target: string | null;
-  unavailableReason: string | null;
-}
-
 const BaseItemSchema = z.object({ oldField: z.string(), payloadJson: z.string().catch("default") });
-export const RenamedItemSchema = BaseItemSchema.omit({ oldField: true }).extend({
-  newField: z.string(),
-});
-
+export const RenamedItemSchema = BaseItemSchema.omit({ oldField: true }).extend({ newField: z.string() });
 const outerGreeting = "Hello";
-
-export function BrokenWidget() {
-  "widget";
-  return <WidgetText>{outerGreeting}</WidgetText>;
-}
-
-function getUnstableSnapshot() {
-  return { now: 1 };
-}
+export function BrokenWidget() { "widget"; return <WidgetText>{outerGreeting}</WidgetText>; }
+function getUnstableSnapshot() { return { now: 1 }; }
 
 export function LegacyTouchableView({ subscribe }: { subscribe: () => () => void }) {
   const snap = useSyncExternalStore(subscribe, getUnstableSnapshot);
@@ -379,6 +363,16 @@ const expectedDiagnostics = [
     ruleId: "antidrift/no-unresolved-dependency-types",
     message:
       "Do not redeclare ambient 'process' types inline; import the typed environment owner or install the runtime types.",
+  },
+  {
+    ruleId: "antidrift/no-structural-type-fork",
+    message:
+      "Type 'WorkspaceSidecarSlice' declares 3 parallel map fields (tabsByWorkspace, activeTabByWorkspace, expandedDirsByWorkspace) keyed by 'string'; consolidate per-key state into a single Map or Record of a domain entry type.",
+  },
+  {
+    ruleId: "antidrift/no-compat-names",
+    message:
+      "Dual-key read 'input.taskId ?? input.task_id' probes both snake_case and camelCase spellings on the same receiver; normalize once at the boundary schema and read one canonical property.",
   },
 ];
 
