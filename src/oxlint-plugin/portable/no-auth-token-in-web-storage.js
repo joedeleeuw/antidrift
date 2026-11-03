@@ -28,6 +28,41 @@ const isCredentialKey = (key) => {
     STRONG_CREDENTIAL_KEY_PATTERN.test(key)
   );
 };
+const SECRET_ENV_NAME =
+  /(?:SECRET|TOKEN|API_KEY|PRIVATE_KEY|PASSWORD|WEBHOOK_SECRET|SIGNING_KEY)/iu;
+const EQUALITY_OPERATORS = new Set(["===", "!==", "==", "!="]);
+
+const isNullishOrEmpty = (node) => {
+  const expression = unwrapExpression(node);
+  return (
+    (expression?.type === "Literal" &&
+      (expression.value === null || expression.value === "")) ||
+    (isIdentifier(expression) && expression.name === "undefined") ||
+    expression?.type === "UnaryExpression"
+  );
+};
+
+const secretEnvName = (sourceCode, node) => {
+  let expression = unwrapExpression(node);
+  if (isIdentifier(expression)) {
+    expression = unwrapExpression(constInitializer(sourceCode, expression));
+  }
+  if (expression?.type === "LogicalExpression") {
+    expression = unwrapExpression(expression.left);
+  }
+  const processEnv = unwrapExpression(expression?.object);
+  if (
+    expression?.type !== "MemberExpression" ||
+    processEnv?.type !== "MemberExpression" ||
+    resolveStaticMemberName(sourceCode, processEnv) !== "env" ||
+    !isIdentifier(unwrapExpression(processEnv.object), "process")
+  ) {
+    return null;
+  }
+  const envName = resolveStaticMemberName(sourceCode, expression);
+  return envName && SECRET_ENV_NAME.test(envName) ? envName : null;
+};
+
 class WebStorageCredentials {
   constructor(context) {
     this.context = context;
@@ -105,10 +140,32 @@ class WebStorageCredentials {
       resolveStaticMemberName(this.context.sourceCode, target)
     );
   };
+  visitBinaryExpression = (node) => {
+    if (
+      !EQUALITY_OPERATORS.has(node.operator) ||
+      isNullishOrEmpty(node.left) ||
+      isNullishOrEmpty(node.right)
+    ) {
+      return;
+    }
+    const sourceCode = this.context.sourceCode;
+    const envName =
+      secretEnvName(sourceCode, node.left) ??
+      secretEnvName(sourceCode, node.right);
+    if (envName) {
+      this.context.report({
+        node,
+        messageId: "nonConstantTimeSecretCompare",
+        data: { envName },
+      });
+    }
+  };
+
   listeners() {
     return {
       CallExpression: this.visitCallExpression,
       AssignmentExpression: this.visitAssignmentExpression,
+      BinaryExpression: this.visitBinaryExpression,
     };
   }
 }
@@ -130,6 +187,8 @@ export default {
         "sessionStorage; any script running in the page can read and " +
         "exfiltrate them. Use a server-set HttpOnly, Secure, SameSite " +
         "cookie instead.",
+      nonConstantTimeSecretCompare:
+        "Do not compare secret env variable '{{envName}}' with an equality operator; use crypto.timingSafeEqual on equal-length buffers to prevent timing side-channels.",
     },
   },
   create(context) {

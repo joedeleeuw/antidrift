@@ -1,9 +1,17 @@
+import { findDescendant } from "./ast.js";
+import {
+  checkReducerMutuallyExclusiveFlags,
+  checkShadowStateMirror,
+  processLifecycleVisitors,
+} from "./lifecycle-process-checks.js";
+import { mergeVisitors } from "../shared/merge-visitors.js";
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import {
   findVariable,
   functionReturnsJsx,
   isFunctionLike,
   isTestFile,
+  staticPropertyName,
   unwrapExpression,
 } from "../shared/scope.js";
 
@@ -39,30 +47,19 @@ function isUseStateCall(node) {
   );
 }
 
+const GUARD_IDENTIFIER =
+  /^(?:AbortController|signal|aborted|cancelled|canceled|generation|epoch|version|requestId|disposed)$/iu;
+const SNAPSHOT_MEMBER =
+  /^(?:getSnapshot|subscribe|failure|error|status|state|snapshot)$/iu;
+
 function isAbortOrGenerationGuardNode(node) {
-  let found = false;
-  function visit(current) {
-    if (found || !current || typeof current !== "object") return;
-    if (
-      current.type === "Identifier" &&
-      /^(?:AbortController|signal|aborted|cancelled|canceled|generation|epoch|version|requestId|disposed)$/iu.test(
-        current.name
-      )
-    ) {
-      found = true;
-      return;
-    }
-    for (const [key, child] of Object.entries(current)) {
-      if (key === "parent" || key === "range" || key === "loc") continue;
-      if (Array.isArray(child)) {
-        for (const nestedChild of child) visit(nestedChild);
-      } else if (child && typeof child === "object") {
-        visit(child);
-      }
-    }
-  }
-  visit(node);
-  return found;
+  return (
+    findDescendant(
+      node,
+      (candidate) =>
+        candidate.type === "Identifier" && GUARD_IDENTIFIER.test(candidate.name)
+    ) !== null
+  );
 }
 
 const DUAL_CHANNEL_METHODS = new Set([
@@ -72,109 +69,24 @@ const DUAL_CHANNEL_METHODS = new Set([
   "registerError",
 ]);
 
-function isReducerCrossTransitionReturn(stmt, boolProps) {
-  if (
-    stmt.type !== "ReturnStatement" ||
-    stmt.argument?.type !== "ObjectExpression"
-  ) {
-    return false;
-  }
-  let hasTrue = false;
-  let hasFalse = false;
-  for (const prop of stmt.argument.properties) {
-    if (
-      prop.type === "Property" &&
-      prop.key?.type === "Identifier" &&
-      boolProps.has(prop.key.name) &&
-      prop.value?.type === "Literal" &&
-      typeof prop.value.value === "boolean"
-    ) {
-      if (prop.value.value) hasTrue = true;
-      else hasFalse = true;
-    }
-  }
-  return hasTrue && hasFalse;
-}
-
-function checkReducerMutuallyExclusiveFlags(fnNode, context) {
-  const firstParam = fnNode.params?.[0];
-  const typeNode = firstParam?.typeAnnotation?.typeAnnotation;
-  if (typeNode?.type !== "TSTypeLiteral") return;
-  const boolProps = new Set();
-  for (const member of typeNode.members) {
-    if (
-      member.type === "TSPropertySignature" &&
-      member.key?.type === "Identifier" &&
-      member.typeAnnotation?.typeAnnotation?.type === "TSBooleanKeyword"
-    ) {
-      boolProps.add(member.key.name);
-    }
-  }
-  if (boolProps.size < 3) return;
-  let crossTransitionCount = 0;
-  function visit(cur) {
-    if (!cur || typeof cur !== "object") return;
-    if (cur !== fnNode && isFunctionLike(cur)) return;
-    if (isReducerCrossTransitionReturn(cur, boolProps)) {
-      crossTransitionCount += 1;
-    }
-    for (const [key, child] of Object.entries(cur)) {
-      if (key === "parent" || key === "range" || key === "loc") continue;
-      if (Array.isArray(child)) {
-        for (const nestedChild of child) visit(nestedChild);
-      } else if (child && typeof child === "object") {
-        visit(child);
-      }
-    }
-  }
-  visit(fnNode.body);
-  if (crossTransitionCount >= 2) {
-    context.report({
-      node: fnNode,
-      message:
-        "Reducer co-mutates >= 3 boolean activity flags as mutually exclusive phases; replace with a single discriminated phase union.",
-    });
-  }
-}
-
 function storeHasSnapshotReadInScope(fnNode, storeName) {
-  let found = false;
-  function visit(cur) {
-    if (found || !cur || typeof cur !== "object") return;
-    if (
-      cur.type === "MemberExpression" &&
-      !cur.computed &&
-      cur.object?.type === "Identifier" &&
-      cur.object.name === storeName &&
-      cur.property?.type === "Identifier" &&
-      /^(?:getSnapshot|subscribe|failure|error|status|state|snapshot)$/iu.test(
-        cur.property.name
-      )
-    ) {
-      found = true;
-      return;
-    }
-    for (const [key, child] of Object.entries(cur)) {
-      if (key === "parent" || key === "range" || key === "loc") continue;
-      if (Array.isArray(child)) {
-        for (const nestedChild of child) visit(nestedChild);
-      } else if (child && typeof child === "object") {
-        visit(child);
-      }
-    }
-  }
-  visit(fnNode);
-  return found;
+  return (
+    findDescendant(
+      fnNode,
+      (candidate) =>
+        candidate.type === "MemberExpression" &&
+        !candidate.computed &&
+        candidate.object?.type === "Identifier" &&
+        candidate.object.name === storeName &&
+        SNAPSHOT_MEMBER.test(staticPropertyName(candidate))
+    ) !== null
+  );
 }
 
 class ResourceLifecycleAnalysis {
   constructor(context) {
     this.context = context;
-    this.filename = (
-      this.context.filename ??
-      this.context.getFilename?.() ??
-      ""
-    ).replaceAll("\\", "/");
+    this.filename = (this.context.filename ?? "").replaceAll("\\", "/");
     this.sourceCode = this.context.sourceCode;
     this.setterVariables = new Set();
     this.fnStack = [];
@@ -193,6 +105,7 @@ class ResourceLifecycleAnalysis {
       resourceSetterCalled: new Set(),
       childCrossFlagTransitions: false,
       childTrueSetters: new Set(),
+      childFlagGroups: [],
     });
   };
 
@@ -212,19 +125,15 @@ class ResourceLifecycleAnalysis {
       }
       if (hasCrossFlag) {
         parentFrame.childCrossFlagTransitions = true;
+        parentFrame.childFlagGroups.push(
+          new Set([
+            ...frame.booleanSetterToggledTrue,
+            ...frame.booleanSetterToggledFalse,
+          ])
+        );
       }
     }
-    if (
-      frame.booleanFlagsDeclared.size >= 3 &&
-      frame.childCrossFlagTransitions &&
-      frame.childTrueSetters.size >= 2
-    ) {
-      this.context.report({
-        node: frame.node,
-        message:
-          "Hook defines >= 3 boolean activity flags co-mutated across transition handlers as mutually exclusive phases; model a single discriminated phase union.",
-      });
-    }
+    this.reportPhaseFlags(frame);
     if (!frame.isAsync && !frame.hasAwait) return;
     if (isAbortOrGenerationGuardNode(frame.node)) return;
     const toggledBool = [...frame.booleanSetterToggledTrue].some(
@@ -239,6 +148,30 @@ class ResourceLifecycleAnalysis {
         node: frame.node,
         message:
           "This async transition hand-rolls a resource lifecycle: a constant lifecycle cell is toggled around the request while sibling cells receive the resource value and caught error. Model one resource/reducer value instead of coupled setters.",
+      });
+    }
+  };
+
+  reportPhaseFlags = (frame) => {
+    if (frame.booleanFlagsDeclared.size < 3) return;
+    if (frame.childCrossFlagTransitions && frame.childTrueSetters.size >= 2) {
+      this.context.report({
+        node: frame.node,
+        message:
+          "Hook defines >= 3 boolean activity flags co-mutated across transition handlers as mutually exclusive phases; model a single discriminated phase union.",
+      });
+      return;
+    }
+    const groupedWrite = frame.childFlagGroups.some(
+      (group) =>
+        [...group].filter((setter) => frame.booleanFlagsDeclared.has(setter))
+          .length >= 3
+    );
+    if (groupedWrite) {
+      this.context.report({
+        node: frame.node,
+        message:
+          "Hook or component sets >= 3 boolean lifecycle flags together as mutually exclusive phases; replace them with a single discriminated phase state.",
       });
     }
   };
@@ -343,6 +276,8 @@ class ResourceLifecycleAnalysis {
       node.id.elements[1]?.type === "Identifier" &&
       isUseStateCall(node.init)
     ) {
+      const owner = enclosingUiFunction(node);
+      if (owner) checkShadowStateMirror(node, owner, this.context);
       const bindingSymbol = findVariable(this.sourceCode, node.id.elements[1]);
       if (bindingSymbol) {
         this.setterVariables.add(bindingSymbol);
@@ -410,7 +345,7 @@ export default {
     type: "problem",
     docs: {
       description:
-        "Disallow hand-rolled resource-lifecycle state machines, multi-boolean activity phase flags, dual-channel store setters, and module-scope mutable UI state.",
+        "Disallow hand-rolled resource-lifecycle state machines, multi-boolean activity phase flags, shadow state mirrors, dual-channel store setters, module-scope mutable UI state, and timer-based process lifecycle hacks.",
     },
     schema: [
       {
@@ -422,6 +357,9 @@ export default {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-    return new ResourceLifecycleAnalysis(context).listeners();
+    return mergeVisitors(
+      new ResourceLifecycleAnalysis(context).listeners(),
+      processLifecycleVisitors(context)
+    );
   },
 };

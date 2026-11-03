@@ -1,4 +1,13 @@
-import { functionReturnsJsx, isTestFile } from "../shared/scope.js";
+import { isLocalFunctionBinding } from "./function-boundary-helpers.js";
+import { ruleFilename } from "../shared/rule-scope.js";
+import {
+  findVariable,
+  functionReturnsJsx,
+  isFunctionLike,
+  isTestFile,
+  staticPropertyName,
+  unwrapExpression,
+} from "../shared/scope.js";
 
 function collectMemberNames(members, names) {
   for (const member of members) {
@@ -91,97 +100,302 @@ export function recordProgramTypeDeclarations(programNode, typeDeclarations) {
   }
 }
 
-function parameterPropertyNames(parameter, typeDeclarations) {
-  const names = new Set();
-  if (parameter.type === "ObjectPattern") {
-    for (const prop of parameter.properties) {
-      if (prop.type === "Property" && prop.key?.type === "Identifier") {
-        names.add(prop.key.name);
-      }
-    }
+const BAG_TYPE_NAME =
+  /(?:Deps|Dependencies|Options|Opts|Params|Parameters|Args|Arguments|Input|Config|Bag|Callbacks|Handlers)$/u;
+const SETTER_NAME = /^set([A-Z]\w*)$/u;
+
+function localBagDeclaration(typeNode, typeDeclarations) {
+  if (
+    typeNode?.type !== "TSTypeReference" ||
+    typeNode.typeName?.type !== "Identifier"
+  ) {
+    return null;
   }
-  collectTypePropertyNames(
-    parameter.typeAnnotation?.typeAnnotation,
-    typeDeclarations,
-    names
+  const name = typeNode.typeName.name;
+  const declaration = typeDeclarations.get(name);
+  if (!declaration) return null;
+  const exported =
+    declaration.parent?.parent?.type === "ExportNamedDeclaration";
+  return !exported || BAG_TYPE_NAME.test(name) ? declaration : null;
+}
+
+function objectPatternNames(pattern) {
+  return pattern.properties
+    .filter(
+      (prop) => prop.type === "Property" && prop.key?.type === "Identifier"
+    )
+    .map((prop) => prop.key.name);
+}
+
+function firstStatementDestructure(node, parameter) {
+  const first =
+    node.body?.type === "BlockStatement" ? node.body.body[0] : undefined;
+  if (
+    parameter.type !== "Identifier" ||
+    first?.type !== "VariableDeclaration"
+  ) {
+    return [];
+  }
+  const declarator = first.declarations.find(
+    (candidate) =>
+      candidate.id?.type === "ObjectPattern" &&
+      candidate.init?.type === "Identifier" &&
+      candidate.init.name === parameter.name
   );
-  return names;
+  return declarator ? objectPatternNames(declarator.id) : [];
 }
 
-function foreignCallbackNames(parameter) {
-  const names = new Set();
-  const typeAnnotation = parameter.typeAnnotation?.typeAnnotation;
-  if (typeAnnotation?.type === "TSTypeLiteral") {
-    for (const member of typeAnnotation.members) {
-      const isFn =
-        member.type === "TSMethodSignature" ||
-        (member.type === "TSPropertySignature" &&
-          member.typeAnnotation?.typeAnnotation?.type === "TSFunctionType");
-      if (isFn && member.key?.type === "Identifier") {
-        names.add(member.key.name);
-      }
+function bagShape(node, parameter, typeDeclarations) {
+  const annotation = parameter.typeAnnotation?.typeAnnotation;
+  const localDeclaration = localBagDeclaration(annotation, typeDeclarations);
+  const destructured =
+    annotation?.type === "TSTypeReference" && !localDeclaration
+      ? []
+      : firstStatementDestructure(node, parameter);
+  const names = new Set(
+    parameter.type === "ObjectPattern" ? objectPatternNames(parameter) : []
+  );
+  collectTypePropertyNames(annotation, typeDeclarations, names);
+  for (const name of destructured) names.add(name);
+  const shaped =
+    parameter.type === "ObjectPattern" ||
+    annotation?.type === "TSTypeLiteral" ||
+    localDeclaration !== null ||
+    destructured.length > 0;
+  return { shaped, size: names.size };
+}
+
+function memberList(typeNode) {
+  if (typeNode?.type === "TSTypeLiteral") return typeNode.members;
+  return typeNode?.type === "TSInterfaceBody" ? typeNode.body : null;
+}
+
+function callbackArity(member) {
+  if (member.key?.type !== "Identifier") return null;
+  if (member.type === "TSMethodSignature") return member.params?.length ?? 0;
+  const signature = member.typeAnnotation?.typeAnnotation;
+  return signature?.type === "TSFunctionType"
+    ? (signature.params?.length ?? 0)
+    : null;
+}
+
+function foreignCallbacks(parameter, typeDeclarations) {
+  const annotation = parameter.typeAnnotation?.typeAnnotation;
+  const members =
+    memberList(annotation) ??
+    memberList(localBagDeclaration(annotation, typeDeclarations));
+  const callbacks = new Map();
+  if (members) {
+    for (const member of members) {
+      const arity = callbackArity(member);
+      if (arity !== null) callbacks.set(member.key.name, arity);
     }
-    return names;
-  }
-  if (
+  } else if (
     parameter.type === "ObjectPattern" &&
-    typeAnnotation?.type !== "TSTypeReference"
+    annotation?.type !== "TSTypeReference"
   ) {
-    for (const prop of parameter.properties) {
-      if (prop.type === "Property" && prop.key?.type === "Identifier") {
-        names.add(prop.key.name);
-      }
-    }
+    for (const name of objectPatternNames(parameter)) callbacks.set(name, null);
   }
-  return names;
+  return callbacks;
 }
 
-export function checkParameterBags(node, typeDeclarations, context) {
-  const filename = (
-    context.filename ??
-    context.getFilename?.() ??
-    ""
-  ).replaceAll("\\", "/");
+function getterSetterPair(callbacks) {
+  for (const [name, arity] of callbacks) {
+    const stem = SETTER_NAME.exec(name)?.[1];
+    if (!stem || (arity !== null && arity !== 1)) continue;
+    const getter = [
+      `get${stem}`,
+      `${stem[0].toLowerCase()}${stem.slice(1)}`,
+    ].find(
+      (candidate) =>
+        callbacks.has(candidate) && (callbacks.get(candidate) ?? 0) === 0
+    );
+    if (getter) return [getter, name];
+  }
+  return null;
+}
+
+function reportForeignCallbacks(parameter, typeDeclarations, context) {
+  const callbacks = foreignCallbacks(parameter, typeDeclarations);
+  const names = [...callbacks.keys()];
+  const setters = names.filter((name) => /^set[A-Z]/u.test(name));
+  const getters = names.filter((name) => /^get[A-Z]/u.test(name));
   if (
-    isTestFile(filename) ||
-    functionReturnsJsx(node) ||
-    node.params.length === 0
+    names.length >= 3 &&
+    (setters.length >= 3 || (setters.length >= 2 && getters.length >= 1))
   ) {
+    const sample = [...setters, ...getters].slice(0, 4).join(", ");
+    context.report({
+      node: parameter,
+      message: `Parameter bag accepts multiple foreign state callbacks (${sample}); return a state transition value or move the logic into the state owner.`,
+    });
     return;
   }
-  const max = context.options[0]?.max ?? 10;
-  for (const parameter of node.params) {
-    if (
-      parameter.type === "Identifier" &&
-      (parameter.name === "deps" || parameter.name === "dependencies")
-    ) {
-      continue;
-    }
-    const names = parameterPropertyNames(parameter, typeDeclarations);
-    if (
-      names.size > max &&
-      (parameter.type === "ObjectPattern" ||
-        parameter.typeAnnotation?.typeAnnotation?.type === "TSTypeLiteral")
-    ) {
+  const pair = getterSetterPair(callbacks);
+  if (pair) {
+    context.report({
+      node: parameter,
+      message: `Parameter bag passes a foreign getter/setter pair (${pair.join(", ")}); return a state transition value or move the logic into the state owner.`,
+    });
+  }
+}
+
+function forwardedLocalCallee(sourceCode, parameter) {
+  if (parameter.type !== "Identifier") return null;
+  const binding = findVariable(sourceCode, parameter);
+  if (!binding || binding.references.length !== 1) return null;
+  const identifier = binding.references[0].identifier;
+  const call = identifier?.parent;
+  return call?.type === "CallExpression" &&
+    call.arguments.includes(identifier) &&
+    call.callee?.type === "Identifier" &&
+    findVariable(sourceCode, call.callee)?.defs?.[0]?.type !==
+      "ImportBinding" &&
+    isLocalFunctionBinding(call.callee, sourceCode)
+    ? call.callee.name
+    : null;
+}
+
+function memberExtraction(sourceCode, parameter) {
+  if (parameter.type !== "Identifier") return null;
+  const references = findVariable(sourceCode, parameter)?.references ?? [];
+  const members = references.map((reference) => reference.identifier.parent);
+  const call = members[0]?.parent;
+  if (references.length < 2 || call?.type !== "CallExpression") return null;
+  const extracted = members.every(
+    (member, index) =>
+      member?.type === "MemberExpression" &&
+      !member.computed &&
+      member.object === references[index].identifier &&
+      member.parent === call &&
+      call.arguments.includes(member)
+  );
+  if (
+    !extracted ||
+    call.callee?.type !== "Identifier" ||
+    !isLocalFunctionBinding(call.callee, sourceCode)
+  ) {
+    return null;
+  }
+  const properties = new Set(members.map((member) => member.property.name));
+  return properties.size >= 2
+    ? { callee: call.callee.name, members: [...properties].join(", ") }
+    : null;
+}
+
+function mutatorClosureTarget(property, sourceCode) {
+  const closure = unwrapExpression(property.value);
+  if (
+    property.type !== "Property" ||
+    property.computed ||
+    property.key?.type !== "Identifier" ||
+    property.key.name === "set" ||
+    !isFunctionLike(closure) ||
+    closure.params[0]?.type !== "Identifier"
+  ) {
+    return null;
+  }
+  const statement =
+    closure.body.type === "BlockStatement" && closure.body.body.length === 1
+      ? closure.body.body[0]
+      : null;
+  const assignment = unwrapExpression(
+    closure.body.type === "BlockStatement"
+      ? statement?.type === "ExpressionStatement" && statement.expression
+      : closure.body
+  );
+  const parameterName = closure.params[0].name;
+  if (
+    assignment?.type !== "AssignmentExpression" ||
+    assignment.operator !== "=" ||
+    unwrapExpression(assignment.right)?.type !== "Identifier" ||
+    unwrapExpression(assignment.right).name !== parameterName ||
+    staticPropertyName(assignment.left) === "current"
+  ) {
+    return null;
+  }
+  return isCapturedTarget(assignment.left, closure, sourceCode)
+    ? sourceCode.getText(assignment.left)
+    : null;
+}
+
+function isCapturedTarget(target, closure, sourceCode) {
+  const parameterName = closure.params[0].name;
+  let root = target;
+  while (root?.type === "MemberExpression") root = root.object;
+  if (root?.type === "ThisExpression") return target !== root;
+  if (root?.type !== "Identifier" || root.name === parameterName) return false;
+  const binding = findVariable(sourceCode, root);
+  return Boolean(binding) && binding.scope.block !== closure;
+}
+
+function checkMutatorClosures(node, context) {
+  for (const argument of node.arguments) {
+    if (argument.type !== "ObjectExpression") continue;
+    for (const property of argument.properties) {
+      const target = mutatorClosureTarget(property, context.sourceCode);
+      if (!target) continue;
       context.report({
-        node: parameter,
-        message: `Function parameter bag accepts ${names.size} properties (max ${max}); group cohesive domain concepts or move behavior onto the owning object.`,
-      });
-    }
-    const callbackNames = foreignCallbackNames(parameter);
-    if (callbackNames.size < 3) continue;
-    const setters = [...callbackNames].filter((name) =>
-      /^set[A-Z]/u.test(name)
-    );
-    const getters = [...callbackNames].filter((name) =>
-      /^get[A-Z]/u.test(name)
-    );
-    if (setters.length >= 3 || (setters.length >= 2 && getters.length >= 1)) {
-      const sample = [...setters, ...getters].slice(0, 4).join(", ");
-      context.report({
-        node: parameter,
-        message: `Parameter bag accepts multiple foreign state callbacks (${sample}); return a state transition value or move the logic into the state owner.`,
+        node: property,
+        message: `Call-site closure '${property.key.name}' only writes its argument into captured '${target}'; return the value from the callee or let the state owner subscribe instead.`,
       });
     }
   }
+}
+
+function checkParameterBags(node, typeDeclarations, context) {
+  if (functionReturnsJsx(node)) return;
+  const max = context.options[0]?.max ?? 10;
+  for (const parameter of node.params) {
+    const bag = bagShape(node, parameter, typeDeclarations);
+    if (bag.shaped && bag.size > max) {
+      context.report({
+        node: parameter,
+        message: `Function parameter bag accepts ${bag.size} properties (max ${max}); group cohesive domain concepts or move behavior onto the owning object.`,
+      });
+    }
+    reportForeignCallbacks(parameter, typeDeclarations, context);
+    const extraction = memberExtraction(context.sourceCode, parameter);
+    if (extraction) {
+      context.report({
+        node: parameter,
+        messageId: "memberExtraction",
+        data: { name: parameter.name, ...extraction },
+      });
+    }
+  }
+}
+
+export function passThroughVisitors(context) {
+  const sourceCode = context.sourceCode;
+  const typeDeclarations = new Map();
+  const isTest = isTestFile(ruleFilename(context));
+
+  function checkFunction(node) {
+    if (node.params.length >= 4) {
+      for (const parameter of node.params) {
+        const callee = forwardedLocalCallee(sourceCode, parameter);
+        if (callee) {
+          context.report({
+            node: parameter,
+            messageId: "passThrough",
+            data: { name: parameter.name, callee },
+          });
+        }
+      }
+    }
+    if (!isTest) checkParameterBags(node, typeDeclarations, context);
+  }
+
+  return {
+    Program(node) {
+      recordProgramTypeDeclarations(node, typeDeclarations);
+    },
+    FunctionDeclaration: checkFunction,
+    FunctionExpression: checkFunction,
+    ArrowFunctionExpression: checkFunction,
+    CallExpression(node) {
+      if (!isTest) checkMutatorClosures(node, context);
+    },
+  };
 }

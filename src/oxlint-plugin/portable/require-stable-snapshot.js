@@ -1,6 +1,7 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import {
   findVariable,
+  functionReturnsJsx,
   isFunctionLike,
   unwrapExpression,
 } from "../shared/scope.js";
@@ -9,6 +10,15 @@ import { getImportedName, isIdentifier } from "./ast.js";
 const REACT_MODULE = "react";
 const HOOK_NAME = "useSyncExternalStore";
 const SNAPSHOT_ARG_INDICES = [1, 2];
+const SELECTOR_HOOK = /^use(?:App)?Selector$|^use(?:[A-Z]\w*)?Store$/u;
+const REACTIVE_PRIMITIVES = new Set([
+  "signal",
+  "atom",
+  "observable",
+  "makeMutable",
+]);
+const STABLE_CELL_HOOKS = new Set(["useRef", "useMemo", "useState"]);
+const RENDER_HOOK_NAME = /^use[A-Z0-9]/u;
 const FRESH_REFERENCE_MEMBER_METHODS = new Set([
   "map",
   "filter",
@@ -165,6 +175,52 @@ const resolveSnapshotCallback = (arg, sourceCode) => {
   }
   return resolveObjectMethodCallback(expr, sourceCode);
 };
+function functionName(node) {
+  if (node.id?.type === "Identifier") return node.id.name;
+  return node.parent?.type === "VariableDeclarator" &&
+    node.parent.id?.type === "Identifier"
+    ? node.parent.id.name
+    : "";
+}
+
+function isRenderBodyCall(node) {
+  let child = node;
+  let current = node.parent;
+  while (current && !isFunctionLike(current)) {
+    if (
+      current.type === "CallExpression" &&
+      current.arguments.includes(child) &&
+      STABLE_CELL_HOOKS.has(current.callee?.name)
+    ) {
+      return false;
+    }
+    child = current;
+    current = current.parent;
+  }
+  return (
+    Boolean(current) &&
+    (functionReturnsJsx(current) ||
+      RENDER_HOOK_NAME.test(functionName(current)))
+  );
+}
+
+const freshSelector = (node, sourceCode) => {
+  const callee = node.callee;
+  const selector = unwrapExpression(node.arguments[0]);
+  if (
+    callee?.type !== "Identifier" ||
+    callee.name === HOOK_NAME ||
+    !SELECTOR_HOOK.test(callee.name) ||
+    node.arguments.length !== 1 ||
+    !isFunctionLike(selector)
+  ) {
+    return null;
+  }
+  return snapshotReturnsFreshReference(selector, sourceCode)
+    ? callee.name
+    : null;
+};
+
 class SnapshotAnalysis {
   constructor(context) {
     this.context = context;
@@ -208,8 +264,30 @@ class SnapshotAnalysis {
     }
   };
 
+  checkSelectorAndPrimitive = (node) => {
+    const hookName = freshSelector(node, this.context.sourceCode);
+    if (hookName) {
+      this.context.report({
+        node,
+        messageId: "requireStableSnapshotSelector",
+        data: { hookName },
+      });
+      return;
+    }
+    const primitive =
+      node.callee?.type === "Identifier" ? node.callee.name : "";
+    if (REACTIVE_PRIMITIVES.has(primitive) && isRenderBodyCall(node)) {
+      this.context.report({
+        node,
+        messageId: "reactivePrimitiveInRender",
+        data: { primitive },
+      });
+    }
+  };
+
   onCallExpression = (node) => {
     if (!this.isUseSyncExternalStoreCallee(node.callee)) {
+      this.checkSelectorAndPrimitive(node);
       return;
     }
     for (const index of SNAPSHOT_ARG_INDICES) {
@@ -243,6 +321,10 @@ export default {
     messages: {
       requireStableSnapshot:
         "getSnapshot/getServerSnapshot must return a cached reference, not a fresh object/array/derived collection each call. React compares results with Object.is, so an unstable snapshot trips 'The result of getSnapshot should be cached' and can loop into 'Maximum update depth exceeded'. Cache the snapshot in the store and return the same reference until the underlying data changes.",
+      requireStableSnapshotSelector:
+        "Selector passed to '{{hookName}}' returns a fresh object/array/derived collection without an equality comparator, so every store update re-renders (and Zustand v5 loops). Wrap the selector with useShallow / pass shallow, or select primitives separately.",
+      reactivePrimitiveInRender:
+        "Reactive primitive '{{primitive}}' is created directly in a component/hook render body, allocating a fresh instance (and resetting its subscriptions) on every render. Move it to module scope or create it lazily inside useState / useRef / useMemo.",
     },
     schema: [
       {

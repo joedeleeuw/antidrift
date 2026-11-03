@@ -29,6 +29,10 @@ const BARE_ERROR_CONSTRUCTORS = new Set([
 ]);
 
 const LOGGER_OBJECTS = new Set(["console", "logger", "log"]);
+const DECODE_METHOD = /^(?:parse|parseAsync|decodeUnknownSync|decodeSync)$/u;
+const NON_SCHEMA_RECEIVER = /^(?:Date|URL|path|Number|BigInt|Temporal)$/u;
+const PROCESS_FALLBACK_FIELDS = new Set(["stdout", "stderr", "code"]);
+const PROCESS_FALLBACK_TARGETS = new Set(["stdout", "stderr", "message"]);
 
 const LOGGER_METHODS = new Set([
   "debug",
@@ -42,43 +46,31 @@ const LOGGER_METHODS = new Set([
 
 function isErrorMemberRead(node, errorName, allowedProperties) {
   const target = unwrapChainExpression(node);
-  if (!target || target.type !== "MemberExpression") {
-    return false;
-  }
-  if (getIdentifierName(target.object) !== errorName) {
-    return false;
-  }
-  const propertyName = getMemberPropertyName(target);
-  return propertyName !== null && allowedProperties.has(propertyName);
+  return (
+    target?.type === "MemberExpression" &&
+    getIdentifierName(target.object) === errorName &&
+    allowedProperties.has(getMemberPropertyName(target))
+  );
 }
 
 function isBareCaughtErrorCall(target, errorName) {
   const args = getNodeArray(target, "arguments");
-  if (
+  if (args.length === 0) {
+    return isErrorMemberRead(target.callee, errorName, new Set(["toString"]));
+  }
+  return (
     getIdentifierName(target.callee) === "String" &&
     args.length === 1 &&
     (getIdentifierName(args[0]) === errorName ||
       isErrorMemberRead(args[0], errorName, new Set(["message"])))
-  ) {
-    return true;
-  }
-  if (
-    args.length === 0 &&
-    isErrorMemberRead(target.callee, errorName, new Set(["toString"]))
-  ) {
-    return true;
-  }
-  return false;
+  );
 }
 
 function isBareCaughtErrorTemplate(target, errorName) {
   const expressions = getNodeArray(target, "expressions");
   const quasis = getNodeArray(target, "quasis");
   const staticText = quasis
-    .map(
-      (quasi) =>
-        getString(quasi.value?.cooked) ?? getString(quasi.value?.raw) ?? ""
-    )
+    .map((quasi) => getString(quasi.value?.raw) ?? "")
     .join("")
     .trim();
   return (
@@ -182,21 +174,52 @@ function inspectCatchStatements(statements, errorName, context) {
 }
 
 function promiseCatchCallbackParamName(node) {
-  if (!isFunctionExpression(node)) {
-    return null;
-  }
   const parent = getNode(node, "parent");
-  if (!parent || parent.type !== "CallExpression") {
-    return null;
-  }
-  const args = getNodeArray(parent, "arguments");
-  if (args[0] !== node || getMemberPropertyName(parent.callee) !== "catch") {
-    return null;
-  }
-  const callbackParameters = getNodeArray(node, "params");
-  return callbackParameters.length >= 1
-    ? getIdentifierName(callbackParameters[0])
+  const isCatchCallback =
+    isFunctionExpression(node) &&
+    parent?.type === "CallExpression" &&
+    getNodeArray(parent, "arguments")[0] === node &&
+    getMemberPropertyName(parent.callee) === "catch";
+  const firstParameter = getNodeArray(node, "params")[0];
+  return isCatchCallback && firstParameter
+    ? getIdentifierName(firstParameter)
     : null;
+}
+
+function returnedDecodeCallee(statement) {
+  const call = unwrapChainExpression(
+    statement?.type === "ReturnStatement" ? statement.argument : null
+  );
+  const callee = call?.type === "CallExpression" ? call.callee : null;
+  const method = getMemberPropertyName(callee);
+  const receiver = getIdentifierName(getNode(callee ?? {}, "object"));
+  if (!method || !DECODE_METHOD.test(method)) return null;
+  if (NON_SCHEMA_RECEIVER.test(receiver ?? "")) return null;
+  return receiver ? `${receiver}.${method}` : method;
+}
+
+const EMPTY_COLLECTION_TEXT = { ArrayExpression: "[]", ObjectExpression: "{}" };
+
+function nullishSentinel(statements, hasCatchBinding) {
+  const exit = statements.at(-1);
+  if (exit?.type !== "ReturnStatement") return null;
+  const sentinel = unwrapChainExpression(exit.argument);
+  if (!sentinel || getIdentifierName(sentinel) === "undefined") {
+    return "undefined";
+  }
+  if (sentinel.type === "Literal" && sentinel.value === null) return "null";
+  const empty = (sentinel.elements ?? sentinel.properties)?.length === 0;
+  return empty && hasCatchBinding
+    ? (EMPTY_COLLECTION_TEXT[sentinel.type] ?? null)
+    : null;
+}
+
+function catchReportsFailure(statements, errorName) {
+  return statements.some(
+    (statement) =>
+      statement.type === "ThrowStatement" ||
+      isLoggerStatementForError(statement, errorName)
+  );
 }
 
 class ErrorDiagnostics {
@@ -239,6 +262,53 @@ class ErrorDiagnostics {
     }
   };
 
+  visitTryStatement = (node) => {
+    const handler = getNode(node, "handler");
+    const block = getNodeArray(getNode(node, "block") ?? {}, "body");
+    const callee = returnedDecodeCallee(block.at(-1));
+    const statements = getNodeArray(
+      getNode(handler ?? {}, "body") ?? {},
+      "body"
+    );
+    const errorName = getIdentifierName(handler?.param);
+    const sentinel = callee
+      ? nullishSentinel(statements, errorName !== null)
+      : null;
+    if (sentinel && !catchReportsFailure(statements, errorName)) {
+      this.context.report({
+        node,
+        messageId: "decodeToNullable",
+        data: { callee, sentinel },
+      });
+    }
+  };
+
+  visitLogicalExpression = (node) => {
+    const errorName = this.catchParamStack.at(-1);
+    const left = unwrapChainExpression(node.left);
+    const right = unwrapChainExpression(node.right);
+    const field = getMemberPropertyName(left);
+    if (
+      !errorName ||
+      (node.operator !== "||" && node.operator !== "??") ||
+      getIdentifierName(left?.object) !== errorName ||
+      !PROCESS_FALLBACK_FIELDS.has(field)
+    ) {
+      return;
+    }
+    const fallsBack =
+      (field === "code" && Boolean(getLiteralString(right))) ||
+      (getIdentifierName(right?.object) === errorName &&
+        PROCESS_FALLBACK_TARGETS.has(getMemberPropertyName(right)));
+    if (fallsBack) {
+      this.context.report({
+        node,
+        messageId: "catchErrorCodeOrStdoutFallback",
+        data: { name: errorName, field },
+      });
+    }
+  };
+
   visitCatchClauseexit = (node) => {
     if (getIdentifierName(node.param)) {
       this.catchParamStack.pop();
@@ -247,22 +317,15 @@ class ErrorDiagnostics {
 
   visitThrowStatement = (node) => {
     const argument = getNode(node, "argument");
-    if (
-      !argument ||
-      !["NewExpression", "CallExpression"].includes(argument.type)
-    ) {
-      return;
-    }
-    const calleeName = getIdentifierName(argument.callee);
-    if (!calleeName || !BARE_ERROR_CONSTRUCTORS.has(calleeName)) {
-      return;
-    }
-    const args = getNodeArray(argument, "arguments");
-    const firstArg = args[0];
-    if (!firstArg) {
-      return;
-    }
-    const message = getLiteralString(firstArg);
+    const calleeName = ["NewExpression", "CallExpression"].includes(
+      argument?.type
+    )
+      ? getIdentifierName(argument.callee)
+      : null;
+    const args = BARE_ERROR_CONSTRUCTORS.has(calleeName)
+      ? getNodeArray(argument, "arguments")
+      : [];
+    const message = args[0] ? getLiteralString(args[0]) : null;
     if (
       calleeName === "Error" &&
       message &&
@@ -275,12 +338,11 @@ class ErrorDiagnostics {
       });
       return;
     }
-    const activeCatchParam =
-      this.catchParamStack[this.catchParamStack.length - 1];
+    const activeCatchParam = this.catchParamStack.at(-1);
     if (
       activeCatchParam &&
       args.length === 1 &&
-      isBareCaughtErrorMessage(firstArg, activeCatchParam)
+      isBareCaughtErrorMessage(args[0], activeCatchParam)
     ) {
       this.context.report({
         node,
@@ -291,43 +353,27 @@ class ErrorDiagnostics {
   };
 
   visitReturnStatement = (node) => {
-    const returnVal = getNode(node, "argument");
-    if (!returnVal || returnVal.type !== "ObjectExpression") {
-      return;
-    }
-    const properties = getNodeArray(returnVal, "properties");
+    const returned = getNode(node, "argument");
+    if (returned?.type !== "ObjectExpression") return;
     let hasSuccessFalse = false;
     let hasVagueError = false;
-    for (const prop of properties) {
+    for (const prop of getNodeArray(returned, "properties")) {
       const keyName = getIdentifierName(prop.key) ?? getLiteralString(prop.key);
-      if (!keyName) {
-        continue;
-      }
-      if (keyName === "success") {
-        const propertyInitializer = getNode(prop, "value");
-        if (
-          propertyInitializer &&
-          propertyInitializer.type === "Literal" &&
-          propertyInitializer.value === false
-        ) {
-          hasSuccessFalse = true;
-        }
+      const initializer = getNode(prop, "value");
+      if (keyName === "success" && initializer?.type === "Literal") {
+        hasSuccessFalse ||= initializer.value === false;
       }
       if (keyName === "error") {
-        const propertyInitializer = getNode(prop, "value");
-        if (!propertyInitializer) {
-          continue;
-        }
-        const errorStr = getString(propertyInitializer.value);
-        if (errorStr && VAGUE_ERROR_PATTERN.test(errorStr)) {
-          hasVagueError = true;
-        }
+        hasVagueError ||= VAGUE_ERROR_PATTERN.test(
+          getString(initializer?.value) ?? ""
+        );
       }
     }
     if (hasSuccessFalse && hasVagueError) {
       this.context.report({ node, messageId: "anemicReturn" });
     }
   };
+
   listeners() {
     return {
       CatchClause: this.visitCatchClause,
@@ -338,6 +384,8 @@ class ErrorDiagnostics {
       "FunctionExpression:exit": this.exitPromiseCatchCallback,
       ThrowStatement: this.visitThrowStatement,
       ReturnStatement: this.visitReturnStatement,
+      TryStatement: this.visitTryStatement,
+      LogicalExpression: this.visitLogicalExpression,
     };
   }
 }
@@ -355,7 +403,7 @@ const noAnemicErrorsRule = {
     type: "problem",
     docs: {
       description:
-        "Disallow vague errors, lossy rewrapping, catch-log-rethrow duplication, and empty success-shaped failure returns.",
+        "Disallow vague errors, lossy rewrapping, catch-log-rethrow duplication, empty success-shaped failure returns, decode-to-nullable collapses, and catch-side error-code/stdout fallbacks.",
     },
     messages: {
       anemicThrow:
@@ -368,6 +416,10 @@ const noAnemicErrorsRule = {
         "Logging caught error '{{name}}' and immediately re-throwing it unmodified duplicates error logging across every frame on the call stack. Either handle the error here, wrap it with domain context and `{ cause: {{name}} }`, or let it propagate and log once at the boundary.",
       fallback:
         "Failure path drops the error and returns an empty collection, which makes bad data look valid. Let the error propagate or return a typed failure.",
+      decodeToNullable:
+        "Boundary decode '{{callee}}' is collapsed to {{sentinel}}, erasing schema and syntax failures into absence; propagate or report the decode error explicitly.",
+      catchErrorCodeOrStdoutFallback:
+        "Catch block falls back from '{{name}}.{{field}}' to another error field or a sentinel code; rethrow or return a typed failure instead of collapsing process output and error codes.",
     },
   },
   create(context) {

@@ -1,29 +1,34 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
-import { findVariable, unwrapExpression } from "../shared/scope.js";
+import {
+  constInitializer,
+  findVariable,
+  staticPropertyKey,
+  staticPropertyName,
+  unwrapExpression,
+} from "../shared/scope.js";
+import {
+  closedStringLiteralUnionValues,
+  getResolvedType,
+  getTypeServices,
+  isBroadResolvedType,
+  resolvedTypeTexts,
+} from "../shared/type-services.js";
 import { findDescendant, isMemberAccess } from "./ast.js";
+import { rootIdentifier } from "./static-resolution.js";
+
+const SCOPE_SCHEMA = [
+  { type: "object", properties: scopeProperties, additionalProperties: false },
+];
+
+const CONVEX_BUILDER =
+  /^(?:query|mutation|action|internal(?:Query|Mutation|Action))$/u;
 
 class ConvexRegistrations {
   constructor(context) {
     this.context = context;
     this.sourceCode = this.context.sourceCode;
-    this.CONVEX_BUILDERS = new Set([
-      "query",
-      "mutation",
-      "action",
-      "internalQuery",
-      "internalMutation",
-      "internalAction",
-    ]);
     this.convexBindings = new Set();
   }
-  isReturnsProperty = (prop) => {
-    if (prop.type !== "Property") return false;
-    if (!prop.computed && prop.key?.type === "Identifier") {
-      return prop.key.name === "returns";
-    }
-    return prop.key?.type === "Literal" && prop.key.value === "returns";
-  };
-
   resolveRegistration = (argNode) => {
     const expr = unwrapExpression(argNode);
     if (expr?.type === "ObjectExpression") return expr;
@@ -52,7 +57,7 @@ class ConvexRegistrations {
       if (
         spec.type === "ImportSpecifier" &&
         spec.imported?.type === "Identifier" &&
-        this.CONVEX_BUILDERS.has(spec.imported.name)
+        CONVEX_BUILDER.test(spec.imported.name)
       ) {
         this.convexBindings.add(spec.local.name);
       }
@@ -66,14 +71,8 @@ class ConvexRegistrations {
     ) {
       return;
     }
-    const calleeVar = findVariable(this.sourceCode, node.callee);
-    if (
-      calleeVar &&
-      calleeVar.defs.length > 0 &&
-      calleeVar.defs[0].type !== "ImportBinding"
-    ) {
-      return;
-    }
+    const definition = findVariable(this.sourceCode, node.callee)?.defs?.[0];
+    if (definition && definition.type !== "ImportBinding") return;
     const config = this.resolveRegistration(node.arguments[0]);
     if (!config) return;
     let effectiveReturns = null;
@@ -82,7 +81,7 @@ class ConvexRegistrations {
       if (prop.type === "SpreadElement") {
         hasUnresolvedSpread = true;
         effectiveReturns = null;
-      } else if (this.isReturnsProperty(prop)) {
+      } else if (staticPropertyKey(prop) === "returns") {
         hasUnresolvedSpread = false;
         effectiveReturns = prop;
       }
@@ -118,13 +117,7 @@ export const requireConvexReturnValidatorRule = {
       description:
         "Require Convex function registrations (`query`, `mutation`, `action`, `internal*`) to declare an explicit `returns` validator without `v.any()`.",
     },
-    schema: [
-      {
-        type: "object",
-        properties: scopeProperties,
-        additionalProperties: false,
-      },
-    ],
+    schema: SCOPE_SCHEMA,
   },
   create(context) {
     if (!isRuleFile(context)) return {};
@@ -132,33 +125,78 @@ export const requireConvexReturnValidatorRule = {
   },
 };
 
+const OWNED_PACKAGES = /^(?:convex\/react|@trpc\/|@tanstack\/react-query)/u;
+const INFERRED_QUERY_HOOK = /^use(?:Suspense|Infinite)?Query$/u;
+const OWNED_HOOK = /^use(?:(?:Suspense|Infinite|Paginated)?Query|Mutation)$/u;
+const TRPC_HOOK = /^use(?:(?:Suspense|Infinite)?Query|Mutation)$/u;
+const TRPC_ROOT = /^(?:trpc|api)$/u;
+
+function queryFnReturnsConcreteType(options, sourceCode) {
+  const services = getTypeServices(sourceCode);
+  const queryFn = options.properties.find(
+    (property) => staticPropertyKey(property) === "queryFn"
+  );
+  const signature = queryFn
+    ? getResolvedType(queryFn.value, sourceCode)?.getCallSignatures?.()[0]
+    : null;
+  if (
+    !services ||
+    !signature ||
+    isBroadResolvedType(queryFn.value, sourceCode)
+  ) {
+    return false;
+  }
+  const returned = services.checker.getReturnTypeOfSignature(signature);
+  const awaited = services.checker.getAwaitedType?.(returned) ?? returned;
+  const text = services.checker.typeToString(awaited);
+  return text !== "any" && text !== "unknown";
+}
+
+function isTrpcRoot(identifier, sourceCode) {
+  if (!identifier) return false;
+  if (TRPC_ROOT.test(identifier.name)) return true;
+  const definition = findVariable(sourceCode, identifier)?.defs?.[0];
+  const source = definition?.parent?.source?.value;
+  const init = unwrapExpression(definition?.node?.init);
+  return (
+    (typeof source === "string" && /trpc/iu.test(source)) ||
+    (init?.type === "CallExpression" &&
+      (init.callee?.name ?? "").startsWith("createTRPC"))
+  );
+}
+
+function ownedApiCallee(node, importedHooks, sourceCode) {
+  const callee = node.callee;
+  const options = unwrapExpression(node.arguments[0]);
+  if (callee?.type === "Identifier" && importedHooks.has(callee.name)) {
+    const inlineQuery =
+      INFERRED_QUERY_HOOK.test(importedHooks.get(callee.name)) &&
+      options?.type === "ObjectExpression";
+    return !inlineQuery || queryFnReturnsConcreteType(options, sourceCode)
+      ? callee.name
+      : null;
+  }
+  const method = staticPropertyName(callee);
+  if (TRPC_HOOK.test(method)) {
+    return isTrpcRoot(rootIdentifier(callee), sourceCode) ? method : null;
+  }
+  return method === "getQueryData" && staticPropertyName(options) === "queryKey"
+    ? method
+    : null;
+}
+
 export const noExplicitTypeArgumentsOnOwnedApiRule = {
   meta: {
     type: "problem",
     docs: {
       description:
-        "Disallow explicit type arguments `<T>` on typed query/mutation hooks that already infer their contract from the registration.",
+        "Disallow explicit type arguments `<T>` on typed query/mutation hooks and query-key reads that already infer their contract from the registration.",
     },
-    schema: [
-      {
-        type: "object",
-        properties: scopeProperties,
-        additionalProperties: false,
-      },
-    ],
+    schema: SCOPE_SCHEMA,
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-    const OWNED_PACKAGES = /^(?:convex\/react|@trpc\/|@tanstack\/react-query)/u;
-    const HOOKS = new Set([
-      "useQuery",
-      "useSuspenseQuery",
-      "useInfiniteQuery",
-      "useMutation",
-      "usePaginatedQuery",
-    ]);
-    const importedHooks = new Set();
-
+    const importedHooks = new Map();
     return {
       ImportDeclaration(node) {
         const src = node.source?.value;
@@ -167,81 +205,244 @@ export const noExplicitTypeArgumentsOnOwnedApiRule = {
           if (
             spec.type === "ImportSpecifier" &&
             spec.imported?.type === "Identifier" &&
-            HOOKS.has(spec.imported.name)
+            OWNED_HOOK.test(spec.imported.name)
           ) {
-            importedHooks.add(spec.local.name);
+            importedHooks.set(spec.local.name, spec.imported.name);
           }
         }
       },
       CallExpression(node) {
         const typeArgs = node.typeArguments ?? node.typeParameters;
         if (!typeArgs?.params?.length) return;
-        if (
-          node.callee?.type === "Identifier" &&
-          importedHooks.has(node.callee.name)
-        ) {
-          context.report({
-            node: typeArgs,
-            message: `Do not pass explicit type arguments to '${node.callee.name}'; let the owned query/mutation registration supply the type.`,
-          });
-        }
+        const name = ownedApiCallee(node, importedHooks, context.sourceCode);
+        if (!name) return;
+        context.report({
+          node: typeArgs,
+          message: `Do not pass explicit type arguments to '${name}'; let the owned query/mutation registration supply the type.`,
+        });
       },
     };
   },
 };
+
+const SQL_STATEMENT =
+  /\b(?:SELECT\s+.+\s+FROM|INSERT\s+INTO|UPDATE\s+\S+\s+SET|DELETE\s+FROM|CREATE\s+TABLE|ALTER\s+TABLE|DROP\s+TABLE)\b/isu;
+const SQL_KEYWORD =
+  /\b(?:select|insert|update|delete|from|where|create|alter|drop|values)\b/iu;
+const SQL_SINK_METHOD =
+  /^(?:query|execute|raw|unsafe|prepare|\$queryRawUnsafe|\$executeRawUnsafe)$/u;
+const SQL_TEXT_METHOD = /^(?:exec|all|get|run|sql)$/u;
+const SQL_RECEIVERS =
+  /^(?:db|database|pool|client|conn|connection|tx|trx|sql|knex|prisma|sqlite)$/iu;
+const SQL_TAG = /(?:^|\.)sql$/iu;
+const BOUND_SCALAR_TYPE =
+  /^(?:number|bigint|boolean|true|false|-?\d[\d_.]*n?)$/u;
+const SQL_CONCAT_MESSAGE =
+  "Do not build SQL queries with string concatenation or unparameterized template interpolation; use parameterized placeholders or a tagged SQL template.";
+
+const CLOSED_ANNOTATION_TYPE =
+  /^(?:TS(?:Number|BigInt|Boolean)Keyword|TSLiteralType)$/u;
+
+function hasClosedAnnotation(expression, sourceCode) {
+  const annotation = findVariable(sourceCode, expression)?.defs?.[0]?.name
+    ?.typeAnnotation?.typeAnnotation;
+  const parts =
+    annotation?.type === "TSUnionType" ? annotation.types : [annotation];
+  return parts.every((part) => CLOSED_ANNOTATION_TYPE.test(part?.type ?? ""));
+}
+
+function isPlaceholderList(expression) {
+  return (
+    expression?.type === "CallExpression" &&
+    staticPropertyName(expression.callee) === "join" &&
+    findDescendant(
+      expression.callee.object,
+      (candidate) => candidate.type === "Literal" && candidate.value === "?"
+    ) !== null
+  );
+}
+
+function staticText(expression) {
+  if (expression?.type === "TemplateLiteral") {
+    return expression.expressions.length === 0
+      ? expression.quasis[0].value.cooked
+      : null;
+  }
+  return typeof expression?.value === "string" ? expression.value : null;
+}
+
+function isStaticString(expression) {
+  return staticText(expression) !== null;
+}
+
+class SqlInterpolations {
+  constructor(context) {
+    const options = context.options[0] ?? {};
+    this.context = context;
+    this.sourceCode = context.sourceCode;
+    this.safeMembers = new Set(options.safeIdentifierMembers ?? []);
+    this.safeTags = new Set(options.safeTemplateTags ?? []);
+    this.reported = new Set();
+  }
+
+  isSafeExpression = (node) => {
+    const expression = unwrapExpression(node);
+    const resolved =
+      expression?.type === "Identifier"
+        ? unwrapExpression(constInitializer(this.sourceCode, expression))
+        : expression;
+    if (
+      resolved?.type === "Literal" ||
+      isStaticString(resolved) ||
+      isPlaceholderList(resolved) ||
+      this.safeMembers.has(staticPropertyName(expression)) ||
+      this.safeMembers.has(this.sourceCode.getText(expression)) ||
+      (expression?.type === "Identifier" &&
+        hasClosedAnnotation(expression, this.sourceCode)) ||
+      closedStringLiteralUnionValues(expression, this.sourceCode)
+    ) {
+      return true;
+    }
+    const typeTexts = resolvedTypeTexts(expression, this.sourceCode) ?? [];
+    return (
+      typeTexts.length > 0 &&
+      typeTexts.every((text) => BOUND_SCALAR_TYPE.test(text))
+    );
+  };
+
+  templateState = (template) => {
+    const quasis = template.quasis.map((quasi) => quasi.value?.raw ?? "");
+    const isUnsafe = () =>
+      template.expressions.some(
+        (expression, index) =>
+          !quasis[index].endsWith("$") && !this.isSafeExpression(expression)
+      );
+    return { text: quasis.join(" ? "), isUnsafe };
+  };
+
+  concatState = (binary) => {
+    const operands = [];
+    const pending = [binary];
+    while (pending.length > 0) {
+      const current = unwrapExpression(pending.pop());
+      if (current?.type === "BinaryExpression" && current.operator === "+") {
+        pending.push(current.right, current.left);
+      } else {
+        operands.push(current);
+      }
+    }
+    const dynamic = operands.filter((operand) => !isStaticString(operand));
+    const text = operands
+      .map((operand) => staticText(operand) ?? "?")
+      .join(" ");
+    return {
+      text,
+      isUnsafe: () =>
+        dynamic.length > 0 && !dynamic.every(this.isSafeExpression),
+      stringy: operands.some(isStaticString),
+    };
+  };
+
+  dynamicState = (node) => {
+    const expression = unwrapExpression(node);
+    if (expression?.type === "TemplateLiteral") {
+      return expression.expressions.length > 0
+        ? this.templateState(expression)
+        : null;
+    }
+    if (
+      expression?.type === "BinaryExpression" &&
+      expression.operator === "+"
+    ) {
+      const state = this.concatState(expression);
+      return state.stringy ? state : null;
+    }
+    return null;
+  };
+
+  report = (node) => {
+    if (this.reported.has(node)) return;
+    this.reported.add(node);
+    this.context.report({ node, message: SQL_CONCAT_MESSAGE });
+  };
+
+  isSqlReceiver = (receiver) => {
+    const expression = unwrapExpression(receiver);
+    const name =
+      expression?.type === "Identifier"
+        ? expression.name
+        : staticPropertyName(expression);
+    return (
+      SQL_RECEIVERS.test(name) ||
+      this.safeTags.has(this.sourceCode.getText(expression))
+    );
+  };
+
+  visitCallExpression = (node) => {
+    const callee = node.callee;
+    const method = staticPropertyName(callee);
+    if (
+      callee?.type !== "MemberExpression" ||
+      (!SQL_SINK_METHOD.test(method) && !SQL_TEXT_METHOD.test(method)) ||
+      !this.isSqlReceiver(callee.object)
+    ) {
+      return;
+    }
+    const firstArg = node.arguments[0];
+    const state = this.dynamicState(firstArg);
+    if (
+      state &&
+      (SQL_SINK_METHOD.test(method) || SQL_KEYWORD.test(state.text)) &&
+      state.isUnsafe()
+    ) {
+      this.report(unwrapExpression(firstArg));
+    }
+  };
+
+  visitStatementText = (node) => {
+    const parent = node.parent;
+    const nested =
+      node.type === "BinaryExpression"
+        ? parent?.type === "BinaryExpression" && parent.operator === "+"
+        : parent?.type === "TaggedTemplateExpression" &&
+          (this.safeTags.has(this.sourceCode.getText(parent.tag)) ||
+            SQL_TAG.test(this.sourceCode.getText(parent.tag)));
+    const state = nested ? null : this.dynamicState(node);
+    if (state && SQL_STATEMENT.test(state.text) && state.isUnsafe()) {
+      this.report(node);
+    }
+  };
+
+  listeners() {
+    return {
+      CallExpression: this.visitCallExpression,
+      TemplateLiteral: this.visitStatementText,
+      BinaryExpression: this.visitStatementText,
+    };
+  }
+}
 
 export const noSqlStringConcatRule = {
   meta: {
     type: "problem",
     docs: {
       description:
-        "Disallow interpolated template literals or string concatenation in SQL execution calls.",
+        "Disallow interpolated template literals or string concatenation that build SQL statements or reach SQL execution calls.",
     },
     schema: [
       {
         type: "object",
-        properties: scopeProperties,
+        properties: {
+          ...scopeProperties,
+          safeIdentifierMembers: { type: "array", items: { type: "string" } },
+          safeTemplateTags: { type: "array", items: { type: "string" } },
+        },
         additionalProperties: false,
       },
     ],
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-    const SQL_METHODS = new Set(["query", "execute", "raw", "unsafe"]);
-    const SQL_RECEIVERS =
-      /^(?:db|pool|client|conn|connection|tx|trx|sql|knex|prisma)$/iu;
-
-    function isDynamicString(node) {
-      const expr = unwrapExpression(node);
-      if (!expr) return false;
-      if (expr.type === "TemplateLiteral" && expr.expressions.length > 0) {
-        return true;
-      }
-      return expr.type === "BinaryExpression" && expr.operator === "+";
-    }
-
-    return {
-      CallExpression(node) {
-        const callee = node.callee;
-        if (
-          callee?.type !== "MemberExpression" ||
-          callee.computed ||
-          callee.property?.type !== "Identifier" ||
-          !SQL_METHODS.has(callee.property.name) ||
-          callee.object?.type !== "Identifier" ||
-          !SQL_RECEIVERS.test(callee.object.name)
-        ) {
-          return;
-        }
-        const firstArg = node.arguments[0];
-        if (isDynamicString(firstArg)) {
-          context.report({
-            node: firstArg,
-            message:
-              "Do not build SQL queries with string concatenation or unparameterized template interpolation; use parameterized placeholders or a tagged SQL template.",
-          });
-        }
-      },
-    };
+    return new SqlInterpolations(context).listeners();
   },
 };

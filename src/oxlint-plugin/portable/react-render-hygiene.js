@@ -1,9 +1,25 @@
-import { hasIterationEquijoin } from "./query-join-checks.js";
-import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
+import {
+  HOOK_NAME,
+  calleeName,
+  functionNameOf,
+  isRenderOwner,
+  queryEnvelopeVisitors,
+  queryJoinVisitors,
+} from "./query-join-checks.js";
+import { existsSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
+import {
+  isRuleFile,
+  ruleFilename,
+  scopeProperties,
+} from "../shared/rule-scope.js";
+import { findDescendant } from "./ast.js";
+import { rootIdentifier } from "./static-resolution.js";
 import {
   findVariable,
   functionReturnsJsx,
   isFunctionLike,
+  staticPropertyName,
   unwrapExpression,
 } from "../shared/scope.js";
 
@@ -11,43 +27,65 @@ const SCOPE_SCHEMA = [
   { type: "object", properties: scopeProperties, additionalProperties: false },
 ];
 
-const HOOK_NAME = /^use[A-Z0-9]/u;
 const HOOK_CALL_NAME = /^(?:use|use[A-Z0-9])/u;
-const QUERY_HOOK_NAME =
-  /^use(?:Suspense)?(?:Infinite)?(?:Query|PaginatedQuery)$/u;
-const LIFECYCLE_ENVELOPE_KEYS = new Set([
-  "isLoading",
-  "isPending",
-  "isError",
-  "isSuccess",
-  "status",
-  "fetchStatus",
-  "refetch",
+const PLATFORMS = ["native", "web", "ios", "android"];
+const SOURCE_EXTENSIONS = ["ts", "tsx", "js", "jsx"];
+const RENDER_CALLBACK_HOOKS = new Set([
+  "useMemo",
+  "useEffect",
+  "useLayoutEffect",
+  "useCallback",
 ]);
-const ENVELOPE_KEYS = new Set(["data", "error", ...LIFECYCLE_ENVELOPE_KEYS]);
-
-function functionNameOf(node) {
-  if (node.id?.type === "Identifier") return node.id.name;
-  if (
-    node.parent?.type === "VariableDeclarator" &&
-    node.parent.id?.type === "Identifier"
-  ) {
-    return node.parent.id.name;
-  }
-  return null;
-}
+const DEPENDENCY_HOOKS = new Set([
+  ...RENDER_CALLBACK_HOOKS,
+  "useInsertionEffect",
+]);
+const EVENT_HANDLER_NAME = /^(?:on|handle)[A-Z]/u;
+const IMPURE_MEMBER_CALLS = new Set([
+  "Date.now",
+  "Math.random",
+  "crypto.randomUUID",
+  "performance.now",
+]);
+const ALWAYS_DECODE_METHOD =
+  /^(?:parseAsync|decodeUnknownSync|decodeUnknownEither)$/u;
+const RAW_PAYLOAD_NAME = /^(?:raw|payload|response|res|body|json|data)$/iu;
 
 function isHookCall(node) {
-  const callee = unwrapExpression(node?.callee);
-  if (callee?.type === "Identifier") return HOOK_CALL_NAME.test(callee.name);
-  if (
-    callee?.type === "MemberExpression" &&
-    !callee.computed &&
-    callee.property?.type === "Identifier"
-  ) {
-    return HOOK_CALL_NAME.test(callee.property.name);
+  return HOOK_CALL_NAME.test(calleeName(node));
+}
+
+function hasPlatformSibling(filename) {
+  const name = basename(filename);
+  const stem = name.replace(
+    /(?:\.(?:native|web|ios|android))?\.[cm]?[jt]sx?$/u,
+    ""
+  );
+  const candidates = PLATFORMS.flatMap((platform) =>
+    SOURCE_EXTENSIONS.map((extension) => `${stem}.${platform}.${extension}`)
+  );
+  if (name !== stem && /\.(?:native|web|ios|android)\./u.test(name)) {
+    candidates.push(
+      ...SOURCE_EXTENSIONS.map((extension) => `${stem}.${extension}`)
+    );
   }
-  return false;
+  return candidates.some(
+    (candidate) =>
+      candidate !== name && existsSync(join(dirname(filename), candidate))
+  );
+}
+
+function isPlatformHookStub(node) {
+  if (node.body?.type !== "BlockStatement") return false;
+  const stmts = node.body.body;
+  if (stmts.length === 0) return true;
+  if (stmts.length !== 1 || stmts[0].type !== "ReturnStatement") return false;
+  const arg = stmts[0].argument;
+  return (
+    !arg ||
+    arg.type === "Literal" ||
+    (arg.type === "Identifier" && arg.name === "undefined")
+  );
 }
 
 export const noHooklessUseFunctionRule = {
@@ -62,33 +100,23 @@ export const noHooklessUseFunctionRule = {
   create(context) {
     if (!isRuleFile(context)) return {};
     const stack = [];
+    let platformSibling = null;
     function enter(node) {
       stack.push({ node, name: functionNameOf(node), calledHook: false });
     }
-    function isPlatformHookStub(node) {
-      if (node.body?.type !== "BlockStatement") return false;
-      const stmts = node.body.body;
-      if (stmts.length === 0) return true;
-      if (stmts.length !== 1 || stmts[0].type !== "ReturnStatement") {
-        return false;
-      }
-      const arg = stmts[0].argument;
-      return (
-        !arg ||
-        arg.type === "Literal" ||
-        (arg.type === "Identifier" && arg.name === "undefined")
-      );
-    }
     function exit() {
       const frame = stack.pop();
-      if (!frame?.name || !HOOK_NAME.test(frame.name)) return;
-      if (isPlatformHookStub(frame.node)) return;
-      if (!frame.calledHook) {
-        context.report({
-          node: frame.node.id ?? frame.node,
-          message: `Function '${frame.name}' uses the 'use*' hook prefix without calling any React hook; rename it to a plain function.`,
-        });
-      }
+      const hookless =
+        HOOK_NAME.test(frame?.name ?? "") &&
+        !frame.calledHook &&
+        !isPlatformHookStub(frame.node);
+      if (!hookless) return;
+      platformSibling ??= hasPlatformSibling(ruleFilename(context));
+      if (platformSibling) return;
+      context.report({
+        node: frame.node.id ?? frame.node,
+        message: `Function '${frame.name}' uses the 'use*' hook prefix without calling any React hook; rename it to a plain function.`,
+      });
     }
     return {
       FunctionDeclaration: enter,
@@ -98,58 +126,94 @@ export const noHooklessUseFunctionRule = {
       ArrowFunctionExpression: enter,
       "ArrowFunctionExpression:exit": exit,
       CallExpression(node) {
-        if (isHookCall(node)) {
-          const top = stack.at(-1);
-          if (top) top.calledHook = true;
-        }
+        const top = stack.at(-1);
+        if (top && isHookCall(node)) top.calledHook = true;
       },
     };
   },
 };
+
+function isUnstableDefault(expr) {
+  const node = unwrapExpression(expr);
+  if (node?.type === "ArrayExpression") return node.elements.length === 0;
+  if (node?.type === "ObjectExpression") return node.properties.length === 0;
+  return (
+    node?.type === "NewExpression" &&
+    node.callee?.type === "Identifier" &&
+    (node.callee.name === "Map" || node.callee.name === "Set")
+  );
+}
+
+function isRenderStableSink(reference) {
+  const parent = reference.identifier.parent;
+  if (parent?.type === "JSXExpressionContainer") {
+    return parent.parent?.type === "JSXAttribute";
+  }
+  const call = parent?.type === "ArrayExpression" ? parent.parent : null;
+  return (
+    call?.type === "CallExpression" &&
+    call.arguments.length >= 2 &&
+    call.arguments.at(-1) === parent &&
+    DEPENDENCY_HOOKS.has(calleeName(call))
+  );
+}
+
+function reportFallbackCollections(node, context) {
+  for (const statement of node.body.body) {
+    if (statement.type !== "VariableDeclaration") continue;
+    for (const declarator of statement.declarations) {
+      const init = unwrapExpression(declarator.init);
+      const fallback =
+        init?.type === "LogicalExpression" &&
+        (init.operator === "??" || init.operator === "||") &&
+        isUnstableDefault(init.right);
+      const references = fallback
+        ? (findVariable(context.sourceCode, declarator.id)?.references ?? [])
+        : [];
+      if (!references.some(isRenderStableSink)) continue;
+      context.report({
+        node: init.right,
+        message:
+          "Unstable collection fallback creates a fresh reference every render and reaches a prop or hook dependency; hoist a module-level empty constant.",
+      });
+    }
+  }
+}
+
+function reportDefaultCollections(node, context) {
+  for (const parameter of node.params) {
+    if (parameter.type !== "ObjectPattern") continue;
+    for (const prop of parameter.properties) {
+      if (
+        prop.type === "Property" &&
+        prop.value?.type === "AssignmentPattern" &&
+        isUnstableDefault(prop.value.right)
+      ) {
+        context.report({
+          node: prop.value.right,
+          message:
+            "Unstable collection default in component props creates a fresh reference every render; hoist a module-level constant or derive inside the body.",
+        });
+      }
+    }
+  }
+}
 
 export const noUnstableRenderDefaultCollectionRule = {
   meta: {
     type: "problem",
     docs: {
       description:
-        "Disallow unstable default collection literals (`= []`, `= {}`, `= new Map()`, `= new Set()`) in React component parameter destructuring.",
+        "Disallow unstable default collection literals (`= []`, `= {}`, `= new Map()`, `= new Set()`) in React component props and `?? []` fallbacks that reach props or hook dependencies.",
     },
     schema: SCOPE_SCHEMA,
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-    function isUnstableDefault(expr) {
-      const node = unwrapExpression(expr);
-      if (!node) return false;
-      if (node.type === "ArrayExpression" && node.elements.length === 0) {
-        return true;
-      }
-      if (node.type === "ObjectExpression" && node.properties.length === 0) {
-        return true;
-      }
-      return (
-        node.type === "NewExpression" &&
-        node.callee?.type === "Identifier" &&
-        (node.callee.name === "Map" || node.callee.name === "Set")
-      );
-    }
     function checkComponent(node) {
-      if (!functionReturnsJsx(node)) return;
-      for (const parameter of node.params) {
-        if (parameter.type !== "ObjectPattern") continue;
-        for (const prop of parameter.properties) {
-          if (
-            prop.type === "Property" &&
-            prop.value?.type === "AssignmentPattern" &&
-            isUnstableDefault(prop.value.right)
-          ) {
-            context.report({
-              node: prop.value.right,
-              message:
-                "Unstable collection default in component props creates a fresh reference every render; hoist a module-level constant or derive inside the body.",
-            });
-          }
-        }
+      if (functionReturnsJsx(node)) reportDefaultCollections(node, context);
+      if (node.body?.type === "BlockStatement" && isRenderOwner(node)) {
+        reportFallbackCollections(node, context);
       }
     }
     return {
@@ -159,55 +223,6 @@ export const noUnstableRenderDefaultCollectionRule = {
     };
   },
 };
-
-function queryHookName(expr) {
-  const node = unwrapExpression(expr);
-  if (node?.type !== "CallExpression") return null;
-  const callee = unwrapExpression(node.callee);
-  return callee?.type === "Identifier" && QUERY_HOOK_NAME.test(callee.name)
-    ? callee.name
-    : null;
-}
-
-function isQueryEnvelope(expr) {
-  const node = unwrapExpression(expr);
-  if (node?.type !== "ObjectExpression") return false;
-  let hits = 0;
-  let hasLifecycleKey = false;
-  for (const prop of node.properties) {
-    if (prop.type === "Property" && prop.key?.type === "Identifier") {
-      const keyName = prop.key.name;
-      if (ENVELOPE_KEYS.has(keyName)) hits += 1;
-      if (LIFECYCLE_ENVELOPE_KEYS.has(keyName)) hasLifecycleKey = true;
-    }
-  }
-  return hasLifecycleKey && hits >= 2 && hits === node.properties.length;
-}
-
-function checkReturnedExpr(expr, reportNode, context, convexDirectValueHooks) {
-  const node = unwrapExpression(expr);
-  if (!node) return;
-  if (isQueryEnvelope(node)) {
-    context.report({
-      node: reportNode,
-      message:
-        "Custom hook leaks a raw query lifecycle envelope; return narrowed domain data or handle lifecycle states inside the boundary.",
-    });
-    return;
-  }
-  if (node.type === "Identifier") {
-    const binding = findVariable(context.sourceCode, node);
-    const init = binding?.defs?.[0]?.node?.init;
-    const hookName = init && queryHookName(init);
-    if (hookName && !convexDirectValueHooks.has(hookName)) {
-      context.report({
-        node: reportNode,
-        message:
-          "Custom hook returns a raw query result directly; return domain data instead of forwarding the query envelope.",
-      });
-    }
-  }
-}
 
 export const noQueryEnvelopeLeakRule = {
   meta: {
@@ -220,50 +235,7 @@ export const noQueryEnvelopeLeakRule = {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-
-    const convexDirectValueHooks = new Set();
-
-    function checkFunction(node) {
-      const name = functionNameOf(node);
-      if (!name || !HOOK_NAME.test(name) || QUERY_HOOK_NAME.test(name)) return;
-      if (node.body?.type !== "BlockStatement") {
-        checkReturnedExpr(
-          node.body,
-          node.body,
-          context,
-          convexDirectValueHooks
-        );
-        return;
-      }
-      for (const stmt of node.body.body) {
-        if (stmt.type === "ReturnStatement" && stmt.argument) {
-          checkReturnedExpr(
-            stmt.argument,
-            stmt,
-            context,
-            convexDirectValueHooks
-          );
-        }
-      }
-    }
-
-    return {
-      ImportDeclaration(node) {
-        if (node.source?.value !== "convex/react") return;
-        for (const spec of node.specifiers ?? []) {
-          if (
-            spec.type === "ImportSpecifier" &&
-            spec.imported?.type === "Identifier" &&
-            spec.imported.name === "useQuery"
-          ) {
-            convexDirectValueHooks.add(spec.local.name);
-          }
-        }
-      },
-      FunctionDeclaration: checkFunction,
-      FunctionExpression: checkFunction,
-      ArrowFunctionExpression: checkFunction,
-    };
+    return queryEnvelopeVisitors(context);
   },
 };
 
@@ -273,43 +245,55 @@ function isUnshadowedGlobal(ident, sourceCode) {
 }
 
 function isImpureCall(node, sourceCode) {
+  const callee = node.callee;
   if (node.type === "NewExpression") {
     return (
-      node.callee?.type === "Identifier" &&
-      node.callee.name === "Date" &&
+      callee?.type === "Identifier" &&
+      callee.name === "Date" &&
       node.arguments.length === 0 &&
-      isUnshadowedGlobal(node.callee, sourceCode)
+      isUnshadowedGlobal(callee, sourceCode)
     );
   }
-  if (node.type !== "CallExpression") return false;
-  const callee = node.callee;
-  if (
+  return (
+    node.type === "CallExpression" &&
     callee?.type === "MemberExpression" &&
-    !callee.computed &&
     callee.object?.type === "Identifier" &&
-    callee.property?.type === "Identifier"
-  ) {
-    const pair = `${callee.object.name}.${callee.property.name}`;
-    if (
-      pair !== "Date.now" &&
-      pair !== "Math.random" &&
-      pair !== "crypto.randomUUID" &&
-      pair !== "performance.now"
-    ) {
-      return false;
-    }
-    return isUnshadowedGlobal(callee.object, sourceCode);
-  }
-  return false;
+    IMPURE_MEMBER_CALLS.has(
+      `${callee.object.name}.${staticPropertyName(callee)}`
+    ) &&
+    isUnshadowedGlobal(callee.object, sourceCode)
+  );
 }
 
-function enclosingComponentIfInRender(node) {
-  for (let cur = node.parent; cur; cur = cur.parent) {
-    if (isFunctionLike(cur)) {
-      return functionReturnsJsx(cur) ? cur : null;
-    }
+function nearestFunction(node) {
+  for (let cur = node?.parent; cur; cur = cur.parent) {
+    if (isFunctionLike(cur)) return cur;
   }
   return null;
+}
+
+function isInParams(node, owner) {
+  return owner.params.some(
+    (parameter) =>
+      parameter.range[0] <= node.range[0] && node.range[1] <= parameter.range[1]
+  );
+}
+
+function impureHelperName(node, sourceCode) {
+  if (node.type !== "CallExpression" || node.callee?.type !== "Identifier") {
+    return null;
+  }
+  const definition = findVariable(sourceCode, node.callee)?.defs?.[0]?.node;
+  const helper = isFunctionLike(definition)
+    ? definition
+    : unwrapExpression(definition?.init);
+  if (!isFunctionLike(helper) || isRenderOwner(helper)) return null;
+  const impure = findDescendant(
+    helper.body,
+    (candidate) => isImpureCall(candidate, sourceCode),
+    (candidate) => !isFunctionLike(candidate)
+  );
+  return impure ? node.callee.name : null;
 }
 
 export const noImpureRenderCallRule = {
@@ -317,25 +301,36 @@ export const noImpureRenderCallRule = {
     type: "problem",
     docs: {
       description:
-        "Disallow impure calls (`Date.now()`, `Math.random()`, `crypto.randomUUID()`, `new Date()`) directly during React component render.",
+        "Disallow impure calls (`Date.now()`, `Math.random()`, `crypto.randomUUID()`, `new Date()`) during React render, in component/hook default parameters, and through 1-hop local helpers called during render.",
     },
     schema: SCOPE_SCHEMA,
   },
   create(context) {
     if (!isRuleFile(context)) return {};
     const sourceCode = context.sourceCode;
-
     function check(node) {
-      if (!isImpureCall(node, sourceCode)) return;
-      if (enclosingComponentIfInRender(node)) {
+      const owner = nearestFunction(node);
+      const renderTime =
+        Boolean(owner) &&
+        (functionReturnsJsx(owner) ||
+          (isRenderOwner(owner) && isInParams(node, owner)));
+      if (!renderTime) return;
+      if (isImpureCall(node, sourceCode)) {
         context.report({
           node,
           message:
             "Impure time or random call during React render breaks purity; compute in an effect, event handler, or loader.",
         });
+        return;
+      }
+      const helper = impureHelperName(node, sourceCode);
+      if (helper) {
+        context.report({
+          node,
+          message: `Render calls helper '${helper}', which reads an impure time or random source; compute in an effect, event handler, or loader.`,
+        });
       }
     }
-
     return {
       CallExpression: check,
       NewExpression: check,
@@ -345,53 +340,55 @@ export const noImpureRenderCallRule = {
 
 function isExternalPayloadDecodeCall(node) {
   const callee = unwrapExpression(node.callee);
+  const method =
+    callee?.type === "MemberExpression" && !callee.computed
+      ? staticPropertyName(callee)
+      : "";
+  const receiver =
+    callee?.object?.type === "Identifier" ? callee.object.name : "";
   if (
-    callee?.type !== "MemberExpression" ||
-    callee.computed ||
-    callee.property?.type !== "Identifier"
+    (receiver === "JSON" && method === "parse") ||
+    ALWAYS_DECODE_METHOD.test(method)
+  ) {
+    return true;
+  }
+  if (method !== "parse" || /^(?:Date|URL|path)$/u.test(receiver)) return false;
+  const arg = unwrapExpression(node.arguments[0]);
+  return (
+    arg?.type === "MemberExpression" ||
+    arg?.type === "CallExpression" ||
+    (arg?.type === "Identifier" && RAW_PAYLOAD_NAME.test(arg.name))
+  );
+}
+
+function isLocalFormState(node, sourceCode) {
+  const root = rootIdentifier(node.arguments[0]);
+  const declarator = root
+    ? findVariable(sourceCode, root)?.defs?.[0]?.node
+    : null;
+  return calleeName(unwrapExpression(declarator?.init)) === "useState";
+}
+
+function decodesDuringRender(node) {
+  const callback = nearestFunction(node);
+  if (!callback || isRenderOwner(callback)) return Boolean(callback);
+  const call = callback.parent;
+  if (
+    call?.type !== "CallExpression" ||
+    call.arguments[0] !== callback ||
+    !RENDER_CALLBACK_HOOKS.has(calleeName(call))
   ) {
     return false;
   }
-  const method = callee.property.name;
-  if (
-    callee.object?.type === "Identifier" &&
-    callee.object.name === "JSON" &&
-    method === "parse"
-  ) {
-    return true;
-  }
-  if (
-    method === "parseAsync" ||
-    method === "decodeUnknownSync" ||
-    method === "decodeUnknownEither"
-  ) {
-    return true;
-  }
-  if (method === "parse") {
-    if (
-      callee.object?.type === "Identifier" &&
-      /^(?:Date|URL|path)$/u.test(callee.object.name)
-    ) {
-      return false;
-    }
-    const arg = unwrapExpression(node.arguments[0]);
-    return (
-      arg?.type === "MemberExpression" ||
-      arg?.type === "CallExpression" ||
-      (arg?.type === "Identifier" &&
-        /^(?:raw|payload|response|res|body|json|data)$/iu.test(arg.name))
-    );
-  }
-  return false;
-}
-
-function isDirectComponentRender(node) {
-  for (let cur = node.parent; cur; cur = cur.parent) {
-    if (isFunctionLike(cur)) {
-      return functionReturnsJsx(cur);
-    }
-  }
-  return false;
+  const declarator = call.parent;
+  const handlerName =
+    declarator?.type === "VariableDeclarator" ? declarator.id?.name : "";
+  const owner = nearestFunction(call);
+  return (
+    !EVENT_HANDLER_NAME.test(handlerName ?? "") &&
+    Boolean(owner) &&
+    isRenderOwner(owner)
+  );
 }
 
 export const noExternalDecodeInTsxRule = {
@@ -399,29 +396,27 @@ export const noExternalDecodeInTsxRule = {
     type: "problem",
     docs: {
       description:
-        "Disallow boundary schema decoding or JSON.parse inside .tsx component files.",
+        "Disallow boundary schema decoding or JSON.parse inside .tsx component render bodies, hooks, and render-time memo/effect callbacks.",
     },
     schema: SCOPE_SCHEMA,
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-    const filename = (
-      context.filename ??
-      context.getFilename?.() ??
-      ""
-    ).replaceAll("\\", "/");
-    if (!filename.endsWith(".tsx")) return {};
-
+    if (!ruleFilename(context).endsWith(".tsx")) return {};
     return {
       CallExpression(node) {
-        if (!isExternalPayloadDecodeCall(node)) return;
-        if (isDirectComponentRender(node)) {
-          context.report({
-            node,
-            message:
-              "Do not decode untrusted external payloads inside TSX components; decode once at the data boundary before rendering.",
-          });
+        if (
+          !isExternalPayloadDecodeCall(node) ||
+          !decodesDuringRender(node) ||
+          isLocalFormState(node, context.sourceCode)
+        ) {
+          return;
         }
+        context.report({
+          node,
+          message:
+            "Do not decode untrusted external payloads inside TSX components; decode once at the data boundary before rendering.",
+        });
       },
     };
   },
@@ -432,21 +427,12 @@ export const noQueryJoinOrTreeReshapeRule = {
     type: "problem",
     docs: {
       description:
-        "Disallow O(N*M) `.find()` or `.filter()` equijoins inside iteration callbacks or loop bodies.",
+        "Disallow O(N*M) `.find()` / `.filter()` equijoins inside iterations, multi-query joins during render, and sequential independent awaits.",
     },
     schema: SCOPE_SCHEMA,
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-    return {
-      CallExpression(node) {
-        if (!hasIterationEquijoin(node, context.sourceCode)) return;
-        context.report({
-          node,
-          message:
-            "Nested `.find()` / `.filter()` equijoin inside an iteration runs in O(N*M); pre-index the inner collection with a Map or Set before iterating.",
-        });
-      },
-    };
+    return queryJoinVisitors(context);
   },
 };

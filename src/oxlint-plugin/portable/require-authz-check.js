@@ -1,4 +1,9 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
+import {
+  findVariable,
+  isFunctionLike,
+  unwrapExpression,
+} from "../shared/scope.js";
 import { findDescendant } from "./ast.js";
 
 const REQUEST_PARAM_ROOTS = new Set([
@@ -21,30 +26,16 @@ const PRIVILEGED_MODULES = new Set([
   "fsPromises",
   "child_process",
 ]);
-const PRIVILEGED_CALLS = new Set([
-  "openExternal",
-  "openPath",
-  "clearStorageData",
-  "clearCache",
-  "getSources",
-  "exec",
-  "execFile",
-  "execSync",
-  "spawn",
-  "writeFile",
-  "writeFileSync",
-  "rm",
-  "rmSync",
-  "unlink",
-  "fetch",
-]);
+const PRIVILEGED_CALL =
+  /^(?:openExternal|openPath|clearStorageData|clearCache|getSources|fetch|(?:exec|spawn|writeFile|rm|unlink)\w*)$/u;
+const PATTERN_RECEIVER = /(?:^re|Re|Regex|RegExp|Pattern|Matcher)$/u;
 const SAFE_LOOKUP_METHODS = new Set([
   "fromWebContents",
   "fromId",
   "getFocusedWindow",
 ]);
 const GUARD_HELPER_PREFIX =
-  /^(?:isTrusted|isAllowed|assert|verify|validate|require|check|ensure)/iu;
+  /^(?:isTrusted|isAllowed|assert|verify|validate|require|check|ensure)|sender|frame|origin|auth/iu;
 
 function calleeName(callee) {
   if (!callee) return null;
@@ -158,24 +149,30 @@ function hasPrivilegedReceiver(expr) {
   return false;
 }
 
+function isPatternReceiver(receiver) {
+  return (
+    Boolean(receiver?.regex) ||
+    (receiver?.type === "Identifier" && PATTERN_RECEIVER.test(receiver.name))
+  );
+}
+
 function isPrivilegedCallNode(cur) {
   if (cur.type !== "CallExpression") return false;
   const callee = cur.callee;
-  if (callee?.type === "Identifier") {
-    return PRIVILEGED_CALLS.has(callee.name);
-  }
+  if (callee?.type === "Identifier") return PRIVILEGED_CALL.test(callee.name);
   if (
-    callee?.type === "MemberExpression" &&
-    !callee.computed &&
-    callee.property?.type === "Identifier"
+    callee?.type !== "MemberExpression" ||
+    callee.computed ||
+    callee.property?.type !== "Identifier" ||
+    SAFE_LOOKUP_METHODS.has(callee.property.name) ||
+    isPatternReceiver(callee.object)
   ) {
-    const propName = callee.property.name;
-    if (SAFE_LOOKUP_METHODS.has(propName)) return false;
-    return (
-      PRIVILEGED_CALLS.has(propName) || hasPrivilegedReceiver(callee.object)
-    );
+    return false;
   }
-  return false;
+  return (
+    PRIVILEGED_CALL.test(callee.property.name) ||
+    hasPrivilegedReceiver(callee.object)
+  );
 }
 
 function findPrivilegedCall(node) {
@@ -274,40 +271,35 @@ class AuthorizationChecks {
       frame.sawAuthz = true;
     }
     if (!isIpcMainRegistration(node)) return;
-    const handler = node.arguments[1];
-    if (
-      handler?.type !== "ArrowFunctionExpression" &&
-      handler?.type !== "FunctionExpression"
-    ) {
-      return;
-    }
+    const handler = this.resolveHandler(node.arguments[1]);
+    if (!handler) return;
     const eventParam = handler.params[0];
     const eventName =
       eventParam?.type === "Identifier" ? eventParam.name : null;
-    if (handler.body?.type !== "BlockStatement") {
-      const priv = findPrivilegedCall(handler.body);
-      if (priv) {
-        this.context.report({
-          node: priv,
-          message:
-            "Privileged Electron IPC handler must validate trusted `event.sender` or `event.senderFrame` before executing host effects.",
-        });
-      }
-      return;
-    }
-    const unguarded = findUnguardedIpcEffect(
-      handler.body.body,
-      eventName,
-      this.authzSet
-    );
+    const unguarded =
+      handler.body?.type === "BlockStatement"
+        ? findUnguardedIpcEffect(handler.body.body, eventName, this.authzSet)
+        : findPrivilegedCall(handler.body);
     if (unguarded) {
       this.context.report({
-        node: unguarded,
+        node,
         message:
           "Privileged Electron IPC handler must validate trusted `event.sender` or `event.senderFrame` before executing host effects.",
       });
     }
   };
+
+  resolveHandler = (argument) => {
+    const handler = unwrapExpression(argument);
+    if (isFunctionLike(handler)) return handler;
+    if (handler?.type !== "Identifier") return null;
+    const definition = findVariable(this.context.sourceCode, handler)?.defs?.[0]
+      ?.node;
+    if (isFunctionLike(definition)) return definition;
+    const init = unwrapExpression(definition?.init);
+    return isFunctionLike(init) ? init : null;
+  };
+
   listeners() {
     return {
       FunctionDeclaration: this.enter,
