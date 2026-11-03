@@ -2,16 +2,16 @@ import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 
 const TEXT_FOREGROUND_OPACITY_PATTERN =
   /(?:^|:)(?:text|decoration|bg|border|ring)-(?:muted-foreground|foreground)\/(?:40|45|50|60|64|70|72|80)(?:\b|$)/;
-const findRawForegroundOpacity = (value) => {
-  for (const token of value.split(/\s+/)) {
+const findRawForegroundOpacity = (classNames) => {
+  for (const token of classNames.split(/\s+/)) {
     if (TEXT_FOREGROUND_OPACITY_PATTERN.test(token)) {
       return token;
     }
   }
   return undefined;
 };
-function checkValue(context, node, value) {
-  const match = findRawForegroundOpacity(value);
+function checkClassNames(context, node, classNames) {
+  const match = findRawForegroundOpacity(classNames);
   if (!match) {
     return;
   }
@@ -48,10 +48,10 @@ export default {
         if (typeof node.value !== "string") {
           return;
         }
-        checkValue(context, node, node.value);
+        checkClassNames(context, node, node.value);
       },
       TemplateElement(node) {
-        checkValue(context, node, node.value.raw);
+        checkClassNames(context, node, node.value.raw);
       },
     };
   },

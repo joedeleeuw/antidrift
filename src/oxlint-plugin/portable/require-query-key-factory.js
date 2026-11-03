@@ -23,12 +23,12 @@ const MODULE_SCOPES = new Set(["global", "module"]);
 const constInitializer = (identifier, context) => {
   let scope = context.sourceCode.getScope(identifier);
   while (scope) {
-    const variable = scope.set.get(identifier.name);
-    if (variable) {
-      if (MODULE_SCOPES.has(scope.type) || variable.defs.length !== 1) {
+    const bindingSymbol = scope.set.get(identifier.name);
+    if (bindingSymbol) {
+      if (MODULE_SCOPES.has(scope.type) || bindingSymbol.defs.length !== 1) {
         return null;
       }
-      const definition = variable.defs.at(0);
+      const definition = bindingSymbol.defs.at(0);
       if (
         !isAstNode(definition?.node) ||
         definition.node.type !== "VariableDeclarator" ||
@@ -126,6 +126,28 @@ const isInsidePredicateOption = (node) => {
   }
   return false;
 };
+const reportInlineOptionKeys = (context, argument) => {
+  const options = literalOf(argument, "ObjectExpression", context);
+  if (!options) {
+    return;
+  }
+  const properties = Array.isArray(options.properties)
+    ? options.properties
+    : [];
+  for (const property of properties) {
+    if (
+      property?.type !== "Property" ||
+      getPropertyName(property.key) !== "queryKey"
+    ) {
+      continue;
+    }
+    const key = literalOf(property.value, "ArrayExpression", context);
+    if (!key || property.value.type === "Identifier") {
+      continue;
+    }
+    context.report({ node: key, messageId: "inlineQueryKey" });
+  }
+};
 export default {
   meta: {
     schema: [
@@ -173,26 +195,7 @@ export default {
           }
         }
         for (const argument of args) {
-          const options = literalOf(argument, "ObjectExpression", context);
-          if (!options) {
-            continue;
-          }
-          const properties = Array.isArray(options.properties)
-            ? options.properties
-            : [];
-          for (const property of properties) {
-            if (
-              property?.type !== "Property" ||
-              getPropertyName(property.key) !== "queryKey"
-            ) {
-              continue;
-            }
-            const key = literalOf(property.value, "ArrayExpression", context);
-            if (!key || property.value.type === "Identifier") {
-              continue;
-            }
-            context.report({ node: key, messageId: "inlineQueryKey" });
-          }
+          reportInlineOptionKeys(context, argument);
         }
       },
       BinaryExpression(node) {

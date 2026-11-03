@@ -11,7 +11,7 @@ const isJsxIdentifier = (node, name) =>
   node !== null &&
   node.type === "JSXIdentifier" &&
   node.name === name;
-const isProvenSafeValue = (node) => {
+const isStaticHtml = (node) => {
   if (!node || typeof node.type !== "string") {
     return false;
   }
@@ -20,13 +20,12 @@ const isProvenSafeValue = (node) => {
   }
   if (node.type === "TemplateLiteral") {
     return (
-      Array.isArray(node.expressions) &&
-      node.expressions.every(isProvenSafeValue)
+      Array.isArray(node.expressions) && node.expressions.every(isStaticHtml)
     );
   }
   return false;
 };
-const isDangerouslySetInnerHtmlValue = (property) => {
+const isInnerHtmlProperty = (property) => {
   if (getPropertyName(property.key) !== "__html") {
     return false;
   }
@@ -50,6 +49,99 @@ const isDangerouslySetInnerHtmlValue = (property) => {
     isJsxIdentifier(attribute.name, "dangerouslySetInnerHTML")
   );
 };
+class HtmlProvenance {
+  constructor(context) {
+    this.context = context;
+    this.options = this.context.options[0] ?? {};
+    this.sanitizers = this.options.sanitizers ?? [
+      { module: "dompurify", export: "default", member: "sanitize" },
+    ];
+    this.trusted = this.options.trustedSources ?? [];
+  }
+  proven = (node, seen = new Set()) => {
+    node = unwrapExpression(node);
+    if (isStaticHtml(node) || importedOwner(this.context, node, this.trusted)) {
+      return true;
+    }
+    if (node?.type === "CallExpression") {
+      return importedOwner(this.context, node.callee, this.sanitizers);
+    }
+    const binding = findVariable(this.context, node);
+    if (!binding || seen.has(binding)) return false;
+    seen.add(binding);
+    const definition = binding.defs[0];
+    return (
+      definition?.type === "Variable" &&
+      definition.parent.kind === "const" &&
+      !binding.references.some(
+        (reference) => reference.isWrite() && !reference.init
+      ) &&
+      this.proven(definition.node.init, seen)
+    );
+  };
+
+  reportIfUnsafe = (node) => {
+    if (this.proven(node)) {
+      return;
+    }
+    this.context.report({ node, messageId: "unsafeInnerHtml" });
+  };
+
+  reportPayloadSpreads = (objectNode) => {
+    for (const property of objectNode.properties) {
+      if (property?.type !== "SpreadElement") {
+        continue;
+      }
+      this.context.report({
+        node: property,
+        messageId: "unsafeInnerHtmlSpread",
+      });
+    }
+  };
+
+  visitJSXAttribute = (node) => {
+    if (!isJsxIdentifier(node.name, "dangerouslySetInnerHTML")) {
+      return;
+    }
+    const attributeInitializer = node.value;
+    if (attributeInitializer?.type !== "JSXExpressionContainer") {
+      return;
+    }
+    const expression = unwrapExpression(attributeInitializer.expression);
+    if (expression?.type === "ObjectExpression") {
+      this.reportPayloadSpreads(expression);
+      return;
+    }
+    this.reportIfUnsafe(attributeInitializer.expression);
+  };
+
+  visitProperty = (node) => {
+    if (!isInnerHtmlProperty(node)) {
+      return;
+    }
+    this.reportIfUnsafe(node.value);
+  };
+
+  visitAssignmentExpression = (node) => {
+    const target = node.left;
+    if (
+      target.type !== "MemberExpression" ||
+      target.computed ||
+      !isIdentifier(target.property, "innerHTML")
+    ) {
+      return;
+    }
+    this.reportIfUnsafe(node.right);
+  };
+  listeners() {
+    return {
+      JSXAttribute: this.visitJSXAttribute,
+      Property: this.visitProperty,
+      AssignmentExpression: this.visitAssignmentExpression,
+    };
+  }
+}
+
 export default {
   meta: {
     schema: [
@@ -76,83 +168,6 @@ export default {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-
-    const options = context.options[0] ?? {};
-    const sanitizers = options.sanitizers ?? [
-      { module: "dompurify", export: "default", member: "sanitize" },
-    ];
-    const trusted = options.trustedSources ?? [];
-    function proven(node, seen = new Set()) {
-      node = unwrapExpression(node);
-      if (isProvenSafeValue(node) || importedOwner(context, node, trusted)) {
-        return true;
-      }
-      if (node?.type === "CallExpression") {
-        return importedOwner(context, node.callee, sanitizers);
-      }
-      const variable = findVariable(context, node);
-      if (!variable || seen.has(variable)) return false;
-      seen.add(variable);
-      const definition = variable.defs[0];
-      return (
-        definition?.type === "Variable" &&
-        definition.parent.kind === "const" &&
-        !variable.references.some(
-          (reference) => reference.isWrite() && !reference.init
-        ) &&
-        proven(definition.node.init, seen)
-      );
-    }
-    const reportIfUnsafe = (node) => {
-      if (proven(node)) {
-        return;
-      }
-      context.report({ node, messageId: "unsafeInnerHtml" });
-    };
-    const reportPayloadSpreads = (objectNode) => {
-      for (const property of objectNode.properties) {
-        if (property?.type !== "SpreadElement") {
-          continue;
-        }
-        context.report({
-          node: property,
-          messageId: "unsafeInnerHtmlSpread",
-        });
-      }
-    };
-    return {
-      JSXAttribute(node) {
-        if (!isJsxIdentifier(node.name, "dangerouslySetInnerHTML")) {
-          return;
-        }
-        const value = node.value;
-        if (value?.type !== "JSXExpressionContainer") {
-          return;
-        }
-        const expression = unwrapExpression(value.expression);
-        if (expression?.type === "ObjectExpression") {
-          reportPayloadSpreads(expression);
-          return;
-        }
-        reportIfUnsafe(value.expression);
-      },
-      Property(node) {
-        if (!isDangerouslySetInnerHtmlValue(node)) {
-          return;
-        }
-        reportIfUnsafe(node.value);
-      },
-      AssignmentExpression(node) {
-        const target = node.left;
-        if (
-          target.type !== "MemberExpression" ||
-          target.computed ||
-          !isIdentifier(target.property, "innerHTML")
-        ) {
-          return;
-        }
-        reportIfUnsafe(node.right);
-      },
-    };
+    return new HtmlProvenance(context).listeners();
   },
 };

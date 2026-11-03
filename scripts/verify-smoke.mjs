@@ -442,7 +442,9 @@ try {
     badOut = String(error.stdout ?? "");
   }
   const oxlintDiagnostics = JSON.parse(badOut).diagnostics ?? [];
-  const oxlintCodes = new Set(oxlintDiagnostics.map((d) => d.code));
+  const oxlintCodes = new Set(
+    oxlintDiagnostics.map((diagnostic) => diagnostic.code)
+  );
   for (const expected of expectedRules) {
     const ruleSlug = expected.split("/")[1];
     const matched = [...oxlintCodes].some(
@@ -493,7 +495,9 @@ try {
   );
 
   const [eslintBad] = await eslint.lintFiles([badFile]);
-  const eslintRuleIds = new Set(eslintBad.messages.map((m) => m.ruleId));
+  const eslintRuleIds = new Set(
+    eslintBad.messages.map((message) => message.ruleId)
+  );
   for (const expected of expectedRules) {
     assert.ok(
       eslintRuleIds.has(expected),
@@ -523,8 +527,8 @@ try {
     `Unexpected pack output: ${packOut}`
   );
 
-  console.log(
-    `Smoke passed: ${ruleNames.length} host-agnostic rules verified in Oxlint, ESLint, and packed tarball.`
+  process.stdout.write(
+    `Smoke passed: ${ruleNames.length} host-agnostic rules verified in Oxlint, ESLint, and packed tarball.\n`
   );
 } finally {
   rmSync(workDir, { recursive: true, force: true });

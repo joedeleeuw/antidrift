@@ -6,15 +6,17 @@ const baseClass = (token) => {
   const idx = token.lastIndexOf(":");
   return idx === -1 ? token : token.slice(idx + 1);
 };
-const isVerticalScroll = (c) =>
-  c === "overflow-auto" ||
-  c === "overflow-scroll" ||
-  c === "overflow-y-auto" ||
-  c === "overflow-y-scroll";
-const constrainsWidth = (c) =>
-  c.startsWith("max-w-") && c !== "max-w-none" && c !== "max-w-full";
-const isCenteredScrollColumn = (value) => {
-  const classes = value.split(SPLIT).filter(Boolean).map(baseClass);
+const isVerticalScroll = (className) =>
+  className === "overflow-auto" ||
+  className === "overflow-scroll" ||
+  className === "overflow-y-auto" ||
+  className === "overflow-y-scroll";
+const constrainsWidth = (className) =>
+  className.startsWith("max-w-") &&
+  className !== "max-w-none" &&
+  className !== "max-w-full";
+const isCenteredScrollColumn = (classNames) => {
+  const classes = classNames.split(SPLIT).filter(Boolean).map(baseClass);
   const hasScroll = classes.some(isVerticalScroll);
   const hasCenter = classes.includes("mx-auto");
   const hasMaxW = classes.some(constrainsWidth);
@@ -22,7 +24,10 @@ const isCenteredScrollColumn = (value) => {
     return false;
   }
   const exempt = classes.some(
-    (c) => c === "absolute" || c === "fixed" || c.startsWith("max-h-")
+    (className) =>
+      className === "absolute" ||
+      className === "fixed" ||
+      className.startsWith("max-h-")
   );
   return !exempt;
 };

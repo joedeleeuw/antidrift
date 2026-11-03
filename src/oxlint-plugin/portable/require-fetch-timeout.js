@@ -17,7 +17,7 @@ const getNodeArguments = (node) => {
   ) {
     return null;
   }
-  return node.arguments.map((value) => value);
+  return node.arguments.map((element) => element);
 };
 const unwrapExpression = (node) => {
   let current = node;
@@ -49,7 +49,7 @@ const getObjectExpressionProperties = (node) => {
   ) {
     return null;
   }
-  return unwrapped.properties.map((value) => value);
+  return unwrapped.properties.map((element) => element);
 };
 const getPropertyKey = (node) => {
   if (typeof node !== "object" || node === null || !("key" in node)) {
@@ -71,20 +71,20 @@ const getIdentifierName = (node) => {
   return unwrapped.name;
 };
 const getBindingIdentifierNames = (node) => {
-  const value = unwrapExpression(node);
-  if (!value) return [];
-  if (value.type === "Identifier") return [value.name];
-  if (value.type === "RestElement") {
-    return getBindingIdentifierNames(value.argument);
+  const element = unwrapExpression(node);
+  if (!element) return [];
+  if (element.type === "Identifier") return [element.name];
+  if (element.type === "RestElement") {
+    return getBindingIdentifierNames(element.argument);
   }
-  if (value.type === "AssignmentPattern") {
-    return getBindingIdentifierNames(value.left);
+  if (element.type === "AssignmentPattern") {
+    return getBindingIdentifierNames(element.left);
   }
-  if (value.type === "ArrayPattern") {
-    return value.elements.flatMap(getBindingIdentifierNames);
+  if (element.type === "ArrayPattern") {
+    return element.elements.flatMap(getBindingIdentifierNames);
   }
-  if (value.type === "ObjectPattern") {
-    return value.properties.flatMap((property) =>
+  if (element.type === "ObjectPattern") {
+    return element.properties.flatMap((property) =>
       getBindingIdentifierNames(
         property.type === "RestElement" ? property.argument : property.value
       )
@@ -125,7 +125,7 @@ const getNodeParams = (node) => {
   ) {
     return [];
   }
-  return node.params.map((value) => value);
+  return node.params.map((element) => element);
 };
 const isFetchCallee = (callee) => {
   if (isIdentifier(callee, "fetch")) {
@@ -221,6 +221,232 @@ const optionsObjectHasSignal = (options) => {
   }
   return "no";
 };
+class FetchSignalAnalysis {
+  constructor(context) {
+    this.context = context;
+    this.requestSignalScopes = [];
+  }
+  fetchOrigin = (node, seen = new Set()) => {
+    node = unwrapExpression(node);
+    if (node?.type !== "Identifier") return isFetchCallee(node);
+    const bindingSymbol = findVariable(this.context, node);
+    if (!bindingSymbol?.defs.length) return node.name === "fetch";
+    if (seen.has(bindingSymbol)) return false;
+    seen.add(bindingSymbol);
+    const definition = bindingSymbol.defs[0];
+    const id =
+      definition.node.type === "AssignmentPattern"
+        ? definition.node.left
+        : definition.name;
+    const annotation = id?.typeAnnotation?.typeAnnotation;
+    if (
+      annotation?.type === "TSTypeQuery" &&
+      isIdentifier(annotation.exprName, "fetch")
+    ) {
+      return true;
+    }
+    if (
+      definition.type === "Variable" &&
+      definition.parent.kind === "const" &&
+      !bindingSymbol.references.some(
+        (reference) => reference.isWrite() && !reference.init
+      )
+    ) {
+      return this.fetchOrigin(definition.node.init, seen);
+    }
+    if (
+      definition.type === "Parameter" &&
+      definition.name?.parent?.type === "AssignmentPattern"
+    ) {
+      return this.fetchOrigin(definition.name.parent.right, seen);
+    }
+    return false;
+  };
+
+  pushRequestSignalScope = () => {
+    this.requestSignalScopes.push(new Map());
+  };
+
+  popRequestSignalScope = () => {
+    this.requestSignalScopes.pop();
+    if (this.requestSignalScopes.length === 0) {
+      this.pushRequestSignalScope();
+    }
+  };
+
+  currentRequestSignalScope = () => {
+    const scope = this.requestSignalScopes.at(-1);
+    if (scope) {
+      return scope;
+    }
+    this.pushRequestSignalScope();
+    return this.currentRequestSignalScope();
+  };
+
+  getRequestSignalState = (name) => {
+    for (
+      let index = this.requestSignalScopes.length - 1;
+      index >= 0;
+      index -= 1
+    ) {
+      const scope = this.requestSignalScopes.at(index);
+      const state = scope?.get(name);
+      if (state !== undefined) {
+        return state;
+      }
+    }
+    return "no";
+  };
+
+  setRequestSignalState = (name, state) => {
+    this.currentRequestSignalScope().set(name, state);
+  };
+
+  assignRequestSignalState = (name, state) => {
+    for (
+      let index = this.requestSignalScopes.length - 1;
+      index >= 0;
+      index -= 1
+    ) {
+      const scope = this.requestSignalScopes.at(index);
+      if (scope?.has(name)) {
+        scope.set(name, state);
+        return;
+      }
+    }
+    this.setRequestSignalState(name, state);
+  };
+
+  declareFunctionParameters = (node) => {
+    for (const parameter of getNodeParams(node)) {
+      for (const identifierName of getBindingIdentifierNames(parameter)) {
+        this.setRequestSignalState(identifierName, "no");
+      }
+    }
+  };
+
+  getFetchInputSignalState = (input) => {
+    const constructorSignal = requestConstructorSignalState(input);
+    if (constructorSignal !== null) {
+      return constructorSignal;
+    }
+    const identifierName = getIdentifierName(input);
+    if (identifierName === null) {
+      return "no";
+    }
+    return this.getRequestSignalState(identifierName);
+  };
+
+  onProgram = () => {
+    this.requestSignalScopes.length = 0;
+    this.pushRequestSignalScope();
+  };
+
+  onProgramExit = () => {
+    this.requestSignalScopes.length = 0;
+  };
+
+  enterFunction = (node) => {
+    this.pushRequestSignalScope();
+    this.declareFunctionParameters(node);
+  };
+
+  onCatchClause = (node) => {
+    this.pushRequestSignalScope();
+    const parameter =
+      typeof node === "object" && node !== null && "param" in node
+        ? node.param
+        : null;
+    for (const identifierName of getBindingIdentifierNames(parameter)) {
+      this.setRequestSignalState(identifierName, "no");
+    }
+  };
+
+  onVariableDeclarator = (node) => {
+    const id = getNodeId(node);
+    const identifierName = getIdentifierName(id);
+    const bindingNames = getBindingIdentifierNames(id);
+    if (bindingNames.length === 0) {
+      return;
+    }
+    const initSignal = requestConstructorSignalState(getNodeInit(node));
+    if (identifierName !== null && initSignal !== null) {
+      this.setRequestSignalState(identifierName, initSignal);
+      return;
+    }
+    if (identifierName !== null && isRequestTypeAnnotation(id)) {
+      this.setRequestSignalState(identifierName, "opaque");
+      return;
+    }
+    for (const bindingName of bindingNames) {
+      this.setRequestSignalState(bindingName, "no");
+    }
+  };
+
+  onAssignmentExpression = (node) => {
+    const left = getNodeLeft(node);
+    const identifierName = getIdentifierName(left);
+    if (identifierName === null) {
+      for (const bindingName of getBindingIdentifierNames(left)) {
+        this.assignRequestSignalState(bindingName, "no");
+      }
+      return;
+    }
+    const rightSignal = requestConstructorSignalState(getNodeRight(node));
+    if (rightSignal !== null) {
+      this.assignRequestSignalState(identifierName, rightSignal);
+      return;
+    }
+    const nextState =
+      this.getRequestSignalState(identifierName) === "opaque" ? "opaque" : "no";
+    this.assignRequestSignalState(identifierName, nextState);
+  };
+
+  onCallExpression = (node) => {
+    if (!this.fetchOrigin(node.callee)) {
+      return;
+    }
+    const [firstArg, options] = node.arguments;
+    if (options === undefined) {
+      if (this.getFetchInputSignalState(firstArg) !== "no") {
+        return;
+      }
+      this.context.report({ node, messageId: "missingSignal" });
+      return;
+    }
+    const unwrappedOptions = unwrapExpression(options);
+    if (getNodeType(unwrappedOptions) !== "ObjectExpression") {
+      return;
+    }
+    if (
+      optionsObjectHasSignal(unwrappedOptions) === "no" &&
+      this.getFetchInputSignalState(firstArg) === "no"
+    ) {
+      this.context.report({ node, messageId: "missingSignal" });
+    }
+  };
+
+  listeners() {
+    return {
+      Program: this.onProgram,
+      "Program:exit": this.onProgramExit,
+      BlockStatement: this.pushRequestSignalScope,
+      "BlockStatement:exit": this.popRequestSignalScope,
+      FunctionDeclaration: this.enterFunction,
+      "FunctionDeclaration:exit": this.popRequestSignalScope,
+      FunctionExpression: this.enterFunction,
+      "FunctionExpression:exit": this.popRequestSignalScope,
+      ArrowFunctionExpression: this.enterFunction,
+      "ArrowFunctionExpression:exit": this.popRequestSignalScope,
+      CatchClause: this.onCatchClause,
+      "CatchClause:exit": this.popRequestSignalScope,
+      VariableDeclarator: this.onVariableDeclarator,
+      AssignmentExpression: this.onAssignmentExpression,
+      CallExpression: this.onCallExpression,
+    };
+  }
+}
+
 export default {
   meta: {
     schema: [
@@ -241,218 +467,6 @@ export default {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-    function fetchOrigin(node, seen = new Set()) {
-      node = unwrapExpression(node);
-      if (node?.type !== "Identifier") return isFetchCallee(node);
-      const variable = findVariable(context, node);
-      if (!variable?.defs.length) return node.name === "fetch";
-      if (seen.has(variable)) return false;
-      seen.add(variable);
-      const definition = variable.defs[0];
-      const id =
-        definition.node.type === "AssignmentPattern"
-          ? definition.node.left
-          : definition.name;
-      const annotation = id?.typeAnnotation?.typeAnnotation;
-      if (
-        annotation?.type === "TSTypeQuery" &&
-        isIdentifier(annotation.exprName, "fetch")
-      ) {
-        return true;
-      }
-      if (
-        definition.type === "Variable" &&
-        definition.parent.kind === "const" &&
-        !variable.references.some(
-          (reference) => reference.isWrite() && !reference.init
-        )
-      ) {
-        return fetchOrigin(definition.node.init, seen);
-      }
-      if (
-        definition.type === "Parameter" &&
-        definition.name?.parent?.type === "AssignmentPattern"
-      ) {
-        return fetchOrigin(definition.name.parent.right, seen);
-      }
-      return false;
-    }
-
-    const requestSignalScopes = [];
-    const pushRequestSignalScope = () => {
-      requestSignalScopes.push(new Map());
-    };
-    const popRequestSignalScope = () => {
-      requestSignalScopes.pop();
-      if (requestSignalScopes.length === 0) {
-        pushRequestSignalScope();
-      }
-    };
-    const currentRequestSignalScope = () => {
-      const scope = requestSignalScopes.at(-1);
-      if (scope) {
-        return scope;
-      }
-      pushRequestSignalScope();
-      return currentRequestSignalScope();
-    };
-    const getRequestSignalState = (name) => {
-      for (let index = requestSignalScopes.length - 1; index >= 0; index -= 1) {
-        const scope = requestSignalScopes.at(index);
-        const state = scope?.get(name);
-        if (state !== undefined) {
-          return state;
-        }
-      }
-      return "no";
-    };
-    const setRequestSignalState = (name, state) => {
-      currentRequestSignalScope().set(name, state);
-    };
-    const assignRequestSignalState = (name, state) => {
-      for (let index = requestSignalScopes.length - 1; index >= 0; index -= 1) {
-        const scope = requestSignalScopes.at(index);
-        if (scope?.has(name)) {
-          scope.set(name, state);
-          return;
-        }
-      }
-      setRequestSignalState(name, state);
-    };
-    const declareFunctionParameters = (node) => {
-      for (const param of getNodeParams(node)) {
-        for (const identifierName of getBindingIdentifierNames(param)) {
-          setRequestSignalState(identifierName, "no");
-        }
-      }
-    };
-    const getFetchInputSignalState = (input) => {
-      const constructorSignal = requestConstructorSignalState(input);
-      if (constructorSignal !== null) {
-        return constructorSignal;
-      }
-      const identifierName = getIdentifierName(input);
-      if (identifierName === null) {
-        return "no";
-      }
-      return getRequestSignalState(identifierName);
-    };
-    if (
-      (() => {
-        requestSignalScopes.length = 0;
-      })() === false
-    ) {
-      return {};
-    }
-    return {
-      Program() {
-        requestSignalScopes.length = 0;
-        pushRequestSignalScope();
-      },
-      "Program:exit"() {
-        requestSignalScopes.length = 0;
-      },
-      BlockStatement() {
-        pushRequestSignalScope();
-      },
-      "BlockStatement:exit"() {
-        popRequestSignalScope();
-      },
-      FunctionDeclaration(node) {
-        pushRequestSignalScope();
-        declareFunctionParameters(node);
-      },
-      "FunctionDeclaration:exit"() {
-        popRequestSignalScope();
-      },
-      FunctionExpression(node) {
-        pushRequestSignalScope();
-        declareFunctionParameters(node);
-      },
-      "FunctionExpression:exit"() {
-        popRequestSignalScope();
-      },
-      ArrowFunctionExpression(node) {
-        pushRequestSignalScope();
-        declareFunctionParameters(node);
-      },
-      "ArrowFunctionExpression:exit"() {
-        popRequestSignalScope();
-      },
-      CatchClause(node) {
-        pushRequestSignalScope();
-        const param =
-          typeof node === "object" && node !== null && "param" in node
-            ? node.param
-            : null;
-        for (const identifierName of getBindingIdentifierNames(param)) {
-          setRequestSignalState(identifierName, "no");
-        }
-      },
-      "CatchClause:exit"() {
-        popRequestSignalScope();
-      },
-      VariableDeclarator(node) {
-        const id = getNodeId(node);
-        const identifierName = getIdentifierName(id);
-        const bindingNames = getBindingIdentifierNames(id);
-        if (bindingNames.length === 0) {
-          return;
-        }
-        const initSignal = requestConstructorSignalState(getNodeInit(node));
-        if (identifierName !== null && initSignal !== null) {
-          setRequestSignalState(identifierName, initSignal);
-          return;
-        }
-        if (identifierName !== null && isRequestTypeAnnotation(id)) {
-          setRequestSignalState(identifierName, "opaque");
-          return;
-        }
-        for (const bindingName of bindingNames) {
-          setRequestSignalState(bindingName, "no");
-        }
-      },
-      AssignmentExpression(node) {
-        const left = getNodeLeft(node);
-        const identifierName = getIdentifierName(left);
-        if (identifierName === null) {
-          for (const bindingName of getBindingIdentifierNames(left)) {
-            assignRequestSignalState(bindingName, "no");
-          }
-          return;
-        }
-        const rightSignal = requestConstructorSignalState(getNodeRight(node));
-        if (rightSignal !== null) {
-          assignRequestSignalState(identifierName, rightSignal);
-          return;
-        }
-        const nextState =
-          getRequestSignalState(identifierName) === "opaque" ? "opaque" : "no";
-        assignRequestSignalState(identifierName, nextState);
-      },
-      CallExpression(node) {
-        if (!fetchOrigin(node.callee)) {
-          return;
-        }
-        const [firstArg, options] = node.arguments;
-        if (options === undefined) {
-          if (getFetchInputSignalState(firstArg) !== "no") {
-            return;
-          }
-          context.report({ node, messageId: "missingSignal" });
-          return;
-        }
-        const unwrappedOptions = unwrapExpression(options);
-        if (getNodeType(unwrappedOptions) !== "ObjectExpression") {
-          return;
-        }
-        if (
-          optionsObjectHasSignal(unwrappedOptions) === "no" &&
-          getFetchInputSignalState(firstArg) === "no"
-        ) {
-          context.report({ node, messageId: "missingSignal" });
-        }
-      },
-    };
+    return new FetchSignalAnalysis(context).listeners();
   },
 };

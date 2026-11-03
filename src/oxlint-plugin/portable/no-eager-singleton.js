@@ -9,6 +9,88 @@ const NEW_DENYLIST = new Set([
   "S3Client",
   "SQL",
 ]);
+class ModuleResources {
+  constructor(context) {
+    this.context = context;
+    this.functionDepth = 0;
+    this.nonStaticClassFieldDepth = 0;
+  }
+  enterFunction = () => {
+    this.functionDepth += 1;
+  };
+
+  exitFunction = () => {
+    this.functionDepth -= 1;
+  };
+
+  enterPropertyDefinition = (node) => {
+    if (node.static !== true) {
+      this.nonStaticClassFieldDepth += 1;
+    }
+  };
+
+  exitPropertyDefinition = (node) => {
+    if (node.static !== true) {
+      this.nonStaticClassFieldDepth -= 1;
+    }
+  };
+
+  isSuppressed = () =>
+    this.functionDepth > 0 || this.nonStaticClassFieldDepth > 0;
+
+  visitCallExpression = (node) => {
+    if (this.isSuppressed()) {
+      return;
+    }
+    const callee = node.callee;
+    if (
+      isIdentifier(callee) &&
+      (this.context.options[0]?.factories ?? [...CALL_DENYLIST]).includes(
+        callee.name
+      )
+    ) {
+      this.context.report({
+        node,
+        messageId: "eagerSingleton",
+        data: { name: callee.name },
+      });
+    }
+  };
+
+  visitNewExpression = (node) => {
+    if (this.isSuppressed()) {
+      return;
+    }
+    const callee = node.callee;
+    if (
+      isIdentifier(callee) &&
+      (this.context.options[0]?.constructors ?? [...NEW_DENYLIST]).includes(
+        callee.name
+      )
+    ) {
+      this.context.report({
+        node,
+        messageId: "eagerSingleton",
+        data: { name: `new ${callee.name}` },
+      });
+    }
+  };
+  listeners() {
+    return {
+      FunctionDeclaration: this.enterFunction,
+      "FunctionDeclaration:exit": this.exitFunction,
+      FunctionExpression: this.enterFunction,
+      "FunctionExpression:exit": this.exitFunction,
+      ArrowFunctionExpression: this.enterFunction,
+      "ArrowFunctionExpression:exit": this.exitFunction,
+      PropertyDefinition: this.enterPropertyDefinition,
+      "PropertyDefinition:exit": this.exitPropertyDefinition,
+      CallExpression: this.visitCallExpression,
+      NewExpression: this.visitNewExpression,
+    };
+  }
+}
+
 export default {
   meta: {
     schema: [
@@ -31,80 +113,6 @@ export default {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-
-    let functionDepth = 0;
-    let nonStaticClassFieldDepth = 0;
-    const enterFunction = () => {
-      functionDepth += 1;
-    };
-    const exitFunction = () => {
-      functionDepth -= 1;
-    };
-    const enterPropertyDefinition = (node) => {
-      if (node.static !== true) {
-        nonStaticClassFieldDepth += 1;
-      }
-    };
-    const exitPropertyDefinition = (node) => {
-      if (node.static !== true) {
-        nonStaticClassFieldDepth -= 1;
-      }
-    };
-    const isSuppressed = () =>
-      functionDepth > 0 || nonStaticClassFieldDepth > 0;
-    if (
-      (() => {
-        functionDepth = 0;
-        nonStaticClassFieldDepth = 0;
-      })() === false
-    ) {
-      return {};
-    }
-    return {
-      FunctionDeclaration: enterFunction,
-      "FunctionDeclaration:exit": exitFunction,
-      FunctionExpression: enterFunction,
-      "FunctionExpression:exit": exitFunction,
-      ArrowFunctionExpression: enterFunction,
-      "ArrowFunctionExpression:exit": exitFunction,
-      PropertyDefinition: enterPropertyDefinition,
-      "PropertyDefinition:exit": exitPropertyDefinition,
-      CallExpression(node) {
-        if (isSuppressed()) {
-          return;
-        }
-        const callee = node.callee;
-        if (
-          isIdentifier(callee) &&
-          (context.options[0]?.factories ?? [...CALL_DENYLIST]).includes(
-            callee.name
-          )
-        ) {
-          context.report({
-            node,
-            messageId: "eagerSingleton",
-            data: { name: callee.name },
-          });
-        }
-      },
-      NewExpression(node) {
-        if (isSuppressed()) {
-          return;
-        }
-        const callee = node.callee;
-        if (
-          isIdentifier(callee) &&
-          (context.options[0]?.constructors ?? [...NEW_DENYLIST]).includes(
-            callee.name
-          )
-        ) {
-          context.report({
-            node,
-            messageId: "eagerSingleton",
-            data: { name: `new ${callee.name}` },
-          });
-        }
-      },
-    };
+    return new ModuleResources(context).listeners();
   },
 };

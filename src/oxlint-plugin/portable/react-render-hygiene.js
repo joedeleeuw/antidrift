@@ -1,3 +1,4 @@
+import { hasIterationEquijoin } from "./query-join-checks.js";
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import {
   findVariable,
@@ -134,9 +135,9 @@ export const noUnstableRenderDefaultCollectionRule = {
     }
     function checkComponent(node) {
       if (!functionReturnsJsx(node)) return;
-      for (const param of node.params) {
-        if (param.type !== "ObjectPattern") continue;
-        for (const prop of param.properties) {
+      for (const parameter of node.params) {
+        if (parameter.type !== "ObjectPattern") continue;
+        for (const prop of parameter.properties) {
           if (
             prop.type === "Property" &&
             prop.value?.type === "AssignmentPattern" &&
@@ -159,21 +160,16 @@ export const noUnstableRenderDefaultCollectionRule = {
   },
 };
 
-function isQueryHookCall(expr, convexDirectValueHooks) {
+function queryHookName(expr) {
   const node = unwrapExpression(expr);
-  if (node?.type !== "CallExpression") return false;
+  if (node?.type !== "CallExpression") return null;
   const callee = unwrapExpression(node.callee);
-  if (
-    callee?.type !== "Identifier" ||
-    !QUERY_HOOK_NAME.test(callee.name) ||
-    convexDirectValueHooks.has(callee.name)
-  ) {
-    return false;
-  }
-  return true;
+  return callee?.type === "Identifier" && QUERY_HOOK_NAME.test(callee.name)
+    ? callee.name
+    : null;
 }
 
-function isEnvelopeObject(expr) {
+function isQueryEnvelope(expr) {
   const node = unwrapExpression(expr);
   if (node?.type !== "ObjectExpression") return false;
   let hits = 0;
@@ -191,7 +187,7 @@ function isEnvelopeObject(expr) {
 function checkReturnedExpr(expr, reportNode, context, convexDirectValueHooks) {
   const node = unwrapExpression(expr);
   if (!node) return;
-  if (isEnvelopeObject(node)) {
+  if (isQueryEnvelope(node)) {
     context.report({
       node: reportNode,
       message:
@@ -200,9 +196,10 @@ function checkReturnedExpr(expr, reportNode, context, convexDirectValueHooks) {
     return;
   }
   if (node.type === "Identifier") {
-    const v = findVariable(context.sourceCode, node);
-    const init = v?.defs?.[0]?.node?.init;
-    if (init && isQueryHookCall(init, convexDirectValueHooks)) {
+    const binding = findVariable(context.sourceCode, node);
+    const init = binding?.defs?.[0]?.node?.init;
+    const hookName = init && queryHookName(init);
+    if (hookName && !convexDirectValueHooks.has(hookName)) {
       context.report({
         node: reportNode,
         message:
@@ -271,8 +268,8 @@ export const noQueryEnvelopeLeakRule = {
 };
 
 function isUnshadowedGlobal(ident, sourceCode) {
-  const variable = findVariable(sourceCode, ident);
-  return !variable || variable.defs.length === 0;
+  const binding = findVariable(sourceCode, ident);
+  return !binding || binding.defs.length === 0;
 }
 
 function isImpureCall(node, sourceCode) {
@@ -430,109 +427,6 @@ export const noExternalDecodeInTsxRule = {
   },
 };
 
-const OUTER_METHODS = new Set(["map", "flatMap", "filter"]);
-const INNER_METHODS = new Set(["find", "filter"]);
-const LOOP_TYPES = new Set([
-  "ForOfStatement",
-  "ForStatement",
-  "WhileStatement",
-]);
-
-function isIterationCall(node, methods) {
-  return (
-    node?.type === "CallExpression" &&
-    node.callee?.type === "MemberExpression" &&
-    !node.callee.computed &&
-    methods.has(node.callee.property?.name) &&
-    isFunctionLike(unwrapExpression(node.arguments[0]))
-  );
-}
-
-function isInside(node, ancestor) {
-  for (let current = node; current; current = current.parent) {
-    if (current === ancestor) return true;
-    if (isFunctionLike(current)) return false;
-  }
-  return false;
-}
-
-function isLoopBinding(identifier, loop, sourceCode) {
-  const binding = findVariable(sourceCode, identifier);
-  if (!binding) return false;
-  if (binding.defs.some((definition) => isInside(definition.node, loop))) {
-    return true;
-  }
-  if (
-    loop.type === "ForOfStatement" &&
-    loop.left.type === "Identifier" &&
-    findVariable(sourceCode, loop.left) === binding
-  ) {
-    return true;
-  }
-  return binding.references.some(
-    (reference) =>
-      isInside(reference.identifier, loop.test) ||
-      (reference.isWrite() && isInside(reference.identifier, loop))
-  );
-}
-
-function iterationOwns(identifier, call, sourceCode) {
-  for (let current = call.parent; current; current = current.parent) {
-    if (isFunctionLike(current)) {
-      const outerCall = current.parent;
-      const parameter = current.params[0];
-      return (
-        isIterationCall(outerCall, OUTER_METHODS) &&
-        outerCall.arguments[0] === current &&
-        parameter?.type === "Identifier" &&
-        findVariable(sourceCode, parameter) ===
-          findVariable(sourceCode, identifier)
-      );
-    }
-    if (
-      LOOP_TYPES.has(current.type) &&
-      isInside(call, current.body) &&
-      isLoopBinding(identifier, current, sourceCode)
-    ) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function propertyOwner(expression) {
-  const member = unwrapExpression(expression);
-  if (member?.type !== "MemberExpression" || member.computed) return null;
-  const owner = unwrapExpression(member.object);
-  return owner?.type === "Identifier" ? owner : null;
-}
-
-function isForeignKeyComparison(node, parameter, call, sourceCode) {
-  if (node.type !== "BinaryExpression" || node.operator !== "===") return false;
-  const left = propertyOwner(node.left);
-  const right = propertyOwner(node.right);
-  if (!left || !right) return false;
-  const innerBinding = findVariable(sourceCode, parameter);
-  if (!innerBinding) return false;
-  const leftInner = findVariable(sourceCode, left) === innerBinding;
-  const rightInner = findVariable(sourceCode, right) === innerBinding;
-  return (
-    leftInner !== rightInner &&
-    iterationOwns(leftInner ? right : left, call, sourceCode)
-  );
-}
-
-function containsForeignKeyComparison(node, parameter, call, sourceCode) {
-  if (!node || isFunctionLike(node)) return false;
-  if (isForeignKeyComparison(node, parameter, call, sourceCode)) return true;
-  return (sourceCode.visitorKeys[node.type] ?? []).some((key) => {
-    const children = Array.isArray(node[key]) ? node[key] : [node[key]];
-    return children.some((child) =>
-      containsForeignKeyComparison(child, parameter, call, sourceCode)
-    );
-  });
-}
-
 export const noQueryJoinOrTreeReshapeRule = {
   meta: {
     type: "problem",
@@ -546,20 +440,7 @@ export const noQueryJoinOrTreeReshapeRule = {
     if (!isRuleFile(context)) return {};
     return {
       CallExpression(node) {
-        if (!isIterationCall(node, INNER_METHODS)) return;
-        const callback = unwrapExpression(node.arguments[0]);
-        const parameter = callback.params[0];
-        if (
-          parameter?.type !== "Identifier" ||
-          !containsForeignKeyComparison(
-            callback.body,
-            parameter,
-            node,
-            context.sourceCode
-          )
-        ) {
-          return;
-        }
+        if (!hasIterationEquijoin(node, context.sourceCode)) return;
         context.report({
           node,
           message:

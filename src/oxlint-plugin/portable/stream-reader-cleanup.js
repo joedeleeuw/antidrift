@@ -1,5 +1,11 @@
 import { isAstNode, isIdentifier } from "./ast.js";
-import { unwrapReaderExpression } from "./stream-reader-ast.js";
+import {
+  callWithinExpressionStatement,
+  isDescendantOf,
+  statementSite,
+  staticMemberName,
+  unwrapReaderExpression,
+} from "./stream-reader-ast.js";
 
 const followsDeclaration = (identifier, definition) =>
   Array.isArray(identifier.range) &&
@@ -39,9 +45,12 @@ export function canWriteBinding(resolveVariable, identifier) {
   );
 }
 
-export function canPrecedeReaderCleanup(statements, analysis) {
-  const canRead = (identifier) => {
-    const resolvedBinding = analysis.resolveVariable(identifier);
+class ReaderCleanupPrefix {
+  constructor(analysis) {
+    this.analysis = analysis;
+  }
+  canRead = (identifier) => {
+    const resolvedBinding = this.analysis.resolveVariable(identifier);
     return (
       resolvedBinding !== null &&
       resolvedBinding.defs.length > 0 &&
@@ -68,7 +77,7 @@ export function canPrecedeReaderCleanup(statements, analysis) {
       })
     );
   };
-  const cannotThrow = (node) => {
+  cannotThrow = (node) => {
     const expression = unwrapReaderExpression(node);
     if (expression === null) {
       return false;
@@ -87,7 +96,7 @@ export function canPrecedeReaderCleanup(statements, analysis) {
     }
     if (expression.type === "ArrayExpression") {
       return expression.elements.every(
-        (element) => element === null || cannotThrow(element)
+        (element) => element === null || this.cannotThrow(element)
       );
     }
     if (expression.type === "ObjectExpression") {
@@ -96,12 +105,12 @@ export function canPrecedeReaderCleanup(statements, analysis) {
           property.type === "Property" &&
           property.kind === "init" &&
           property.computed !== true &&
-          cannotThrow(property.value)
+          this.cannotThrow(property.value)
       );
     }
-    return isIdentifier(expression) && canRead(expression);
+    return isIdentifier(expression) && this.canRead(expression);
   };
-  return statements.every((statement) => {
+  allows = (statement) => {
     if (!isAstNode(statement)) {
       return false;
     }
@@ -116,7 +125,7 @@ export function canPrecedeReaderCleanup(statements, analysis) {
             isAstNode(declaration) &&
             declaration.type === "VariableDeclarator" &&
             isIdentifier(declaration.id) &&
-            (declaration.init === null || cannotThrow(declaration.init))
+            (declaration.init === null || this.cannotThrow(declaration.init))
         )
       );
     }
@@ -125,12 +134,167 @@ export function canPrecedeReaderCleanup(statements, analysis) {
     }
     const expression = unwrapReaderExpression(statement.expression);
     return (
-      analysis.allowAssignments === true &&
+      this.analysis.allowAssignments === true &&
       expression?.type === "AssignmentExpression" &&
       expression.operator === "=" &&
       isIdentifier(expression.left) &&
-      canWriteBinding(analysis.resolveVariable, expression.left) &&
-      cannotThrow(expression.right)
+      canWriteBinding(this.analysis.resolveVariable, expression.left) &&
+      this.cannotThrow(expression.right)
     );
-  });
+  };
+}
+
+export function canPrecedeReaderCleanup(statements, analysis) {
+  return statements.every(new ReaderCleanupPrefix(analysis).allows);
+}
+
+export class ReaderCleanup {
+  constructor(reader) {
+    this.reader = reader;
+  }
+  methodStatementIndexes = (block, method, binding) => {
+    if (
+      !isAstNode(block) ||
+      block.type !== "BlockStatement" ||
+      !Array.isArray(block.body)
+    ) {
+      return [];
+    }
+    const indexes = [];
+    for (const [index, statement] of block.body.entries()) {
+      if (
+        callWithinExpressionStatement(
+          statement,
+          (candidate) =>
+            this.reader.readerMethodCall(candidate, method, binding),
+          this.reader.canAssign
+        )
+      ) {
+        indexes.push(index);
+      }
+    }
+    return indexes;
+  };
+
+  handledCancelStatement = (statement, binding) => {
+    if (!isAstNode(statement) || statement.type !== "ExpressionStatement") {
+      return false;
+    }
+    let expression = unwrapReaderExpression(statement.expression);
+    while (
+      expression?.type === "AwaitExpression" ||
+      (expression?.type === "AssignmentExpression" &&
+        expression.operator === "=" &&
+        isIdentifier(expression.left) &&
+        this.reader.canAssign(expression.left))
+    ) {
+      const innerExpression =
+        expression.type === "AwaitExpression"
+          ? expression.argument
+          : expression.right;
+      expression = unwrapReaderExpression(innerExpression);
+    }
+    if (expression?.type !== "CallExpression") {
+      return false;
+    }
+    const callee = unwrapReaderExpression(expression.callee);
+    return (
+      callee?.type === "MemberExpression" &&
+      staticMemberName(callee) === "catch" &&
+      this.reader.readerMethodCall(callee.object, "cancel", binding) !== null
+    );
+  };
+
+  finalizerCleanup = (block, binding) => {
+    if (
+      !isAstNode(block) ||
+      block.type !== "BlockStatement" ||
+      !Array.isArray(block.body)
+    ) {
+      return { cancelBeforeRelease: false, releases: false };
+    }
+    let handledCancel = false;
+    for (const statement of block.body) {
+      if (
+        callWithinExpressionStatement(
+          statement,
+          (candidate) =>
+            this.reader.readerMethodCall(candidate, "releaseLock", binding),
+          this.reader.canAssign
+        )
+      ) {
+        return {
+          cancelBeforeRelease: handledCancel,
+          releases: true,
+        };
+      }
+      if (
+        callWithinExpressionStatement(
+          statement,
+          (candidate) =>
+            this.reader.readerMethodCall(candidate, "cancel", binding),
+          this.reader.canAssign
+        )
+      ) {
+        if (!this.handledCancelStatement(statement, binding)) {
+          return { cancelBeforeRelease: false, releases: false };
+        }
+        handledCancel = true;
+        continue;
+      }
+      return this.nestedFinalizerCleanup(statement, binding, handledCancel);
+    }
+    return { cancelBeforeRelease: false, releases: false };
+  };
+
+  nestedFinalizerCleanup = (statement, binding, handledCancel) => {
+    if (
+      isAstNode(statement) &&
+      statement.type === "TryStatement" &&
+      isAstNode(statement.finalizer)
+    ) {
+      const nested = this.finalizerCleanup(statement.finalizer, binding);
+      if (nested.releases) {
+        const tryCancels =
+          this.methodStatementIndexes(statement.block, "cancel", binding)
+            .length > 0;
+        return {
+          cancelBeforeRelease:
+            handledCancel || tryCancels || nested.cancelBeforeRelease,
+          releases: true,
+        };
+      }
+    }
+    return { cancelBeforeRelease: false, releases: false };
+  };
+
+  tryCoversAcquisition = (tryNode, acquisition) => {
+    if (isDescendantOf(acquisition.node, tryNode.block)) {
+      return true;
+    }
+    const acquisitionSite = statementSite(acquisition.node);
+    const trySite = statementSite(tryNode);
+    if (
+      acquisitionSite === null ||
+      trySite === null ||
+      acquisitionSite.block !== trySite.block ||
+      !Array.isArray(acquisitionSite.block.body)
+    ) {
+      return false;
+    }
+    const acquisitionIndex = acquisitionSite.block.body.indexOf(
+      acquisitionSite.statement
+    );
+    const tryIndex = acquisitionSite.block.body.indexOf(trySite.statement);
+    return (
+      acquisitionIndex !== -1 &&
+      tryIndex > acquisitionIndex &&
+      canPrecedeReaderCleanup(
+        acquisitionSite.block.body.slice(acquisitionIndex + 1, tryIndex),
+        {
+          resolveVariable: this.reader.resolveVariable,
+        }
+      )
+    );
+  };
 }

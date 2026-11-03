@@ -1,10 +1,161 @@
+import {
+  checkParameterBags,
+  recordProgramTypeDeclarations,
+} from "./parameter-bag-checks.js";
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import {
   findVariable,
-  functionReturnsJsx,
   isFunctionLike,
   unwrapExpression,
 } from "../shared/scope.js";
+
+function returnedCall(body) {
+  if (!body) return null;
+  if (body.type === "BlockStatement") {
+    if (body.body.length !== 1 || body.body[0].type !== "ReturnStatement") {
+      return null;
+    }
+    return unwrapExpression(body.body[0].argument);
+  }
+  return unwrapExpression(body);
+}
+
+function unexportedFunctionName(node) {
+  const parent = node.parent;
+  if (
+    parent?.type === "ExportNamedDeclaration" ||
+    parent?.type === "ExportDefaultDeclaration" ||
+    parent?.parent?.parent?.type === "ExportNamedDeclaration"
+  ) {
+    return null;
+  }
+  if (node.id?.name) return node.id.name;
+  if (
+    parent?.type === "VariableDeclarator" &&
+    parent.id?.type === "Identifier"
+  ) {
+    return parent.id.name;
+  }
+  return null;
+}
+
+function hasValueReturn(body) {
+  let found = false;
+  function visit(cur) {
+    if (found || !cur || typeof cur !== "object") return;
+    if (isFunctionLike(cur)) return;
+    if (cur.type === "ReturnStatement" && cur.argument !== null) {
+      found = true;
+      return;
+    }
+    for (const [k, child] of Object.entries(cur)) {
+      if (k === "parent" || k === "range" || k === "loc") continue;
+      if (Array.isArray(child)) {
+        for (const element of child) visit(element);
+      } else if (child && typeof child === "object") {
+        visit(child);
+      }
+    }
+  }
+  visit(body);
+  return found;
+}
+
+function conditionRootGroup(node) {
+  let cur = node;
+  while (
+    cur.parent &&
+    (cur.parent.type === "ParenthesizedExpression" ||
+      (cur.parent.type === "LogicalExpression" && cur.parent.operator === "||"))
+  ) {
+    cur = cur.parent;
+  }
+  return cur;
+}
+
+function collectReferenceLiterals(ref, literals, groups) {
+  const parent = ref.identifier?.parent;
+  if (
+    parent?.type === "BinaryExpression" &&
+    (parent.operator === "===" || parent.operator === "!==")
+  ) {
+    const other = parent.left === ref.identifier ? parent.right : parent.left;
+    if (other?.type === "Literal" && typeof other.value === "string") {
+      literals.add(`"${other.value}"`);
+      if (
+        parent.operator === "!==" &&
+        parent.parent?.type === "LogicalExpression" &&
+        parent.parent.operator === "&&"
+      ) {
+        groups.add(parent);
+      } else {
+        groups.add(conditionRootGroup(parent));
+      }
+      return true;
+    }
+    return false;
+  }
+  if (
+    parent?.type === "SwitchStatement" &&
+    parent.discriminant === ref.identifier
+  ) {
+    for (const switchCase of parent.cases) {
+      if (
+        switchCase.test?.type === "Literal" &&
+        typeof switchCase.test.value === "string"
+      ) {
+        literals.add(`"${switchCase.test.value}"`);
+        groups.add(switchCase);
+      }
+    }
+    return true;
+  }
+  return false;
+}
+
+function wrappingCandidate(node) {
+  if (node.async || node.generator || node.params.length === 0) return;
+  if (node.params.some((parameter) => parameter.type !== "Identifier")) return;
+  const name = unexportedFunctionName(node);
+  if (!name) return;
+  const call = returnedCall(node.body);
+  if (
+    call?.type !== "CallExpression" ||
+    call.callee?.type !== "Identifier" ||
+    call.arguments.length !== node.params.length
+  ) {
+    return;
+  }
+  const sameOrder = node.params.every(
+    (parameter, idx) =>
+      call.arguments[idx]?.type === "Identifier" &&
+      call.arguments[idx].name === parameter.name
+  );
+  if (!sameOrder) return;
+  return {
+    node: node.id ?? node,
+    name,
+    callee: call.callee.name,
+  };
+}
+
+function isLayerReference(reference) {
+  for (
+    let current = reference.identifier?.parent;
+    current;
+    current = current.parent
+  ) {
+    if (
+      current.type === "CallExpression" &&
+      current.callee?.type === "MemberExpression" &&
+      current.callee.object?.type === "Identifier" &&
+      current.callee.object.name === "Layer"
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
 
 const SERVICE_CONSTRUCTOR_NAME = /^make[A-Z]/u;
 const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/u;
@@ -64,23 +215,11 @@ export const noServiceConstructorImportsRule = {
           ) {
             continue;
           }
-          const variable = findVariable(context.sourceCode, specifier.local);
+          const binding = findVariable(context.sourceCode, specifier.local);
           const allInLayer =
-            variable &&
-            variable.references.length > 0 &&
-            variable.references.every((ref) => {
-              for (let cur = ref.identifier?.parent; cur; cur = cur.parent) {
-                if (
-                  cur.type === "CallExpression" &&
-                  cur.callee?.type === "MemberExpression" &&
-                  cur.callee.object?.type === "Identifier" &&
-                  cur.callee.object.name === "Layer"
-                ) {
-                  return true;
-                }
-              }
-              return false;
-            });
+            binding &&
+            binding.references.length > 0 &&
+            binding.references.every(isLayerReference);
           if (allInLayer) continue;
           context.report({
             node: specifier,
@@ -93,93 +232,11 @@ export const noServiceConstructorImportsRule = {
   },
 };
 
-function collectTypePropertyNames(
-  typeNode,
-  typeDeclarations,
-  names = new Set(),
-  seen = new Set()
-) {
-  if (!typeNode) return names;
-  if (typeNode.type === "TSTypeLiteral") {
-    for (const member of typeNode.members) {
-      if (
-        (member.type === "TSPropertySignature" ||
-          member.type === "TSMethodSignature") &&
-        member.key?.type === "Identifier"
-      ) {
-        names.add(member.key.name);
-      }
-    }
-    return names;
-  }
-  if (typeNode.type === "TSInterfaceBody") {
-    for (const member of typeNode.body) {
-      if (
-        (member.type === "TSPropertySignature" ||
-          member.type === "TSMethodSignature") &&
-        member.key?.type === "Identifier"
-      ) {
-        names.add(member.key.name);
-      }
-    }
-    return names;
-  }
-  if (typeNode.type === "TSIntersectionType") {
-    for (const part of typeNode.types) {
-      collectTypePropertyNames(part, typeDeclarations, names, seen);
-    }
-    return names;
-  }
-  if (
-    typeNode.type === "TSTypeReference" &&
-    typeNode.typeName?.type === "Identifier" &&
-    !seen.has(typeNode.typeName.name)
-  ) {
-    seen.add(typeNode.typeName.name);
-    collectTypePropertyNames(
-      typeDeclarations.get(typeNode.typeName.name),
-      typeDeclarations,
-      names,
-      seen
-    );
-  }
-  return names;
-}
-
-function recordProgramTypeDeclarations(programNode, typeDeclarations) {
-  for (const stmt of programNode.body) {
-    const decl =
-      stmt.type === "ExportNamedDeclaration" ? stmt.declaration : stmt;
-    if (decl?.type === "TSInterfaceDeclaration" && decl.id?.name) {
-      typeDeclarations.set(decl.id.name, decl.body);
-    } else if (decl?.type === "TSTypeAliasDeclaration" && decl.id?.name) {
-      typeDeclarations.set(decl.id.name, decl.typeAnnotation);
-    }
-  }
-}
-
-function parameterPropertyNames(param, typeDeclarations) {
-  const names = new Set();
-  if (param.type === "ObjectPattern") {
-    for (const prop of param.properties) {
-      if (prop.type === "Property" && prop.key?.type === "Identifier") {
-        names.add(prop.key.name);
-      }
-    }
-  }
-  collectTypePropertyNames(
-    param.typeAnnotation?.typeAnnotation,
-    typeDeclarations,
-    names
-  );
-  return names;
-}
-
 function forwardedLocalCallee(sourceCode, parameter) {
   if (parameter.type !== "Identifier") return null;
-  const variable = findVariable(sourceCode, parameter);
-  if (!variable || variable.references.length !== 1) return null;
-  const identifier = variable.references[0].identifier;
+  const binding = findVariable(sourceCode, parameter);
+  if (!binding || binding.references.length !== 1) return null;
+  const identifier = binding.references[0].identifier;
   const call = identifier?.parent;
   if (
     call?.type !== "CallExpression" ||
@@ -222,50 +279,23 @@ export const noPassThroughParametersRule = {
   create(context) {
     if (!isRuleFile(context)) return {};
     const sourceCode = context.sourceCode;
-    const max = context.options[0]?.max ?? 10;
     const typeDeclarations = new Map();
 
     function checkFunction(node) {
       if (node.params.length >= 4) {
-        for (const param of node.params) {
-          const callee = forwardedLocalCallee(sourceCode, param);
+        for (const parameter of node.params) {
+          const callee = forwardedLocalCallee(sourceCode, parameter);
           if (callee) {
             context.report({
-              node: param,
+              node: parameter,
               messageId: "passThrough",
-              data: { name: param.name, callee },
+              data: { name: parameter.name, callee },
             });
           }
         }
       }
 
-      if (functionReturnsJsx(node) || node.params.length === 0) return;
-      for (const param of node.params) {
-        const names = parameterPropertyNames(param, typeDeclarations);
-        if (
-          names.size > max &&
-          (param.type === "ObjectPattern" ||
-            param.typeAnnotation?.typeAnnotation?.type === "TSTypeLiteral")
-        ) {
-          context.report({
-            node: param,
-            message: `Function parameter bag accepts ${names.size} properties (max ${max}); group cohesive domain concepts or move behavior onto the owning object.`,
-          });
-        }
-        if (names.size < 3) continue;
-        const setters = [...names].filter((name) => /^set[A-Z]/u.test(name));
-        const getters = [...names].filter((name) => /^get[A-Z]/u.test(name));
-        if (
-          setters.length >= 3 ||
-          (setters.length >= 2 && getters.length >= 1)
-        ) {
-          const sample = [...setters, ...getters].slice(0, 4).join(", ");
-          context.report({
-            node: param,
-            message: `Parameter bag accepts multiple foreign state callbacks (${sample}); return a state transition value or move the logic into the state owner.`,
-          });
-        }
-      }
+      checkParameterBags(node, typeDeclarations, context);
     }
 
     return {
@@ -303,60 +333,9 @@ export const noWrappingFunctionsRule = {
     const exportedNames = new Set();
     const candidates = [];
 
-    function returnedCall(body) {
-      if (!body) return null;
-      if (body.type === "BlockStatement") {
-        if (body.body.length !== 1 || body.body[0].type !== "ReturnStatement") {
-          return null;
-        }
-        return unwrapExpression(body.body[0].argument);
-      }
-      return unwrapExpression(body);
-    }
-
-    function unexportedFunctionName(node) {
-      const parent = node.parent;
-      if (
-        parent?.type === "ExportNamedDeclaration" ||
-        parent?.type === "ExportDefaultDeclaration" ||
-        parent?.parent?.parent?.type === "ExportNamedDeclaration"
-      ) {
-        return null;
-      }
-      if (node.id?.name) return node.id.name;
-      if (
-        parent?.type === "VariableDeclarator" &&
-        parent.id?.type === "Identifier"
-      ) {
-        return parent.id.name;
-      }
-      return null;
-    }
-
     function checkFunction(node) {
-      if (node.async || node.generator || node.params.length === 0) return;
-      if (node.params.some((p) => p.type !== "Identifier")) return;
-      const name = unexportedFunctionName(node);
-      if (!name) return;
-      const call = returnedCall(node.body);
-      if (
-        call?.type !== "CallExpression" ||
-        call.callee?.type !== "Identifier" ||
-        call.arguments.length !== node.params.length
-      ) {
-        return;
-      }
-      const sameOrder = node.params.every(
-        (param, idx) =>
-          call.arguments[idx]?.type === "Identifier" &&
-          call.arguments[idx].name === param.name
-      );
-      if (!sameOrder) return;
-      candidates.push({
-        node: node.id ?? node,
-        name,
-        callee: call.callee.name,
-      });
+      const candidate = wrappingCandidate(node);
+      if (candidate) candidates.push(candidate);
     }
 
     return {
@@ -414,40 +393,21 @@ export const noArgumentMutationSideEffectRule = {
     const EXEMPT_PARAM =
       /^(?:cache|ctx|context|memo|acc|accumulator|out|draft|state|req|res)$/i;
 
-    function hasValueReturn(body) {
-      let found = false;
-      function visit(cur) {
-        if (found || !cur || typeof cur !== "object") return;
-        if (isFunctionLike(cur)) return;
-        if (cur.type === "ReturnStatement" && cur.argument !== null) {
-          found = true;
-          return;
-        }
-        for (const [k, v] of Object.entries(cur)) {
-          if (k === "parent" || k === "range" || k === "loc") continue;
-          if (Array.isArray(v)) {
-            for (const item of v) visit(item);
-          } else if (v && typeof v === "object") {
-            visit(v);
-          }
-        }
-      }
-      visit(body);
-      return found;
-    }
-
     return {
       FunctionDeclaration(node) {
         if (node.body?.type !== "BlockStatement" || hasValueReturn(node.body)) {
           return;
         }
-        for (const param of node.params) {
-          if (param.type !== "Identifier" || EXEMPT_PARAM.test(param.name)) {
+        for (const parameter of node.params) {
+          if (
+            parameter.type !== "Identifier" ||
+            EXEMPT_PARAM.test(parameter.name)
+          ) {
             continue;
           }
-          const variable = findVariable(sourceCode, param);
-          if (!variable) continue;
-          const mutated = variable.references.find((ref) => {
+          const binding = findVariable(sourceCode, parameter);
+          if (!binding) continue;
+          const mutated = binding.references.find((ref) => {
             const parent = ref.identifier?.parent;
             return (
               parent?.type === "MemberExpression" &&
@@ -460,7 +420,7 @@ export const noArgumentMutationSideEffectRule = {
             context.report({
               node: mutated.identifier.parent.parent,
               messageId: "mutatesArg",
-              data: { name: param.name },
+              data: { name: parameter.name },
             });
           }
         }
@@ -493,60 +453,6 @@ export const noClosedStringParameterRule = {
     const sourceCode = context.sourceCode;
 
     const BOUNDARY_DECODER_NAME = /^(?:decode|parse|normalize)[A-Z]/u;
-
-    function conditionRootGroup(node) {
-      let cur = node;
-      while (
-        cur.parent &&
-        (cur.parent.type === "ParenthesizedExpression" ||
-          (cur.parent.type === "LogicalExpression" &&
-            cur.parent.operator === "||"))
-      ) {
-        cur = cur.parent;
-      }
-      return cur;
-    }
-
-    function collectReferenceLiterals(ref, literals, groups) {
-      const parent = ref.identifier?.parent;
-      if (
-        parent?.type === "BinaryExpression" &&
-        (parent.operator === "===" || parent.operator === "!==")
-      ) {
-        const other =
-          parent.left === ref.identifier ? parent.right : parent.left;
-        if (other?.type === "Literal" && typeof other.value === "string") {
-          literals.add(`"${other.value}"`);
-          if (
-            parent.operator === "!==" &&
-            parent.parent?.type === "LogicalExpression" &&
-            parent.parent.operator === "&&"
-          ) {
-            groups.add(parent);
-          } else {
-            groups.add(conditionRootGroup(parent));
-          }
-          return true;
-        }
-        return false;
-      }
-      if (
-        parent?.type === "SwitchStatement" &&
-        parent.discriminant === ref.identifier
-      ) {
-        for (const switchCase of parent.cases) {
-          if (
-            switchCase.test?.type === "Literal" &&
-            typeof switchCase.test.value === "string"
-          ) {
-            literals.add(`"${switchCase.test.value}"`);
-            groups.add(switchCase);
-          }
-        }
-        return true;
-      }
-      return false;
-    }
 
     function checkFunction(node) {
       if (node.id?.name && BOUNDARY_DECODER_NAME.test(node.id.name)) return;

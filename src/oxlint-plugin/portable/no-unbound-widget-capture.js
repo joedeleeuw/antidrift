@@ -73,6 +73,116 @@ function collectScopes(scope, out) {
   }
 }
 
+class WidgetCaptures {
+  constructor(context) {
+    this.context = context;
+    this.sourceCode = this.context.sourceCode;
+    this.option = this.context.options?.[0];
+    this.allowedModules = this.option?.allowedInjectedModules
+      ? new Set(this.option.allowedInjectedModules)
+      : DEFAULT_INJECTED_MODULES;
+    this.widgetFunctions = [];
+  }
+  recordIfWidget = (node) => {
+    if (hasWidgetDirective(node)) {
+      this.widgetFunctions.push(node);
+    }
+  };
+
+  classifySpecifierAlias = (spec) => {
+    const importedName =
+      spec.imported?.type === "Identifier"
+        ? spec.imported.name
+        : spec.imported?.value;
+    if (importedName && importedName !== spec.local?.name) {
+      return {
+        kind: "aliased",
+        imported: importedName,
+        local: spec.local.name,
+      };
+    }
+    return { kind: "injected", imported: importedName };
+  };
+
+  classifyImportDef = (def) => {
+    if (def?.type !== "ImportBinding") return null;
+    const source = def.parent?.source?.value;
+    if (typeof source !== "string") return { kind: "forbidden" };
+    const spec = def.node;
+    if (source === "react-native" && spec?.type === "ImportSpecifier") {
+      const classification = this.classifySpecifierAlias(spec);
+      return REACT_NATIVE_WIDGET_GLOBALS.has(classification.imported)
+        ? classification
+        : { kind: "forbidden" };
+    }
+    if (!this.allowedModules.has(source)) return { kind: "forbidden" };
+    if (spec?.type === "ImportSpecifier") {
+      return this.classifySpecifierAlias(spec);
+    }
+    const isReactNamespace =
+      source === "react" &&
+      (spec?.type === "ImportDefaultSpecifier" ||
+        spec?.type === "ImportNamespaceSpecifier") &&
+      spec.local?.name === "React";
+    return isReactNamespace ? { kind: "injected" } : { kind: "forbidden" };
+  };
+
+  checkWidgetFunction = (fnNode) => {
+    const rootScope = this.sourceCode.getScope?.(fnNode);
+    if (!rootScope) return;
+    const scopes = new Set();
+    collectScopes(rootScope, scopes);
+    const reportedNodes = new Set();
+
+    for (const scope of scopes) {
+      for (const ref of scope.references ?? []) {
+        const ident = ref.identifier;
+        if (!ident || reportedNodes.has(ident) || isTypeReferenceNode(ident)) {
+          continue;
+        }
+        const resolved = ref.resolved;
+        if (!resolved || resolved.defs.length === 0) continue;
+        if (isScopeWithin(resolved.scope, rootScope)) continue;
+
+        const def = resolved.defs[0];
+        const importClassification = this.classifyImportDef(def);
+        if (importClassification?.kind === "injected") continue;
+        reportedNodes.add(ident);
+        if (importClassification?.kind === "aliased") {
+          this.context.report({
+            node: ident,
+            messageId: "aliasedInjectedImport",
+            data: {
+              local: importClassification.local,
+              imported: importClassification.imported,
+            },
+          });
+        } else {
+          this.context.report({
+            node: ident,
+            messageId: "capturedBinding",
+            data: { name: ident.name },
+          });
+        }
+      }
+    }
+  };
+
+  visitProgramExit = () => {
+    for (const fnNode of this.widgetFunctions) {
+      this.checkWidgetFunction(fnNode);
+    }
+  };
+  listeners() {
+    return {
+      FunctionDeclaration: this.recordIfWidget,
+      FunctionExpression: this.recordIfWidget,
+      ArrowFunctionExpression: this.recordIfWidget,
+      "Program:exit": this.visitProgramExit,
+    };
+  }
+}
+
 export default {
   meta: {
     type: "problem",
@@ -102,109 +212,6 @@ export default {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-    const sourceCode = context.sourceCode;
-    const option = context.options?.[0];
-    const allowedModules = option?.allowedInjectedModules
-      ? new Set(option.allowedInjectedModules)
-      : DEFAULT_INJECTED_MODULES;
-    const widgetFunctions = [];
-
-    function recordIfWidget(node) {
-      if (hasWidgetDirective(node)) {
-        widgetFunctions.push(node);
-      }
-    }
-
-    function classifySpecifierAlias(spec) {
-      const importedName =
-        spec.imported?.type === "Identifier"
-          ? spec.imported.name
-          : spec.imported?.value;
-      if (importedName && importedName !== spec.local?.name) {
-        return {
-          kind: "aliased",
-          imported: importedName,
-          local: spec.local.name,
-        };
-      }
-      return { kind: "injected", imported: importedName };
-    }
-
-    function classifyImportDef(def) {
-      if (def?.type !== "ImportBinding") return null;
-      const source = def.parent?.source?.value;
-      if (typeof source !== "string") return { kind: "forbidden" };
-      const spec = def.node;
-      if (source === "react-native" && spec?.type === "ImportSpecifier") {
-        const result = classifySpecifierAlias(spec);
-        return REACT_NATIVE_WIDGET_GLOBALS.has(result.imported)
-          ? result
-          : { kind: "forbidden" };
-      }
-      if (!allowedModules.has(source)) return { kind: "forbidden" };
-      if (spec?.type === "ImportSpecifier") return classifySpecifierAlias(spec);
-      const isReactNamespace =
-        source === "react" &&
-        (spec?.type === "ImportDefaultSpecifier" ||
-          spec?.type === "ImportNamespaceSpecifier") &&
-        spec.local?.name === "React";
-      return isReactNamespace ? { kind: "injected" } : { kind: "forbidden" };
-    }
-
-    function checkWidgetFunction(fnNode) {
-      const rootScope = sourceCode.getScope?.(fnNode);
-      if (!rootScope) return;
-      const scopes = new Set();
-      collectScopes(rootScope, scopes);
-      const reportedNodes = new Set();
-
-      for (const scope of scopes) {
-        for (const ref of scope.references ?? []) {
-          const ident = ref.identifier;
-          if (
-            !ident ||
-            reportedNodes.has(ident) ||
-            isTypeReferenceNode(ident)
-          ) {
-            continue;
-          }
-          const resolved = ref.resolved;
-          if (!resolved || resolved.defs.length === 0) continue;
-          if (isScopeWithin(resolved.scope, rootScope)) continue;
-
-          const def = resolved.defs[0];
-          const importInfo = classifyImportDef(def);
-          if (importInfo?.kind === "injected") continue;
-          reportedNodes.add(ident);
-          if (importInfo?.kind === "aliased") {
-            context.report({
-              node: ident,
-              messageId: "aliasedInjectedImport",
-              data: {
-                local: importInfo.local,
-                imported: importInfo.imported,
-              },
-            });
-          } else {
-            context.report({
-              node: ident,
-              messageId: "capturedBinding",
-              data: { name: ident.name },
-            });
-          }
-        }
-      }
-    }
-
-    return {
-      FunctionDeclaration: recordIfWidget,
-      FunctionExpression: recordIfWidget,
-      ArrowFunctionExpression: recordIfWidget,
-      "Program:exit"() {
-        for (const fnNode of widgetFunctions) {
-          checkWidgetFunction(fnNode);
-        }
-      },
-    };
+    return new WidgetCaptures(context).listeners();
   },
 };

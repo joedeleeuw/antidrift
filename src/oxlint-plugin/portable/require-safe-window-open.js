@@ -6,7 +6,7 @@ import {
   unwrapExpression,
 } from "./ast.js";
 
-const staticTemplateValue = (node) => {
+const staticTemplateText = (node) => {
   if (
     !isAstNode(node) ||
     node.type !== "TemplateLiteral" ||
@@ -43,9 +43,9 @@ const staticMemberName = (member) => {
   if (isStringLiteral(unwrapped.property)) {
     return unwrapped.property.value;
   }
-  return staticTemplateValue(unwrapped.property);
+  return staticTemplateText(unwrapped.property);
 };
-const memberObject = (member) => {
+const memberReceiver = (member) => {
   const unwrapped = unwrapExpression(member);
   if (!unwrapped || unwrapped.type !== "MemberExpression") {
     return null;
@@ -89,13 +89,13 @@ const bindingHasDefinitions = (binding) =>
   "defs" in binding &&
   Array.isArray(binding.defs) &&
   binding.defs.length > 0;
-const isScopeVariable = (value) =>
-  typeof value === "object" &&
-  value !== null &&
-  "defs" in value &&
-  Array.isArray(value.defs) &&
-  "references" in value &&
-  Array.isArray(value.references);
+const isScopeVariable = (candidate) =>
+  typeof candidate === "object" &&
+  candidate !== null &&
+  "defs" in candidate &&
+  Array.isArray(candidate.defs) &&
+  "references" in candidate &&
+  Array.isArray(candidate.references);
 const scopeVariableForReference = (context, node) => {
   if (!isIdentifier(node)) {
     return null;
@@ -137,10 +137,10 @@ const isGlobalReference = (context, node) => {
   return binding === null || !bindingHasDefinitions(binding);
 };
 const stableAliasInitializer = (context, identifier) => {
-  const variable = scopeVariableForReference(context, identifier);
+  const binding = scopeVariableForReference(context, identifier);
   if (
-    variable === null ||
-    variable.references.some(
+    binding === null ||
+    binding.references.some(
       (reference) =>
         reference.init !== true &&
         typeof reference.isWrite === "function" &&
@@ -149,7 +149,7 @@ const stableAliasInitializer = (context, identifier) => {
   ) {
     return null;
   }
-  for (const definition of variable.defs) {
+  for (const definition of binding.defs) {
     if (
       definition.type !== "Variable" ||
       !isAstNode(definition.node) ||
@@ -178,11 +178,11 @@ const browserGlobalKind = (context, node, visited = new Set()) => {
     ) {
       return expression.name;
     }
-    const variable = scopeVariableForReference(context, expression);
-    if (variable === null || visited.has(variable)) {
+    const binding = scopeVariableForReference(context, expression);
+    if (binding === null || visited.has(binding)) {
       return null;
     }
-    visited.add(variable);
+    visited.add(binding);
     return browserGlobalKind(
       context,
       stableAliasInitializer(context, expression),
@@ -211,7 +211,7 @@ const isBrowserOpenCallee = (context, callee) => {
   ) {
     return false;
   }
-  return browserGlobalKind(context, memberObject(unwrappedCallee)) !== null;
+  return browserGlobalKind(context, memberReceiver(unwrappedCallee)) !== null;
 };
 export default {
   meta: {

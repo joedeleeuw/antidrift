@@ -84,7 +84,7 @@ const hasAttribute = (openingElement, names) =>
     const name = getAttributeName(attribute);
     return name !== null && names.has(name);
   });
-const getStaticStringValue = (node) => {
+const getStaticText = (node) => {
   if (!isAstNode(node)) {
     return null;
   }
@@ -103,7 +103,7 @@ const getStaticStringValue = (node) => {
 };
 const getClassName = (openingElement) => {
   const className = findAttribute(openingElement, "className");
-  return getStaticStringValue(className?.value) ?? "";
+  return getStaticText(className?.value) ?? "";
 };
 const isScreenReaderOnly = (element) => {
   const openingElement = getOpeningElement(element);
@@ -208,8 +208,8 @@ const isIconSizeButton = (node) => {
     return false;
   }
   const size = findAttribute(openingElement, "size");
-  const sizeValue = getStaticStringValue(size?.value);
-  if (typeof sizeValue === "string" && sizeValue.startsWith("icon")) {
+  const sizeName = getStaticText(size?.value);
+  if (typeof sizeName === "string" && sizeName.startsWith("icon")) {
     return true;
   }
   return getClassName(openingElement)
@@ -221,14 +221,14 @@ const getRenderElement = (openingElement) => {
   if (!isAstNode(render)) {
     return null;
   }
-  const value = render.value;
-  if (!isAstNode(value)) {
+  const attributeInitializer = render.value;
+  if (!isAstNode(attributeInitializer)) {
     return null;
   }
-  if (value.type === "JSXExpressionContainer") {
-    return value.expression;
+  if (attributeInitializer.type === "JSXExpressionContainer") {
+    return attributeInitializer.expression;
   }
-  return value;
+  return attributeInitializer;
 };
 const hasTooltip = (node) => {
   let current = isAstNode(node) ? node : null;

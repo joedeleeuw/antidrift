@@ -8,7 +8,7 @@ import {
 
 const RAW_DOCUMENT_SECURITY_HEADERS = "RAW_DOCUMENT_RESPONSE_SECURITY_HEADERS";
 
-const getHeadersObject = (node) => {
+const getHeadersExpression = (node) => {
   if (node.type !== "ObjectExpression") {
     return null;
   }
@@ -42,6 +42,105 @@ const hasAttachmentDisposition = (node) => {
   }
   return isCallTo(disposition.value, "contentDisposition");
 };
+class DocumentResponses {
+  constructor(context) {
+    this.context = context;
+    this.fileHandler = this.context.options[0]?.allResponses === true;
+    this.downloadHeadersIdentifiers = new Set();
+  }
+  visitImportDeclaration = (node) => {
+    if (node.source.value !== this.context.options[0]?.headersModule) {
+      return;
+    }
+    const manualSecurityHeadersImport = node.specifiers.find(
+      (specifier) =>
+        getImportedName(specifier) === RAW_DOCUMENT_SECURITY_HEADERS
+    );
+    if (manualSecurityHeadersImport) {
+      this.context.report({
+        node: manualSecurityHeadersImport,
+        messageId: "manualHeaders",
+        data: {
+          owner:
+            this.context.options[0]?.owner ??
+            "a Response with explicit Content-Type, Content-Disposition and X-Content-Type-Options: nosniff headers",
+        },
+      });
+    }
+  };
+
+  visitVariableDeclarator = (node) => {
+    if (
+      !isIdentifier(node.id) ||
+      node.init?.type !== "NewExpression" ||
+      !isIdentifier(node.init.callee, "Headers")
+    ) {
+      return;
+    }
+    const init = node.init.arguments.at(0);
+    if (!init || init.type !== "ObjectExpression") {
+      return;
+    }
+    if (hasAttachmentDisposition(init)) {
+      this.downloadHeadersIdentifiers.add(node.id.name);
+    }
+  };
+
+  visitNewExpression = (node) => {
+    if (!isIdentifier(node.callee, "Response")) {
+      return;
+    }
+    const body = node.arguments.at(0);
+    if (!body || (body.type === "Literal" && body.value === null)) {
+      return;
+    }
+    const init = node.arguments.at(1);
+    const headers = init ? getHeadersExpression(init) : null;
+    const isDownloadResponse =
+      this.fileHandler ||
+      (headers?.type === "ObjectExpression" &&
+        hasAttachmentDisposition(headers)) ||
+      (headers?.type === "Identifier" &&
+        this.downloadHeadersIdentifiers.has(headers.name));
+    if (!isDownloadResponse) {
+      return;
+    }
+    if (headers?.type === "ObjectExpression") {
+      const names = new Map(
+        headers.properties
+          .filter((property) => property.type === "Property")
+          .map((property) => [
+            getPropertyName(property.key)?.toLowerCase(),
+            property.value,
+          ])
+      );
+      if (
+        names.has("content-type") &&
+        names.has("content-disposition") &&
+        names.get("x-content-type-options")?.value === "nosniff"
+      ) {
+        return;
+      }
+    }
+    this.context.report({
+      node,
+      messageId: "directResponse",
+      data: {
+        owner:
+          this.context.options[0]?.owner ??
+          "a Response with explicit Content-Type, Content-Disposition and X-Content-Type-Options: nosniff headers",
+      },
+    });
+  };
+  listeners() {
+    return {
+      ImportDeclaration: this.visitImportDeclaration,
+      VariableDeclarator: this.visitVariableDeclarator,
+      NewExpression: this.visitNewExpression,
+    };
+  }
+}
+
 export default {
   meta: {
     schema: [
@@ -69,92 +168,6 @@ export default {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-
-    const fileHandler = context.options[0]?.allResponses === true;
-    const downloadHeadersIdentifiers = new Set();
-    return {
-      ImportDeclaration(node) {
-        if (node.source.value !== context.options[0]?.headersModule) {
-          return;
-        }
-        const manualSecurityHeadersImport = node.specifiers.find(
-          (specifier) =>
-            getImportedName(specifier) === RAW_DOCUMENT_SECURITY_HEADERS
-        );
-        if (manualSecurityHeadersImport) {
-          context.report({
-            node: manualSecurityHeadersImport,
-            messageId: "manualHeaders",
-            data: {
-              owner:
-                context.options[0]?.owner ??
-                "a Response with explicit Content-Type, Content-Disposition and X-Content-Type-Options: nosniff headers",
-            },
-          });
-        }
-      },
-      VariableDeclarator(node) {
-        if (
-          !isIdentifier(node.id) ||
-          node.init?.type !== "NewExpression" ||
-          !isIdentifier(node.init.callee, "Headers")
-        ) {
-          return;
-        }
-        const init = node.init.arguments.at(0);
-        if (!init || init.type !== "ObjectExpression") {
-          return;
-        }
-        if (hasAttachmentDisposition(init)) {
-          downloadHeadersIdentifiers.add(node.id.name);
-        }
-      },
-      NewExpression(node) {
-        if (!isIdentifier(node.callee, "Response")) {
-          return;
-        }
-        const body = node.arguments.at(0);
-        if (!body || (body.type === "Literal" && body.value === null)) {
-          return;
-        }
-        const init = node.arguments.at(1);
-        const headers = init ? getHeadersObject(init) : null;
-        const isDownloadResponse =
-          fileHandler ||
-          (headers?.type === "ObjectExpression" &&
-            hasAttachmentDisposition(headers)) ||
-          (headers?.type === "Identifier" &&
-            downloadHeadersIdentifiers.has(headers.name));
-        if (!isDownloadResponse) {
-          return;
-        }
-        if (headers?.type === "ObjectExpression") {
-          const names = new Map(
-            headers.properties
-              .filter((property) => property.type === "Property")
-              .map((property) => [
-                getPropertyName(property.key)?.toLowerCase(),
-                property.value,
-              ])
-          );
-          if (
-            names.has("content-type") &&
-            names.has("content-disposition") &&
-            names.get("x-content-type-options")?.value === "nosniff"
-          ) {
-            return;
-          }
-        }
-        context.report({
-          node,
-          messageId: "directResponse",
-          data: {
-            owner:
-              context.options[0]?.owner ??
-              "a Response with explicit Content-Type, Content-Disposition and X-Content-Type-Options: nosniff headers",
-          },
-        });
-      },
-    };
+    return new DocumentResponses(context).listeners();
   },
 };

@@ -38,7 +38,7 @@ const openingHasInteractiveHandler = (opening) =>
     if (attrName === null || !WATCHED_HANDLERS.has(attrName)) {
       return false;
     }
-    return !isSafeHandlerValue(expressionFromAttribute(attr));
+    return !isSafeHandler(expressionFromAttribute(attr));
   });
 const interactiveAncestorName = (opening) => {
   let current = opening.parent?.parent;
@@ -71,7 +71,7 @@ const expressionFromAttribute = (attr) => {
   }
   return null;
 };
-const isSafeHandlerValue = (expr) => {
+const isSafeHandler = (expr) => {
   if (!expr) {
     return true;
   }
@@ -85,12 +85,10 @@ const isSafeHandlerValue = (expr) => {
     return isPlainIdentifier(expr.callee) && HELPER_NAMES.has(expr.callee.name);
   }
   if (expr.type === "ConditionalExpression") {
-    return (
-      isSafeHandlerValue(expr.consequent) && isSafeHandlerValue(expr.alternate)
-    );
+    return isSafeHandler(expr.consequent) && isSafeHandler(expr.alternate);
   }
   if (expr.type === "LogicalExpression") {
-    return isSafeHandlerValue(expr.left) && isSafeHandlerValue(expr.right);
+    return isSafeHandler(expr.left) && isSafeHandler(expr.right);
   }
   return false;
 };

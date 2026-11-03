@@ -112,28 +112,26 @@ export const memberCall = (node, method) => {
   }
   return { call, object: callee.object };
 };
-export const callWithinExpressionStatement = (
-  statement,
-  predicate,
-  canAssign
-) => {
-  if (!isAstNode(statement) || statement.type !== "ExpressionStatement") {
-    return false;
+class UnconditionalReaderCall {
+  constructor(predicate, canAssign) {
+    this.predicate = predicate;
+    this.canAssign = canAssign;
   }
-  const containsUnconditionalCall = (node) => {
+
+  contains = (node) => {
     const expression = unwrapReaderExpression(node);
     if (expression === null) {
       return false;
     }
     if (expression.type === "AwaitExpression") {
-      return containsUnconditionalCall(expression.argument);
+      return this.contains(expression.argument);
     }
     if (
       expression.type === "AssignmentExpression" &&
       expression.operator === "=" &&
-      canAssign(expression.left)
+      this.canAssign(expression.left)
     ) {
-      return containsUnconditionalCall(expression.right);
+      return this.contains(expression.right);
     }
     if (
       expression.type === "CallExpression" &&
@@ -142,43 +140,58 @@ export const callWithinExpressionStatement = (
           expression.callee.optional !== true &&
           staticMemberName(expression.callee) === "releaseLock"))
     ) {
-      if (predicate(expression)) {
+      if (this.predicate(expression)) {
         return true;
       }
       const callee = unwrapReaderExpression(expression.callee);
       if (
         callee?.type === "MemberExpression" &&
         callee.optional !== true &&
-        containsUnconditionalCall(callee.object)
+        this.contains(callee.object)
       ) {
         return true;
       }
       return Array.isArray(expression.arguments)
-        ? expression.arguments.some(containsUnconditionalCall)
+        ? expression.arguments.some(this.contains)
         : false;
     }
-    if (
+    return (
       expression.type === "SequenceExpression" &&
-      Array.isArray(expression.expressions)
-    ) {
-      for (const sequenceExpression of expression.expressions) {
-        if (containsUnconditionalCall(sequenceExpression)) {
-          return true;
-        }
-        const preceding = unwrapReaderExpression(sequenceExpression);
-        if (
-          preceding === null ||
-          (preceding.type !== "Identifier" &&
-            preceding.type !== "Literal" &&
-            preceding.type !== "ThisExpression")
-        ) {
-          return false;
-        }
+      Array.isArray(expression.expressions) &&
+      this.sequenceContains(expression.expressions)
+    );
+  };
+
+  sequenceContains(expressions) {
+    for (const sequenceExpression of expressions) {
+      if (this.contains(sequenceExpression)) {
+        return true;
+      }
+      const preceding = unwrapReaderExpression(sequenceExpression);
+      if (
+        preceding === null ||
+        (preceding.type !== "Identifier" &&
+          preceding.type !== "Literal" &&
+          preceding.type !== "ThisExpression")
+      ) {
+        return false;
       }
     }
     return false;
-  };
-  return containsUnconditionalCall(statement.expression);
+  }
+}
+
+export const callWithinExpressionStatement = (
+  statement,
+  predicate,
+  canAssign
+) => {
+  if (!isAstNode(statement) || statement.type !== "ExpressionStatement") {
+    return false;
+  }
+  return new UnconditionalReaderCall(predicate, canAssign).contains(
+    statement.expression
+  );
 };
 const abruptCompletionTarget = (node) => {
   if (node.type !== "BreakStatement" && node.type !== "ContinueStatement") {

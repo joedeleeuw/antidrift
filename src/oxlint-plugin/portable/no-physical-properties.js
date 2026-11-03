@@ -9,7 +9,7 @@ const isClassNameAttribute = (node) =>
   node?.type === "JSXAttribute" &&
   node.name.type === "JSXIdentifier" &&
   node.name.name === "className";
-const isDirectClassNameValue = (node) => {
+const isDirectClassName = (node) => {
   if (isClassNameAttribute(node.parent) && node.parent.value === node) {
     return true;
   }
@@ -33,14 +33,17 @@ const isDirectClassNameValue = (node) => {
     isClassNameAttribute(container.parent)
   );
 };
-function withoutSymmetricInsets(value) {
-  return value.replace(/\b(left|right)-([\w.]+)\b/gu, (token, side, size) => {
-    const other = side === "left" ? "right" : "left";
-    return value.split(/\s+/u).includes(`${other}-${size}`) ? "" : token;
-  });
+function withoutSymmetricInsets(classNames) {
+  return classNames.replace(
+    /\b(left|right)-([\w.]+)\b/gu,
+    (token, side, size) => {
+      const other = side === "left" ? "right" : "left";
+      return classNames.split(/\s+/u).includes(`${other}-${size}`) ? "" : token;
+    }
+  );
 }
 const reportPhysicalProperty = (context, node) => {
-  if (!isDirectClassNameValue(node)) {
+  if (!isDirectClassName(node)) {
     context.report({ node, messageId: "physicalProperty" });
     return;
   }

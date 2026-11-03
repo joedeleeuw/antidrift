@@ -93,6 +93,31 @@ const isBuilderChainUnion = (chains) =>
         isStrictPrefix(other.steps, chain.steps)
     )
   );
+const branchAwaitFixes = (context, node, fixer) => {
+  const awaitEnd = node.range[0] + AWAIT_KEYWORD_LENGTH;
+  const branches = collectBranches(node.argument, []);
+  if (hasFixUnsafeWrapper(node.argument)) {
+    return null;
+  }
+  const hasInterveningComment = context.sourceCode
+    .getAllComments()
+    .some(
+      (comment) =>
+        comment.range[0] >= awaitEnd &&
+        comment.range[0] < node.argument.range[0]
+    );
+  if (hasInterveningComment) {
+    return null;
+  }
+  let removalEnd = awaitEnd;
+  while (/\s/u.test(context.sourceCode.text.at(removalEnd) ?? "")) {
+    removalEnd += 1;
+  }
+  return [
+    fixer.removeRange([node.range[0], removalEnd]),
+    ...branches.map((branch) => fixer.insertTextBefore(branch, "await ")),
+  ];
+};
 export default {
   meta: {
     schema: [
@@ -151,33 +176,7 @@ export default {
           node,
           messageId: "awaitedBuilderUnion",
           data: { root: first.root },
-          fix: (fixer) => {
-            const awaitEnd = node.range[0] + AWAIT_KEYWORD_LENGTH;
-            const branches = collectBranches(node.argument, []);
-            if (hasFixUnsafeWrapper(node.argument)) {
-              return null;
-            }
-            const hasInterveningComment = context.sourceCode
-              .getAllComments()
-              .some(
-                (comment) =>
-                  comment.range[0] >= awaitEnd &&
-                  comment.range[0] < node.argument.range[0]
-              );
-            if (hasInterveningComment) {
-              return null;
-            }
-            let removalEnd = awaitEnd;
-            while (/\s/u.test(context.sourceCode.text.at(removalEnd) ?? "")) {
-              removalEnd += 1;
-            }
-            return [
-              fixer.removeRange([node.range[0], removalEnd]),
-              ...branches.map((branch) =>
-                fixer.insertTextBefore(branch, "await ")
-              ),
-            ];
-          },
+          fix: (fixer) => branchAwaitFixes(context, node, fixer),
         });
       },
     };

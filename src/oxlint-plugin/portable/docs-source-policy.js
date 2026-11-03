@@ -4,11 +4,11 @@ import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 
 const MAX_QUARANTINE_MILLISECONDS = 31 * 24 * 60 * 60 * 1000;
 const EXACT_UTC_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u;
-const parsedExactUtcTimestamp = (value) => {
-  if (!EXACT_UTC_TIMESTAMP.test(value)) {
+const parsedExactUtcTimestamp = (timestamp) => {
+  if (!EXACT_UTC_TIMESTAMP.test(timestamp)) {
     return null;
   }
-  const milliseconds = Date.parse(value);
+  const milliseconds = Date.parse(timestamp);
   return Number.isNaN(milliseconds) ? null : milliseconds;
 };
 const addClassification = (classifications, dependency, disposition) => {
@@ -19,14 +19,7 @@ const addClassification = (classifications, dependency, disposition) => {
   }
   current.push(disposition);
 };
-const checkDocumentationSourcePolicy = ({
-  dependencies,
-  exclusions,
-  now,
-  sources,
-}) => {
-  const failures = [];
-  const classifications = new Map();
+const classifySources = (sources, classifications, failures) => {
   for (const [sourceName, source] of Object.entries(sources)) {
     if (source.dependencies.length === 0) {
       failures.push(`${sourceName} has no covered dependencies.`);
@@ -45,6 +38,8 @@ const checkDocumentationSourcePolicy = ({
       addClassification(classifications, dependency, `source ${sourceName}`);
     }
   }
+};
+const classifyExclusions = ({ exclusions, now, classifications, failures }) => {
   for (const exclusion of exclusions) {
     addClassification(classifications, exclusion.dependency, "exclusion");
     if (exclusion.explanation.trim().length === 0) {
@@ -80,6 +75,17 @@ const checkDocumentationSourcePolicy = ({
       );
     }
   }
+};
+const checkDocumentationSourcePolicy = ({
+  dependencies,
+  exclusions,
+  now,
+  sources,
+}) => {
+  const failures = [];
+  const classifications = new Map();
+  classifySources(sources, classifications, failures);
+  classifyExclusions({ exclusions, now, classifications, failures });
   for (const dependency of dependencies) {
     if (!classifications.has(dependency)) {
       failures.push(

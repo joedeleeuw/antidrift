@@ -2,6 +2,9 @@ import {
   bareAssertionMethods,
   isBooleanLiteral,
   isMembershipAssertionNode,
+  walkWithinBlock,
+} from "../shared/test-block-arrangement.js";
+import {
   literalAtPath,
   literalContainerTypes,
   literalNodesEqual,
@@ -10,8 +13,7 @@ import {
   resolveLiteralNode,
   templateText,
   unwrapExpression,
-  walkWithinBlock,
-} from "../shared/test-block-arrangement.js";
+} from "../shared/test-block-shapes.js";
 import { staticPropertyName } from "../shared/test-files.js";
 import {
   actForRoot,

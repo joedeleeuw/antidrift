@@ -12,6 +12,33 @@ function typesPackageName(packageName) {
   return `@types/${packageName}`;
 }
 
+function configuredDependencies(context) {
+  const allowDevDeps = context.options[0]?.allowDevDependencies !== false;
+  const owner = packageOwner(context.filename ?? context.getFilename());
+  const manifest = owner?.manifest ?? {};
+  const dependencies = new Set([
+    manifest.name,
+    ...[
+      manifest.dependencies,
+      ...(allowDevDeps ? [manifest.devDependencies] : []),
+      manifest.peerDependencies,
+      manifest.optionalDependencies,
+    ].flatMap((group) => Object.keys(group ?? {})),
+  ]);
+  if (allowDevDeps && context.options[0]?.ancestorDevDependencies !== false) {
+    let current = owner;
+    while (current && dirname(current.directory) !== current.directory) {
+      current = packageOwner(
+        join(dirname(current.directory), "__dependency_probe__.js")
+      );
+      for (const name of Object.keys(current?.manifest.devDependencies ?? {})) {
+        dependencies.add(name);
+      }
+    }
+  }
+  return dependencies;
+}
+
 export default {
   meta: {
     type: "problem",
@@ -37,31 +64,7 @@ export default {
   create(context) {
     if (!isRuleFile(context)) return {};
 
-    const allowDevDeps = context.options[0]?.allowDevDependencies !== false;
-    const owner = packageOwner(context.filename ?? context.getFilename());
-    const manifest = owner?.manifest ?? {};
-    const dependencies = new Set([
-      manifest.name,
-      ...[
-        manifest.dependencies,
-        ...(allowDevDeps ? [manifest.devDependencies] : []),
-        manifest.peerDependencies,
-        manifest.optionalDependencies,
-      ].flatMap((group) => Object.keys(group ?? {})),
-    ]);
-    if (allowDevDeps && context.options[0]?.ancestorDevDependencies !== false) {
-      let current = owner;
-      while (current && dirname(current.directory) !== current.directory) {
-        current = packageOwner(
-          join(dirname(current.directory), "__dependency_probe__.js")
-        );
-        for (const name of Object.keys(
-          current?.manifest.devDependencies ?? {}
-        )) {
-          dependencies.add(name);
-        }
-      }
-    }
+    const dependencies = configuredDependencies(context);
     const prefixes = context.options[0]?.internalPrefixes ?? ["@/", "~/"];
     function inspect(node) {
       const source = node.source?.value;

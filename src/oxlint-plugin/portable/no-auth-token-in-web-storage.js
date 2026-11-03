@@ -15,7 +15,7 @@ const NON_CREDENTIAL_TOKEN_PATTERN =
   /csrf|xsrf|device|fcm|apns|push|design|tokeniz|syntax|css|theme|color/iu;
 const STRONG_CREDENTIAL_KEY_PATTERN =
   /jwt|secret|password|passwd|credential|private[-_]?key|api[-_]?key|bearer|access[-_]?token|refresh[-_]?token|auth[-_]?token|id[-_]?token|session/iu;
-const staticTemplateValue = (node) => {
+const staticTemplateText = (node) => {
   if (
     !isAstNode(node) ||
     node.type !== "TemplateLiteral" ||
@@ -47,6 +47,208 @@ const isCredentialKey = (key) => {
     STRONG_CREDENTIAL_KEY_PATTERN.test(key)
   );
 };
+class WebStorageCredentials {
+  constructor(context) {
+    this.context = context;
+  }
+  resolveVariable = (identifier) => {
+    let scope = this.context.sourceCode.getScope(identifier);
+    while (scope !== null) {
+      const binding = scope.set.get(identifier.name);
+      if (binding !== undefined) {
+        return binding;
+      }
+      scope = scope.upper;
+    }
+    return null;
+  };
+
+  isGlobalReference = (node, name) => {
+    if (!isIdentifier(node, name)) {
+      return false;
+    }
+    const binding = this.resolveVariable(node);
+    return binding === null || binding.defs.length === 0;
+  };
+
+  resolveStaticString = (node, visited = new Set()) => {
+    const expression = unwrapExpression(node);
+    if (expression === null) {
+      return null;
+    }
+    if (isStringLiteral(expression)) {
+      return expression.value;
+    }
+    const templateText = staticTemplateText(expression);
+    if (templateText !== null) {
+      return templateText;
+    }
+    if (expression.type === "BinaryExpression" && expression.operator === "+") {
+      const left = this.resolveStaticString(expression.left, new Set(visited));
+      const right = this.resolveStaticString(
+        expression.right,
+        new Set(visited)
+      );
+      return left === null || right === null ? null : left + right;
+    }
+    if (!isIdentifier(expression)) {
+      return null;
+    }
+    const binding = this.resolveVariable(expression);
+    if (binding === null || visited.has(binding)) {
+      return null;
+    }
+    visited.add(binding);
+    for (const definition of binding.defs) {
+      if (
+        definition.type !== "Variable" ||
+        !isAstNode(definition.node) ||
+        definition.node.type !== "VariableDeclarator" ||
+        !isAstNode(definition.parent) ||
+        definition.parent.type !== "VariableDeclaration" ||
+        definition.parent.kind !== "const"
+      ) {
+        continue;
+      }
+      return this.resolveStaticString(definition.node.init, visited);
+    }
+    return null;
+  };
+
+  resolveMemberName = (node) => {
+    const member = unwrapExpression(node);
+    if (member === null || member.type !== "MemberExpression") {
+      return null;
+    }
+    return member.computed === true
+      ? this.resolveStaticString(member.property)
+      : getPropertyName(member.property);
+  };
+
+  isBrowserGlobalHost = (node, visited = new Set()) => {
+    const expression = unwrapExpression(node);
+    if (expression === null) {
+      return false;
+    }
+    if (isIdentifier(expression) && GLOBAL_HOST_NAMES.has(expression.name)) {
+      return this.isGlobalReference(expression, expression.name);
+    }
+    if (expression.type === "MemberExpression") {
+      const memberName = this.resolveMemberName(expression);
+      return (
+        memberName !== null &&
+        GLOBAL_HOST_NAMES.has(memberName) &&
+        this.isBrowserGlobalHost(expression.object, visited)
+      );
+    }
+    if (!isIdentifier(expression)) {
+      return false;
+    }
+    const binding = this.resolveVariable(expression);
+    if (binding === null || visited.has(binding)) {
+      return false;
+    }
+    visited.add(binding);
+    for (const definition of binding.defs) {
+      if (
+        definition.type !== "Variable" ||
+        !isAstNode(definition.node) ||
+        definition.node.type !== "VariableDeclarator" ||
+        !isAstNode(definition.parent) ||
+        definition.parent.type !== "VariableDeclaration" ||
+        definition.parent.kind !== "const"
+      ) {
+        continue;
+      }
+      return this.isBrowserGlobalHost(definition.node.init, visited);
+    }
+    return false;
+  };
+
+  isWebStorage = (node, visited = new Set()) => {
+    const expression = unwrapExpression(node);
+    if (expression === null) {
+      return false;
+    }
+    if (isIdentifier(expression) && STORAGE_NAMES.has(expression.name)) {
+      return this.isGlobalReference(expression, expression.name);
+    }
+    if (isIdentifier(expression)) {
+      const binding = this.resolveVariable(expression);
+      if (binding === null || visited.has(binding)) {
+        return false;
+      }
+      visited.add(binding);
+      for (const definition of binding.defs) {
+        if (
+          definition.type !== "Variable" ||
+          !isAstNode(definition.node) ||
+          definition.node.type !== "VariableDeclarator" ||
+          !isAstNode(definition.parent) ||
+          definition.parent.type !== "VariableDeclaration" ||
+          definition.parent.kind !== "const"
+        ) {
+          continue;
+        }
+        return this.isWebStorage(definition.node.init, visited);
+      }
+      return false;
+    }
+    if (expression.type !== "MemberExpression") {
+      return false;
+    }
+    const storageName = this.resolveMemberName(expression);
+    if (storageName === null || !STORAGE_NAMES.has(storageName)) {
+      return false;
+    }
+    return this.isBrowserGlobalHost(expression.object);
+  };
+
+  reportCredentialName = (node, keyName) => {
+    if (keyName === null || !isCredentialKey(keyName)) {
+      return;
+    }
+    this.context.report({ node, messageId: "noAuthTokenInWebStorage" });
+  };
+
+  reportCredentialKey = (node, key) => {
+    this.reportCredentialName(node, this.resolveStaticString(key));
+  };
+
+  visitCallExpression = (node) => {
+    const callee = unwrapExpression(node.callee);
+    if (
+      callee === null ||
+      callee.type !== "MemberExpression" ||
+      this.resolveMemberName(callee) !== "setItem" ||
+      !this.isWebStorage(callee.object) ||
+      !Array.isArray(node.arguments) ||
+      node.arguments.length < 2
+    ) {
+      return;
+    }
+    this.reportCredentialKey(node, node.arguments.at(0));
+  };
+
+  visitAssignmentExpression = (node) => {
+    const target = unwrapExpression(node.left);
+    if (
+      target === null ||
+      target.type !== "MemberExpression" ||
+      !this.isWebStorage(target.object)
+    ) {
+      return;
+    }
+    this.reportCredentialName(node, this.resolveMemberName(target));
+  };
+  listeners() {
+    return {
+      CallExpression: this.visitCallExpression,
+      AssignmentExpression: this.visitAssignmentExpression,
+    };
+  }
+}
+
 export default {
   meta: {
     schema: [
@@ -68,189 +270,6 @@ export default {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-
-    const resolveVariable = (identifier) => {
-      let scope = context.sourceCode.getScope(identifier);
-      while (scope !== null) {
-        const variable = scope.set.get(identifier.name);
-        if (variable !== undefined) {
-          return variable;
-        }
-        scope = scope.upper;
-      }
-      return null;
-    };
-    const isGlobalReference = (node, name) => {
-      if (!isIdentifier(node, name)) {
-        return false;
-      }
-      const variable = resolveVariable(node);
-      return variable === null || variable.defs.length === 0;
-    };
-    const resolveStaticString = (node, visited = new Set()) => {
-      const expression = unwrapExpression(node);
-      if (expression === null) {
-        return null;
-      }
-      if (isStringLiteral(expression)) {
-        return expression.value;
-      }
-      const templateValue = staticTemplateValue(expression);
-      if (templateValue !== null) {
-        return templateValue;
-      }
-      if (
-        expression.type === "BinaryExpression" &&
-        expression.operator === "+"
-      ) {
-        const left = resolveStaticString(expression.left, new Set(visited));
-        const right = resolveStaticString(expression.right, new Set(visited));
-        return left === null || right === null ? null : left + right;
-      }
-      if (!isIdentifier(expression)) {
-        return null;
-      }
-      const variable = resolveVariable(expression);
-      if (variable === null || visited.has(variable)) {
-        return null;
-      }
-      visited.add(variable);
-      for (const definition of variable.defs) {
-        if (
-          definition.type !== "Variable" ||
-          !isAstNode(definition.node) ||
-          definition.node.type !== "VariableDeclarator" ||
-          !isAstNode(definition.parent) ||
-          definition.parent.type !== "VariableDeclaration" ||
-          definition.parent.kind !== "const"
-        ) {
-          continue;
-        }
-        return resolveStaticString(definition.node.init, visited);
-      }
-      return null;
-    };
-    const resolveMemberName = (node) => {
-      const member = unwrapExpression(node);
-      if (member === null || member.type !== "MemberExpression") {
-        return null;
-      }
-      return member.computed === true
-        ? resolveStaticString(member.property)
-        : getPropertyName(member.property);
-    };
-    const isBrowserGlobalHost = (node, visited = new Set()) => {
-      const expression = unwrapExpression(node);
-      if (expression === null) {
-        return false;
-      }
-      if (isIdentifier(expression) && GLOBAL_HOST_NAMES.has(expression.name)) {
-        return isGlobalReference(expression, expression.name);
-      }
-      if (expression.type === "MemberExpression") {
-        const memberName = resolveMemberName(expression);
-        return (
-          memberName !== null &&
-          GLOBAL_HOST_NAMES.has(memberName) &&
-          isBrowserGlobalHost(expression.object, visited)
-        );
-      }
-      if (!isIdentifier(expression)) {
-        return false;
-      }
-      const variable = resolveVariable(expression);
-      if (variable === null || visited.has(variable)) {
-        return false;
-      }
-      visited.add(variable);
-      for (const definition of variable.defs) {
-        if (
-          definition.type !== "Variable" ||
-          !isAstNode(definition.node) ||
-          definition.node.type !== "VariableDeclarator" ||
-          !isAstNode(definition.parent) ||
-          definition.parent.type !== "VariableDeclaration" ||
-          definition.parent.kind !== "const"
-        ) {
-          continue;
-        }
-        return isBrowserGlobalHost(definition.node.init, visited);
-      }
-      return false;
-    };
-    const isWebStorage = (node, visited = new Set()) => {
-      const expression = unwrapExpression(node);
-      if (expression === null) {
-        return false;
-      }
-      if (isIdentifier(expression) && STORAGE_NAMES.has(expression.name)) {
-        return isGlobalReference(expression, expression.name);
-      }
-      if (isIdentifier(expression)) {
-        const variable = resolveVariable(expression);
-        if (variable === null || visited.has(variable)) {
-          return false;
-        }
-        visited.add(variable);
-        for (const definition of variable.defs) {
-          if (
-            definition.type !== "Variable" ||
-            !isAstNode(definition.node) ||
-            definition.node.type !== "VariableDeclarator" ||
-            !isAstNode(definition.parent) ||
-            definition.parent.type !== "VariableDeclaration" ||
-            definition.parent.kind !== "const"
-          ) {
-            continue;
-          }
-          return isWebStorage(definition.node.init, visited);
-        }
-        return false;
-      }
-      if (expression.type !== "MemberExpression") {
-        return false;
-      }
-      const storageName = resolveMemberName(expression);
-      if (storageName === null || !STORAGE_NAMES.has(storageName)) {
-        return false;
-      }
-      return isBrowserGlobalHost(expression.object);
-    };
-    const reportCredentialKeyValue = (node, keyValue) => {
-      if (keyValue === null || !isCredentialKey(keyValue)) {
-        return;
-      }
-      context.report({ node, messageId: "noAuthTokenInWebStorage" });
-    };
-    const reportCredentialKey = (node, key) => {
-      reportCredentialKeyValue(node, resolveStaticString(key));
-    };
-    return {
-      CallExpression(node) {
-        const callee = unwrapExpression(node.callee);
-        if (
-          callee === null ||
-          callee.type !== "MemberExpression" ||
-          resolveMemberName(callee) !== "setItem" ||
-          !isWebStorage(callee.object) ||
-          !Array.isArray(node.arguments) ||
-          node.arguments.length < 2
-        ) {
-          return;
-        }
-        reportCredentialKey(node, node.arguments.at(0));
-      },
-      AssignmentExpression(node) {
-        const target = unwrapExpression(node.left);
-        if (
-          target === null ||
-          target.type !== "MemberExpression" ||
-          !isWebStorage(target.object)
-        ) {
-          return;
-        }
-        reportCredentialKeyValue(node, resolveMemberName(target));
-      },
-    };
+    return new WebStorageCredentials(context).listeners();
   },
 };

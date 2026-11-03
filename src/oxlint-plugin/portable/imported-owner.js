@@ -19,8 +19,8 @@ export function findVariable(context, node) {
     scope;
     scope = scope.upper
   ) {
-    const variable = scope.set.get(node.name);
-    if (variable) return variable;
+    const binding = scope.set.get(node.name);
+    if (binding) return binding;
   }
   return null;
 }
@@ -36,10 +36,10 @@ export function importedOwner(context, node, owners, seen = new Set()) {
       seen
     );
   }
-  const variable = findVariable(context, node);
-  if (!variable || seen.has(variable)) return false;
-  seen.add(variable);
-  const definition = variable.defs[0];
+  const binding = findVariable(context, node);
+  if (!binding || seen.has(binding)) return false;
+  seen.add(binding);
+  const definition = binding.defs[0];
   if (definition?.type === "ImportBinding") {
     let name =
       definition.node.imported?.name ?? definition.node.imported?.value;
@@ -55,7 +55,7 @@ export function importedOwner(context, node, owners, seen = new Set()) {
   if (
     definition?.type === "Variable" &&
     definition.parent.kind === "const" &&
-    !variable.references.some(
+    !binding.references.some(
       (reference) => reference.isWrite() && !reference.init
     )
   ) {

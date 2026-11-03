@@ -42,12 +42,14 @@ const getAttribute = (openingElement, name) => {
   );
 };
 const getRenderElement = (openingElement) => {
-  const value = getAttribute(openingElement, "render")?.value;
-  if (!isAstNode(value)) {
+  const attributeInitializer = getAttribute(openingElement, "render")?.value;
+  if (!isAstNode(attributeInitializer)) {
     return null;
   }
   const expression =
-    value.type === "JSXExpressionContainer" ? value.expression : value;
+    attributeInitializer.type === "JSXExpressionContainer"
+      ? attributeInitializer.expression
+      : attributeInitializer;
   return isAstNode(expression) && expression.type === "JSXElement"
     ? expression
     : null;

@@ -35,7 +35,8 @@ function propertyToAttr(prop, sourceCode) {
   return `${keyName}={${sourceCode.getText(prop.value)}}`;
 }
 
-function buildJsxFix(fixer, node, name, arg, sourceCode) {
+function buildJsxFix(fixer, callTarget, sourceCode) {
+  const { node, name, arg } = callTarget;
   if (!arg) return fixer.replaceText(node, `<${name} />`);
   if (arg.type === "Identifier") {
     return fixer.replaceText(node, `<${name} {...${arg.name}} />`);
@@ -121,10 +122,10 @@ function isComponentWrapperCall(sourceCode, node) {
 // forwardRef/memo wrapper. Imported and otherwise unresolvable callees are not
 // reported.
 function resolvesToComponent(sourceCode, identifier, seen = new Set()) {
-  const variable = findVariable(sourceCode, identifier);
-  if (!variable || seen.has(variable)) return false;
-  seen.add(variable);
-  const definition = variable.defs?.[0];
+  const binding = findVariable(sourceCode, identifier);
+  if (!binding || seen.has(binding)) return false;
+  seen.add(binding);
+  const definition = binding.defs?.[0];
   if (definition?.type === "FunctionName") {
     return functionReturnsJsx(definition.node);
   }
@@ -142,6 +143,34 @@ function resolvesToComponent(sourceCode, identifier, seen = new Set()) {
   return isComponentWrapperCall(sourceCode, init);
 }
 
+function createComponentCallVisitors(context) {
+  let nonReactJsx = false;
+  return {
+    Program(node) {
+      nonReactJsx = isNonReactJsxFile(node);
+    },
+    CallExpression(node) {
+      if (nonReactJsx || node.callee.type !== "Identifier") return;
+      const name = node.callee.name;
+      if (!/^[A-Z]/u.test(name) || shouldSkip(name)) return;
+      if (!resolvesToComponent(context.sourceCode, node.callee)) return;
+      if (node.arguments.length > 1) return;
+      const arg = node.arguments[0];
+      if (arg && arg.type !== "ObjectExpression" && arg.type !== "Identifier") {
+        return;
+      }
+      context.report({
+        node,
+        messageId: "noCallingComponentAsFunction",
+        data: { name },
+        fix(fixer) {
+          return buildJsxFix(fixer, { node, name, arg }, context.sourceCode);
+        },
+      });
+    },
+  };
+}
+
 export default function ruleNoCallingComponentsAsFunctions() {
   return {
     meta: {
@@ -157,36 +186,6 @@ export default function ruleNoCallingComponentsAsFunctions() {
           '"{{name}}" appears to be a React component. Use <{{name}} /> instead of calling it as a function.',
       },
     },
-    create(context) {
-      let nonReactJsx = false;
-      return {
-        Program(node) {
-          nonReactJsx = isNonReactJsxFile(node);
-        },
-        CallExpression(node) {
-          if (nonReactJsx || node.callee.type !== "Identifier") return;
-          const name = node.callee.name;
-          if (!/^[A-Z]/u.test(name) || shouldSkip(name)) return;
-          if (!resolvesToComponent(context.sourceCode, node.callee)) return;
-          if (node.arguments.length > 1) return;
-          const arg = node.arguments[0];
-          if (
-            arg &&
-            arg.type !== "ObjectExpression" &&
-            arg.type !== "Identifier"
-          ) {
-            return;
-          }
-          context.report({
-            node,
-            messageId: "noCallingComponentAsFunction",
-            data: { name },
-            fix(fixer) {
-              return buildJsxFix(fixer, node, name, arg, context.sourceCode);
-            },
-          });
-        },
-      };
-    },
+    create: createComponentCallVisitors,
   };
 }

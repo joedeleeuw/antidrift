@@ -96,12 +96,12 @@ function referencesSenderOrFrame(node, eventParamName) {
       found = true;
       return;
     }
-    for (const [k, v] of Object.entries(cur)) {
+    for (const [k, child] of Object.entries(cur)) {
       if (k === "parent" || k === "range" || k === "loc") continue;
-      if (Array.isArray(v)) {
-        for (const item of v) visit(item);
-      } else if (v && typeof v === "object") {
-        visit(v);
+      if (Array.isArray(child)) {
+        for (const element of child) visit(element);
+      } else if (child && typeof child === "object") {
+        visit(child);
       }
     }
   }
@@ -190,12 +190,12 @@ function findPrivilegedCall(node) {
       found = cur;
       return;
     }
-    for (const [k, v] of Object.entries(cur)) {
+    for (const [k, child] of Object.entries(cur)) {
       if (k === "parent" || k === "range" || k === "loc") continue;
-      if (Array.isArray(v)) {
-        for (const item of v) visit(item);
-      } else if (v && typeof v === "object") {
-        visit(v);
+      if (Array.isArray(child)) {
+        for (const element of child) visit(element);
+      } else if (child && typeof child === "object") {
+        visit(child);
       }
     }
   }
@@ -246,6 +246,103 @@ function findUnguardedIpcEffect(stmts, eventName, authzSet) {
   return null;
 }
 
+class AuthorizationChecks {
+  constructor(context) {
+    this.context = context;
+    this.configured = this.context.options[0]?.authzFunctions ?? [];
+    if (
+      !Array.isArray(this.configured) ||
+      this.configured.some((name) => typeof name !== "string")
+    ) {
+      throw new TypeError("authzFunctions must be strings");
+    }
+    this.authzSet = new Set(this.configured);
+    this.stack = [];
+  }
+  enter = (node) => {
+    this.stack.push({ node, paramsAccess: null, sawAuthz: false });
+  };
+
+  exit = () => {
+    const frame = this.stack.pop();
+    if (this.configured.length > 0 && frame?.paramsAccess && !frame.sawAuthz) {
+      this.context.report({
+        node: frame.paramsAccess,
+        message:
+          "Handler reads request params without a configured authorization/ownership check.",
+      });
+    }
+  };
+
+  visitMemberExpression = (node) => {
+    const frame = this.stack.at(-1);
+    if (
+      frame &&
+      !node.computed &&
+      node.property?.type === "Identifier" &&
+      node.property.name === "params" &&
+      node.object?.type === "Identifier" &&
+      REQUEST_PARAM_ROOTS.has(node.object.name)
+    ) {
+      frame.paramsAccess ??= node;
+    }
+  };
+
+  visitCallExpression = (node) => {
+    const frame = this.stack.at(-1);
+    const name = calleeName(node.callee);
+    if (frame && name && this.authzSet.has(name)) {
+      frame.sawAuthz = true;
+    }
+    if (!isIpcMainRegistration(node)) return;
+    const handler = node.arguments[1];
+    if (
+      handler?.type !== "ArrowFunctionExpression" &&
+      handler?.type !== "FunctionExpression"
+    ) {
+      return;
+    }
+    const eventParam = handler.params[0];
+    const eventName =
+      eventParam?.type === "Identifier" ? eventParam.name : null;
+    if (handler.body?.type !== "BlockStatement") {
+      const priv = findPrivilegedCall(handler.body);
+      if (priv) {
+        this.context.report({
+          node: priv,
+          message:
+            "Privileged Electron IPC handler must validate trusted `event.sender` or `event.senderFrame` before executing host effects.",
+        });
+      }
+      return;
+    }
+    const unguarded = findUnguardedIpcEffect(
+      handler.body.body,
+      eventName,
+      this.authzSet
+    );
+    if (unguarded) {
+      this.context.report({
+        node: unguarded,
+        message:
+          "Privileged Electron IPC handler must validate trusted `event.sender` or `event.senderFrame` before executing host effects.",
+      });
+    }
+  };
+  listeners() {
+    return {
+      FunctionDeclaration: this.enter,
+      "FunctionDeclaration:exit": this.exit,
+      FunctionExpression: this.enter,
+      "FunctionExpression:exit": this.exit,
+      ArrowFunctionExpression: this.enter,
+      "ArrowFunctionExpression:exit": this.exit,
+      MemberExpression: this.visitMemberExpression,
+      CallExpression: this.visitCallExpression,
+    };
+  }
+}
+
 export default {
   meta: {
     type: "problem",
@@ -270,89 +367,6 @@ export default {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-    const configured = context.options[0]?.authzFunctions ?? [];
-    if (
-      !Array.isArray(configured) ||
-      configured.some((name) => typeof name !== "string")
-    ) {
-      throw new TypeError("authzFunctions must be strings");
-    }
-    const authzSet = new Set(configured);
-    const stack = [];
-    const enter = (node) => {
-      stack.push({ node, paramsAccess: null, sawAuthz: false });
-    };
-    const exit = () => {
-      const frame = stack.pop();
-      if (configured.length > 0 && frame?.paramsAccess && !frame.sawAuthz) {
-        context.report({
-          node: frame.paramsAccess,
-          message:
-            "Handler reads request params without a configured authorization/ownership check.",
-        });
-      }
-    };
-    return {
-      FunctionDeclaration: enter,
-      "FunctionDeclaration:exit": exit,
-      FunctionExpression: enter,
-      "FunctionExpression:exit": exit,
-      ArrowFunctionExpression: enter,
-      "ArrowFunctionExpression:exit": exit,
-      MemberExpression(node) {
-        const frame = stack.at(-1);
-        if (
-          frame &&
-          !node.computed &&
-          node.property?.type === "Identifier" &&
-          node.property.name === "params" &&
-          node.object?.type === "Identifier" &&
-          REQUEST_PARAM_ROOTS.has(node.object.name)
-        ) {
-          frame.paramsAccess ??= node;
-        }
-      },
-      CallExpression(node) {
-        const frame = stack.at(-1);
-        const name = calleeName(node.callee);
-        if (frame && name && authzSet.has(name)) {
-          frame.sawAuthz = true;
-        }
-        if (!isIpcMainRegistration(node)) return;
-        const handler = node.arguments[1];
-        if (
-          handler?.type !== "ArrowFunctionExpression" &&
-          handler?.type !== "FunctionExpression"
-        ) {
-          return;
-        }
-        const eventParam = handler.params[0];
-        const eventName =
-          eventParam?.type === "Identifier" ? eventParam.name : null;
-        if (handler.body?.type !== "BlockStatement") {
-          const priv = findPrivilegedCall(handler.body);
-          if (priv) {
-            context.report({
-              node: priv,
-              message:
-                "Privileged Electron IPC handler must validate trusted `event.sender` or `event.senderFrame` before executing host effects.",
-            });
-          }
-          return;
-        }
-        const unguarded = findUnguardedIpcEffect(
-          handler.body.body,
-          eventName,
-          authzSet
-        );
-        if (unguarded) {
-          context.report({
-            node: unguarded,
-            message:
-              "Privileged Electron IPC handler must validate trusted `event.sender` or `event.senderFrame` before executing host effects.",
-          });
-        }
-      },
-    };
+    return new AuthorizationChecks(context).listeners();
   },
 };

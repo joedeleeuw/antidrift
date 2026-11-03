@@ -28,15 +28,38 @@ const hasDirAttr = (opening) =>
       attr.name?.type === "JSXIdentifier" &&
       attr.name.name === "dir"
   );
-const meaningfulChildren = (children) =>
-  children.filter(
-    (child) => !(child.type === "JSXText" && child.value.trim().length === 0)
-  );
 const isNameExpr = (expr, nameProps) =>
   (expr.type === "MemberExpression" ||
     expr.type === "OptionalMemberExpression") &&
   expr.property.type === "Identifier" &&
   nameProps.has(expr.property.name);
+const renderedNameChildren = (children, nameProps) => {
+  const siblings = children.filter(
+    (child) => !(child.type === "JSXText" && child.value.trim().length === 0)
+  );
+  const names = siblings.filter(
+    (child) =>
+      child.type === "JSXExpressionContainer" &&
+      isNameExpr(child.expression, nameProps)
+  );
+  return { siblings, names };
+};
+const reportMissingDirection = (context, opening, messageArguments) => {
+  if (
+    hasDirAttr(opening) ||
+    (opening.name.type === "JSXIdentifier" &&
+      RAW_ISOLATING.has(opening.name.name))
+  ) {
+    return;
+  }
+  if (!hasDirAttr(opening)) {
+    context.report({
+      node: opening,
+      messageId: "missingDir",
+      data: messageArguments,
+    });
+  }
+};
 export default {
   meta: {
     schema: [
@@ -65,7 +88,7 @@ export default {
     const options = context.options[0] ?? {};
     const names = new Set(options.nameProps ?? NAME_PROPS);
     const components = new Set(options.isolatingComponents ?? SELF_ISOLATING);
-    const data = {
+    const messageArguments = {
       owner:
         options.owner ??
         "Unicode FSI (\\u2068) and PDI (\\u2069), or an HTML bdi element",
@@ -79,29 +102,23 @@ export default {
         if (elementName !== null && components.has(elementName)) {
           return;
         }
-        const kids = meaningfulChildren(node.children);
-        const nameKids = kids.filter(
-          (child) =>
-            child.type === "JSXExpressionContainer" &&
-            isNameExpr(child.expression, names)
+        const { siblings, names: nameKids } = renderedNameChildren(
+          node.children,
+          names
         );
         if (nameKids.length === 0) {
           return;
         }
-        if (kids.length === 1) {
-          if (
-            hasDirAttr(opening) ||
-            (elementName !== null && RAW_ISOLATING.has(elementName))
-          ) {
-            return;
-          }
-          if (!hasDirAttr(opening)) {
-            context.report({ node: opening, messageId: "missingDir", data });
-          }
+        if (siblings.length === 1) {
+          reportMissingDirection(context, opening, messageArguments);
           return;
         }
         for (const child of nameKids) {
-          context.report({ node: child, messageId: "missingBidi", data });
+          context.report({
+            node: child,
+            messageId: "missingBidi",
+            data: messageArguments,
+          });
         }
       },
     };

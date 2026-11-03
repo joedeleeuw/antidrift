@@ -39,7 +39,7 @@ const segments = (name) =>
     .toLowerCase()
     .split(/\s+/);
 const isNumericName = (name) =>
-  segments(name).some((s) => NUMERIC_WORDS.has(s));
+  segments(name).some((specifier) => NUMERIC_WORDS.has(specifier));
 const isNumericExpr = (node) => {
   if (!node) {
     return false;

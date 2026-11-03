@@ -12,8 +12,8 @@ const SOURCE_EXTENSIONS = [
   ".cjs",
 ];
 
-export function astLiteralValue(node) {
-  if (node?.type === "TSLiteralType") return astLiteralValue(node.literal);
+export function astLiteralText(node) {
+  if (node?.type === "TSLiteralType") return astLiteralText(node.literal);
   if (
     node?.type === "Literal" &&
     (typeof node.value === "string" || typeof node.value === "number")
@@ -30,10 +30,10 @@ export function astLiteralValue(node) {
   return null;
 }
 
-export function memberSet(values) {
-  if (values.length === 0 || values.includes(null)) return null;
+export function memberSet(literals) {
+  if (literals.length === 0 || literals.includes(null)) return null;
   return JSON.stringify(
-    [...new Set(values.map((value) => JSON.stringify(value)))].sort()
+    [...new Set(literals.map((literal) => JSON.stringify(literal)))].sort()
   );
 }
 
@@ -66,7 +66,7 @@ function astArrayMembers(initializer) {
   if (!isConstAssertion(outer)) return null;
   const inner = unwrapParensAndSatisfies(outer.expression);
   if (inner?.type !== "ArrayExpression") return null;
-  return memberSet(inner.elements.map((element) => astLiteralValue(element)));
+  return memberSet(inner.elements.map((element) => astLiteralText(element)));
 }
 
 function recordConstStatement(statement, bindings, exports) {
@@ -167,16 +167,37 @@ function parseSingleElementToken(token) {
 function parseArrayElementTokens(rawInner) {
   const tokenRegex =
     /\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^,\s]+)\s*(?:,|$)/gu;
-  const values = [];
+  const literals = [];
   let consumed = 0;
   for (const match of rawInner.matchAll(tokenRegex)) {
     if (match.index !== consumed) return [null];
     consumed = match.index + match[0].length;
-    values.push(parseSingleElementToken(match[1]));
+    literals.push(parseSingleElementToken(match[1]));
   }
   if (rawInner.slice(consumed).trim().length > 0) return [null];
-  return values;
+  return literals;
 }
+
+function recordRegexArrayMatches(cleaned, pattern, bindings, exports) {
+  for (const match of cleaned.matchAll(pattern)) {
+    const isExported = Boolean(match[1]);
+    const localName = match[2];
+    const members = memberSet(parseArrayElementTokens(match[3]));
+    if (!members) continue;
+    bindings.set(localName, members);
+    if (isExported) {
+      exports.set(localName, localName);
+    }
+  }
+}
+
+const CONST_ARRAY_REGEX =
+  /(?:^|[;\n])\s*(export\s+)?const\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+?)?=\s*\(*\s*\[([\s\S]*?)\]\s*\)*\s*as\s+const\b/gu;
+const ZOD_ENUM_REGEX =
+  /(?:^|[;\n])\s*(export\s+)?const\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+?)?=\s*z\.enum\(\s*\[([\s\S]*?)\]\s*\)/gu;
+const NAMED_EXPORT_REGEX = /(?:^|[;\n])\s*export\s*\{([^}]+)\}(?!\s*from\b)/gu;
+const DEFAULT_EXPORT_REGEX =
+  /(?:^|[;\n])\s*export\s+default\s+([A-Za-z_$][\w$]*)\b/gu;
 
 export function exportedArrays(filename, text) {
   void filename;
@@ -184,34 +205,10 @@ export function exportedArrays(filename, text) {
   const bindings = new Map();
   const exports = new Map();
 
-  const constRegex =
-    /(?:^|[;\n])\s*(export\s+)?const\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+?)?=\s*\(*\s*\[([\s\S]*?)\]\s*\)*\s*as\s+const\b/gu;
-  for (const match of cleaned.matchAll(constRegex)) {
-    const isExported = Boolean(match[1]);
-    const localName = match[2];
-    const members = memberSet(parseArrayElementTokens(match[3]));
-    if (!members) continue;
-    bindings.set(localName, members);
-    if (isExported) {
-      exports.set(localName, localName);
-    }
-  }
+  recordRegexArrayMatches(cleaned, CONST_ARRAY_REGEX, bindings, exports);
+  recordRegexArrayMatches(cleaned, ZOD_ENUM_REGEX, bindings, exports);
 
-  const zEnumRegex =
-    /(?:^|[;\n])\s*(export\s+)?const\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+?)?=\s*z\.enum\(\s*\[([\s\S]*?)\]\s*\)/gu;
-  for (const match of cleaned.matchAll(zEnumRegex)) {
-    const isExported = Boolean(match[1]);
-    const localName = match[2];
-    const members = memberSet(parseArrayElementTokens(match[3]));
-    if (!members) continue;
-    bindings.set(localName, members);
-    if (isExported) {
-      exports.set(localName, localName);
-    }
-  }
-
-  const namedExportRegex = /(?:^|[;\n])\s*export\s*\{([^}]+)\}(?!\s*from\b)/gu;
-  for (const match of cleaned.matchAll(namedExportRegex)) {
+  for (const match of cleaned.matchAll(NAMED_EXPORT_REGEX)) {
     for (const part of match[1].split(",")) {
       const trimmed = part.trim();
       if (!trimmed || trimmed.startsWith("type ")) continue;
@@ -220,15 +217,12 @@ export function exportedArrays(filename, text) {
       );
       if (asMatch) {
         const local = asMatch[1];
-        const exported = asMatch[2] ?? local;
-        exports.set(exported, local);
+        exports.set(asMatch[2] ?? local, local);
       }
     }
   }
 
-  const defaultExportRegex =
-    /(?:^|[;\n])\s*export\s+default\s+([A-Za-z_$][\w$]*)\b/gu;
-  for (const match of cleaned.matchAll(defaultExportRegex)) {
+  for (const match of cleaned.matchAll(DEFAULT_EXPORT_REGEX)) {
     exports.set("default", match[1]);
   }
 
@@ -312,7 +306,7 @@ const statusOwnerFileCache = new Map();
 
 export function resolveOwnerStatusValues(statusName, entry) {
   if (Array.isArray(entry?.values)) {
-    return entry.values.filter((v) => typeof v === "string");
+    return entry.values.filter((literal) => typeof literal === "string");
   }
   const owner = entry?.owner;
   if (typeof owner !== "string" || owner.length === 0) return [];
@@ -336,9 +330,11 @@ export function resolveOwnerStatusValues(statusName, entry) {
           camel,
           statusName,
         ];
-  const matched = arrays.find((arr) => candidates.includes(arr.name));
+  const matched = arrays.find((exportedArray) =>
+    candidates.includes(exportedArray.name)
+  );
   if (!matched) return [];
   return JSON.parse(matched.members)
-    .map((item) => JSON.parse(item))
-    .filter((v) => typeof v === "string");
+    .map((serialized) => JSON.parse(serialized))
+    .filter((literal) => typeof literal === "string");
 }

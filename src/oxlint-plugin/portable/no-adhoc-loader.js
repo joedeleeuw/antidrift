@@ -52,10 +52,12 @@ const staticStrings = (node, out) => {
   }
   if (node.type === "TemplateLiteral" && Array.isArray(node.quasis)) {
     for (const quasi of node.quasis) {
-      const value = isAstNode(quasi) ? quasi.value : undefined;
+      const templateText = isAstNode(quasi) ? quasi.value : undefined;
       const cooked =
-        typeof value === "object" && value !== null && "cooked" in value
-          ? value.cooked
+        typeof templateText === "object" &&
+        templateText !== null &&
+        "cooked" in templateText
+          ? templateText.cooked
           : undefined;
       if (typeof cooked === "string") {
         out.push(cooked);
@@ -79,6 +81,34 @@ const staticStrings = (node, out) => {
   ) {
     staticStrings(node.consequent ?? node.left, out);
     staticStrings(node.alternate ?? node.right, out);
+  }
+};
+const inspectLoaderAttribute = (context, node, owners) => {
+  const name = jsxAttributeName(node);
+  if (name === "role") {
+    const parts = [];
+    staticStrings(node.value, parts);
+    if (parts.includes("progressbar")) {
+      context.report({ node, messageId: "progressbar", data: owners });
+    }
+    return;
+  }
+  if (name !== "className") {
+    return;
+  }
+  const parts = [];
+  staticStrings(node.value, parts);
+  for (const part of parts) {
+    const match = BANNED_UTILITY.exec(part);
+    if (match !== null) {
+      const utility = match[0].trim().slice("animate-".length);
+      context.report({
+        node,
+        messageId: "animateUtility",
+        data: { utility, ...owners },
+      });
+      return;
+    }
   }
 };
 export default {
@@ -158,32 +188,7 @@ export default {
         }
       },
       JSXAttribute(node) {
-        const name = jsxAttributeName(node);
-        if (name === "role") {
-          const parts = [];
-          staticStrings(node.value, parts);
-          if (parts.includes("progressbar")) {
-            context.report({ node, messageId: "progressbar", data: owners });
-          }
-          return;
-        }
-        if (name !== "className") {
-          return;
-        }
-        const parts = [];
-        staticStrings(node.value, parts);
-        for (const part of parts) {
-          const match = BANNED_UTILITY.exec(part);
-          if (match !== null) {
-            const utility = match[0].trim().slice("animate-".length);
-            context.report({
-              node,
-              messageId: "animateUtility",
-              data: { utility, ...owners },
-            });
-            return;
-          }
-        }
+        inspectLoaderAttribute(context, node, owners);
       },
     };
   },

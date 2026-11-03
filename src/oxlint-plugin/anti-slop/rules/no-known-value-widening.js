@@ -3,6 +3,7 @@ import {
   createTypeEnvironment,
   isKnownEvidenceExpression,
 } from "../shared/dictionary-types.js";
+
 function unwrapExpression(expression) {
   let current = expression;
   while (
@@ -16,58 +17,60 @@ function unwrapExpression(expression) {
   }
   return current;
 }
-function resolveVariable(sourceCode, identifier) {
+
+function resolveBinding(sourceCode, identifier) {
   let scope = sourceCode.getScope(identifier);
   while (scope !== null) {
-    const variable = scope.set.get(identifier.name);
-    if (variable !== undefined) return variable;
+    const binding = scope.set.get(identifier.name);
+    if (binding !== undefined) return binding;
     scope = scope.upper;
   }
   return null;
 }
-function variableDeclarator(variable) {
-  if (variable.defs.length !== 1) return null;
-  const [definition] = variable.defs;
+
+function bindingDeclarator(binding) {
+  if (binding.defs.length !== 1) return null;
+  const [definition] = binding.defs;
   return definition?.type === "Variable" &&
     definition.node.type === "VariableDeclarator"
     ? definition.node
     : null;
 }
-function isStableConstVariable(variable, declarator) {
+
+function isStableConstBinding(binding, declarator) {
   return (
     declarator.parent.type === "VariableDeclaration" &&
     declarator.parent.kind === "const" &&
-    variable.references.every(
+    binding.references.every(
       (reference) => reference.init || !reference.isWrite()
     )
   );
 }
-function hasKnownEvidence(
-  sourceCode,
-  expression,
-  visitedVariables = new Set()
-) {
+
+function hasKnownEvidence(sourceCode, expression, visitedBindings = new Set()) {
   if (isKnownEvidenceExpression(expression)) return true;
   const unwrapped = unwrapExpression(expression);
   if (unwrapped.type !== "Identifier") return false;
-  const variable = resolveVariable(sourceCode, unwrapped);
-  if (variable === null || visitedVariables.has(variable)) return false;
-  const declarator = variableDeclarator(variable);
+  const binding = resolveBinding(sourceCode, unwrapped);
+  if (binding === null || visitedBindings.has(binding)) return false;
+  const declarator = bindingDeclarator(binding);
   if (
     declarator === null ||
     declarator.init === null ||
-    !isStableConstVariable(variable, declarator)
+    !isStableConstBinding(binding, declarator)
   ) {
     return false;
   }
-  visitedVariables.add(variable);
-  return hasKnownEvidence(sourceCode, declarator.init, visitedVariables);
+  visitedBindings.add(binding);
+  return hasKnownEvidence(sourceCode, declarator.init, visitedBindings);
 }
+
 function annotationTarget(annotation, environment) {
   return annotation === null || annotation === undefined
     ? null
     : classifyWideningTarget(annotation.typeAnnotation, environment);
 }
+
 function enclosingFunction(node) {
   let current = node.parent;
   while (current !== null && current.type !== "Program") {
@@ -82,40 +85,135 @@ function enclosingFunction(node) {
   }
   return null;
 }
+
 function sourceKeyName(sourceCode, key) {
-  if (key.type === "Identifier" || key.type === "PrivateIdentifier")
+  if (key.type === "Identifier" || key.type === "PrivateIdentifier") {
     return key.name;
+  }
   if (key.type === "Literal") return String(key.value);
   return sourceCode.getText(key);
 }
+
 function functionName(sourceCode, owner) {
   if (owner === null) return "anonymous function";
   if (owner.id !== null) return owner.id.name;
   const parent = owner.parent;
-  if (parent.type === "VariableDeclarator" && parent.id.type === "Identifier")
+  if (parent.type === "VariableDeclarator" && parent.id.type === "Identifier") {
     return parent.id.name;
-  if (parent.type === "MethodDefinition")
+  }
+  if (parent.type === "MethodDefinition") {
     return sourceKeyName(sourceCode, parent.key);
+  }
   return "anonymous function";
 }
+
 function isEmptyObjectExpression(expression) {
   const unwrapped = unwrapExpression(expression);
   return (
     unwrapped.type === "ObjectExpression" && unwrapped.properties.length === 0
   );
 }
+
 function isDictionaryAccumulatorTarget(destination) {
   return (
     destination.kind === "open dictionary" ||
     destination.kind === "generic container"
   );
 }
+
 function hasParentAssertion(node) {
   return (
     node.parent?.type === "TSAsExpression" ||
     node.parent?.type === "TSTypeAssertion"
   );
 }
+
+function createFlowReporter(context, getEnvironment) {
+  const reportFlow = (expression, destination, subject) => {
+    if (destination === null) return;
+    if (
+      isDictionaryAccumulatorTarget(destination) &&
+      isEmptyObjectExpression(expression)
+    ) {
+      return;
+    }
+    if (!hasKnownEvidence(context.sourceCode, expression)) return;
+    context.report({
+      node: expression,
+      messageId: "widening",
+      data: { subject, target: destination.kind },
+    });
+  };
+  const targetFromAnnotation = (annotation) => {
+    const environment = getEnvironment();
+    return environment === null
+      ? null
+      : annotationTarget(annotation, environment);
+  };
+  const reportProperty = (node) => {
+    if (node.value === null) return;
+    reportFlow(
+      node.value,
+      targetFromAnnotation(node.typeAnnotation),
+      `property \`${sourceKeyName(context.sourceCode, node.key)}\``
+    );
+  };
+  const reportAssertion = (node) => {
+    const environment = getEnvironment();
+    if (environment === null || hasParentAssertion(node)) return;
+    reportFlow(
+      node.expression,
+      classifyWideningTarget(node.typeAnnotation, environment),
+      "assertion"
+    );
+  };
+  return {
+    reportFlow,
+    targetFromAnnotation,
+    reportProperty,
+    reportAssertion,
+  };
+}
+
+function createWideningVisitors(context) {
+  let environment = null;
+  const { reportFlow, targetFromAnnotation, reportProperty, reportAssertion } =
+    createFlowReporter(context, () => environment);
+  return {
+    Program(node) {
+      environment = createTypeEnvironment(node);
+    },
+    VariableDeclarator(node) {
+      if (node.init === null || node.id.type !== "Identifier") return;
+      const target = targetFromAnnotation(node.id.typeAnnotation);
+      reportFlow(node.init, target, `binding \`${node.id.name}\``);
+    },
+    PropertyDefinition: reportProperty,
+    AccessorProperty: reportProperty,
+    AssignmentExpression(node) {
+      if (node.operator !== "=" || node.left.type !== "Identifier") return;
+      const binding = resolveBinding(context.sourceCode, node.left);
+      const declarator = binding ? bindingDeclarator(binding) : null;
+      if (declarator === null || declarator.id.type !== "Identifier") return;
+      const target = targetFromAnnotation(declarator.id.typeAnnotation);
+      reportFlow(node.right, target, `binding \`${declarator.id.name}\``);
+    },
+    ReturnStatement(node) {
+      if (node.argument === null) return;
+      const owner = enclosingFunction(node);
+      const label = `return value of \`${functionName(context.sourceCode, owner)}\``;
+      reportFlow(node.argument, targetFromAnnotation(owner?.returnType), label);
+    },
+    ArrowFunctionExpression(node) {
+      if (node.body.type === "BlockStatement") return;
+      const label = `return value of \`${functionName(context.sourceCode, node)}\``;
+      reportFlow(node.body, targetFromAnnotation(node.returnType), label);
+    },
+    TSAsExpression: reportAssertion,
+    TSTypeAssertion: reportAssertion,
+  };
+}
+
 export const noKnownValueWideningRule = {
   meta: {
     type: "problem",
@@ -128,98 +226,5 @@ export const noKnownValueWideningRule = {
         "The explicit {{target}} type on {{subject}} discards known type evidence. Keep inference, validate with `satisfies`, or use a named owner contract.",
     },
   },
-  create(context) {
-    let environment = null;
-    const reportFlow = (expression, destination, subject) => {
-      if (destination === null) return;
-      if (
-        isDictionaryAccumulatorTarget(destination) &&
-        isEmptyObjectExpression(expression)
-      ) {
-        return;
-      }
-      if (!hasKnownEvidence(context.sourceCode, expression)) return;
-      context.report({
-        node: expression,
-        messageId: "widening",
-        data: { subject, target: destination.kind },
-      });
-    };
-    const targetFromAnnotation = (annotation) =>
-      environment === null ? null : annotationTarget(annotation, environment);
-    return {
-      Program(node) {
-        environment = createTypeEnvironment(node);
-      },
-      VariableDeclarator(node) {
-        if (node.init === null || node.id.type !== "Identifier") return;
-        reportFlow(
-          node.init,
-          targetFromAnnotation(node.id.typeAnnotation),
-          `binding \`${node.id.name}\``
-        );
-      },
-      PropertyDefinition(node) {
-        if (node.value === null) return;
-        reportFlow(
-          node.value,
-          targetFromAnnotation(node.typeAnnotation),
-          `property \`${sourceKeyName(context.sourceCode, node.key)}\``
-        );
-      },
-      AccessorProperty(node) {
-        if (node.value === null) return;
-        reportFlow(
-          node.value,
-          targetFromAnnotation(node.typeAnnotation),
-          `property \`${sourceKeyName(context.sourceCode, node.key)}\``
-        );
-      },
-      AssignmentExpression(node) {
-        if (node.operator !== "=" || node.left.type !== "Identifier") return;
-        const variable = resolveVariable(context.sourceCode, node.left);
-        if (variable === null) return;
-        const declarator = variableDeclarator(variable);
-        if (declarator === null || declarator.id.type !== "Identifier") return;
-        reportFlow(
-          node.right,
-          targetFromAnnotation(declarator.id.typeAnnotation),
-          `binding \`${declarator.id.name}\``
-        );
-      },
-      ReturnStatement(node) {
-        if (node.argument === null) return;
-        const owner = enclosingFunction(node);
-        reportFlow(
-          node.argument,
-          targetFromAnnotation(owner?.returnType),
-          `return value of \`${functionName(context.sourceCode, owner)}\``
-        );
-      },
-      ArrowFunctionExpression(node) {
-        if (node.body.type === "BlockStatement") return;
-        reportFlow(
-          node.body,
-          targetFromAnnotation(node.returnType),
-          `return value of \`${functionName(context.sourceCode, node)}\``
-        );
-      },
-      TSAsExpression(node) {
-        if (environment === null || hasParentAssertion(node)) return;
-        reportFlow(
-          node.expression,
-          classifyWideningTarget(node.typeAnnotation, environment),
-          "assertion"
-        );
-      },
-      TSTypeAssertion(node) {
-        if (environment === null || hasParentAssertion(node)) return;
-        reportFlow(
-          node.expression,
-          classifyWideningTarget(node.typeAnnotation, environment),
-          "assertion"
-        );
-      },
-    };
-  },
+  create: createWideningVisitors,
 };

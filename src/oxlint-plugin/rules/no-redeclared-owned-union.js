@@ -1,5 +1,5 @@
 import {
-  astLiteralValue,
+  astLiteralText,
   exportedArraysFromProgram,
   importedArrays,
   memberSet,
@@ -21,8 +21,8 @@ function convexMethod(node, method, sourceCode) {
   }
   const { object, property } = node.callee;
   if (object.type !== "Identifier" || property.name !== method) return null;
-  const variable = findVariable(sourceCode, object);
-  const definition = variable?.defs[0];
+  const binding = findVariable(sourceCode, object);
+  const definition = binding?.defs[0];
   if (
     definition?.type !== "ImportBinding" ||
     definition.node.type !== "ImportSpecifier"
@@ -37,7 +37,7 @@ function convexMethod(node, method, sourceCode) {
   ) {
     return null;
   }
-  return definition.node.imported.name === "v" ? variable : null;
+  return definition.node.imported.name === "v" ? binding : null;
 }
 
 function validatorMembers(node, sourceCode) {
@@ -51,7 +51,7 @@ function validatorMembers(node, sourceCode) {
       ) {
         return null;
       }
-      return astLiteralValue(argument.arguments[0]);
+      return astLiteralText(argument.arguments[0]);
     })
   );
 }
@@ -114,7 +114,7 @@ function importOwners(statement, context, cache) {
   );
   return statement.specifiers.flatMap((specifier) => {
     if (specifier.importKind === "type") return [];
-    const variable = findVariable(context.sourceCode, specifier.local);
+    const binding = findVariable(context.sourceCode, specifier.local);
     if (specifier.type === "ImportNamespaceSpecifier") {
       return arrays
         .filter((array) => array.name !== "default")
@@ -122,7 +122,7 @@ function importOwners(statement, context, cache) {
           ...array,
           name: `${specifier.local.name}.${array.name}`,
           binding: specifier.local.name,
-          variable,
+          variable: binding,
         }));
     }
     const imported =
@@ -135,9 +135,74 @@ function importOwners(statement, context, cache) {
         ...array,
         name: specifier.local.name,
         binding: specifier.local.name,
-        variable,
+        variable: binding,
       }));
   });
+}
+
+function collectProgramOwners(programNode, context) {
+  const cache = new Map();
+  const owners = exportedArraysFromProgram(programNode).map((array) => ({
+    ...array,
+    name: array.local,
+    binding: array.local,
+    variable: localOwnerVariable(programNode, context.sourceCode, array.local),
+  }));
+  for (const statement of programNode.body) {
+    if (statement.type === "ImportDeclaration") {
+      owners.push(...importOwners(statement, context, cache));
+    }
+  }
+  return owners;
+}
+
+function createUnionVisitors(context) {
+  if (!isRuleFile(context)) return {};
+  const sourceCode = context.sourceCode;
+  const allows = new Set(context.options[0]?.allows ?? []);
+  const statuses = context.options[0]?.statuses ?? {};
+  let owners = [];
+  function report(node, members, name) {
+    if (!members || allows.has(name)) return;
+    const owner = owners.find(
+      (candidate) =>
+        candidate.members === members &&
+        candidate.variable &&
+        scopeVariable(sourceCode, node, candidate.binding) ===
+          candidate.variable
+    );
+    if (owner) {
+      context.report({
+        node,
+        messageId: "redeclaredOwner",
+        data: { owner: owner.name },
+      });
+    }
+  }
+  return {
+    Program(node) {
+      owners = collectProgramOwners(node, context);
+    },
+    TSTypeAliasDeclaration(node) {
+      if (node.typeAnnotation.type !== "TSUnionType") return;
+      report(
+        node.typeAnnotation,
+        memberSet(node.typeAnnotation.types.map(astLiteralText)),
+        node.id.name
+      );
+    },
+    TSLiteralType(node) {
+      const owner = canonicalStatusLiteralOwner(node, statuses);
+      if (!owner || fileMatchesPath(context.filename, owner.owner)) return;
+      context.report({
+        node,
+        message: `String literal '${owner.value}' duplicates a canonical status from ${owner.owner}. Import the type instead.`,
+      });
+    },
+    CallExpression(node) {
+      report(node, validatorMembers(node, sourceCode), callSite(node));
+    },
+  };
 }
 
 export default function ruleNoRedeclaredOwnedUnion() {
@@ -168,64 +233,6 @@ export default function ruleNoRedeclaredOwnedUnion() {
           "This union re-declares an owned literal value space; derive it from the owning runtime array {{owner}}.",
       },
     },
-    create(context) {
-      if (!isRuleFile(context)) return {};
-      const sourceCode = context.sourceCode;
-      const allows = new Set(context.options[0]?.allows ?? []);
-      const statuses = context.options[0]?.statuses ?? {};
-      let owners = [];
-      function report(node, members, name) {
-        if (!members || allows.has(name)) return;
-        const owner = owners.find(
-          (candidate) =>
-            candidate.members === members &&
-            candidate.variable &&
-            scopeVariable(sourceCode, node, candidate.binding) ===
-              candidate.variable
-        );
-        if (owner) {
-          context.report({
-            node,
-            messageId: "redeclaredOwner",
-            data: { owner: owner.name },
-          });
-        }
-      }
-      return {
-        Program(node) {
-          const cache = new Map();
-          owners = exportedArraysFromProgram(node).map((array) => ({
-            ...array,
-            name: array.local,
-            binding: array.local,
-            variable: localOwnerVariable(node, sourceCode, array.local),
-          }));
-          for (const statement of node.body) {
-            if (statement.type === "ImportDeclaration") {
-              owners.push(...importOwners(statement, context, cache));
-            }
-          }
-        },
-        TSTypeAliasDeclaration(node) {
-          if (node.typeAnnotation.type !== "TSUnionType") return;
-          report(
-            node.typeAnnotation,
-            memberSet(node.typeAnnotation.types.map(astLiteralValue)),
-            node.id.name
-          );
-        },
-        TSLiteralType(node) {
-          const owner = canonicalStatusLiteralOwner(node, statuses);
-          if (!owner || fileMatchesPath(context.filename, owner.owner)) return;
-          context.report({
-            node,
-            message: `String literal '${owner.value}' duplicates a canonical status from ${owner.owner}. Import the type instead.`,
-          });
-        },
-        CallExpression(node) {
-          report(node, validatorMembers(node, sourceCode), callSite(node));
-        },
-      };
-    },
+    create: createUnionVisitors,
   };
 }

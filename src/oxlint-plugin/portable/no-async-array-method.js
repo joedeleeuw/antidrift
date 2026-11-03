@@ -73,6 +73,112 @@ function enabledBranches(option) {
   return new Set(["never-await", ...branches]);
 }
 
+class AsyncArrayCallbacks {
+  constructor(context) {
+    this.context = context;
+    this.sourceCode = this.context.sourceCode;
+    this.pendingMaps = [];
+    this.branches = enabledBranches(this.context.options[0]);
+  }
+  visitProgramExit = () => {
+    for (const pending of this.pendingMaps) {
+      if (!pending.awaited && !pending.returned) {
+        this.context.report({
+          node: pending.node,
+          message: `Wrap .${pending.method}() with an async callback in Promise.all(...) (or Promise.allSettled) so the promises are awaited.`,
+        });
+      }
+    }
+  };
+
+  visitReturnStatement = (node) => {
+    const arg = unwrapExpression(node.argument);
+    if (arg?.type === "Identifier") {
+      const binding = findVariable(this.sourceCode, arg);
+      for (const pending of this.pendingMaps) {
+        if (pending.variable && pending.variable === binding) {
+          pending.returned = true;
+        }
+      }
+    }
+  };
+
+  visitCallExpression = (node) => {
+    if (isPromiseCombinatorCall(node)) {
+      const firstArg = unwrapExpression(node.arguments[0]);
+      if (firstArg?.type === "Identifier") {
+        const binding = findVariable(this.sourceCode, firstArg);
+        for (const pending of this.pendingMaps) {
+          if (pending.variable && pending.variable === binding) {
+            pending.awaited = true;
+          }
+        }
+      }
+    }
+    const callee = unwrapExpression(node.callee);
+    if (
+      callee?.type !== "MemberExpression" ||
+      callee.computed ||
+      callee.property?.type !== "Identifier"
+    ) {
+      return;
+    }
+    const method = callee.property.name;
+    const callback = unwrapExpression(node.arguments[0]);
+    if (!isFunctionLike(callback) || !callback.async) return;
+
+    if (NEVER_AWAIT.has(method)) {
+      if (!this.branches.has("never-await")) return;
+      this.context.report({
+        node: callback,
+        message: `.${method}() does not await its callback, so an async callback here runs unhandled. Use a for...of loop.`,
+      });
+      return;
+    }
+    this.inspectCollection(node, callback, method);
+  };
+
+  inspectCollection = (node, callback, method) => {
+    if (
+      !REQUIRE_COLLECTION.has(method) ||
+      !this.branches.has("requires-collection")
+    ) {
+      return;
+    }
+    if (isWrappedInPromiseCombinator(node) || isReturnedExpression(node)) {
+      return;
+    }
+    const parent = node.parent;
+    if (
+      parent?.type === "VariableDeclarator" &&
+      parent.id?.type === "Identifier"
+    ) {
+      const binding = findVariable(this.sourceCode, parent.id);
+      if (binding) {
+        this.pendingMaps.push({
+          variable: binding,
+          node: callback,
+          method,
+          awaited: false,
+          returned: false,
+        });
+        return;
+      }
+    }
+    this.context.report({
+      node: callback,
+      message: `Wrap .${method}() with an async callback in Promise.all(...) (or Promise.allSettled) so the promises are awaited.`,
+    });
+  };
+  listeners() {
+    return {
+      "Program:exit": this.visitProgramExit,
+      ReturnStatement: this.visitReturnStatement,
+      CallExpression: this.visitCallExpression,
+    };
+  }
+}
+
 export default {
   meta: {
     type: "problem",
@@ -98,95 +204,6 @@ export default {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-    const sourceCode = context.sourceCode;
-    const pendingMaps = [];
-    const branches = enabledBranches(context.options[0]);
-
-    return {
-      "Program:exit"() {
-        for (const pending of pendingMaps) {
-          if (!pending.awaited && !pending.returned) {
-            context.report({
-              node: pending.node,
-              message: `Wrap .${pending.method}() with an async callback in Promise.all(...) (or Promise.allSettled) so the promises are awaited.`,
-            });
-          }
-        }
-      },
-      ReturnStatement(node) {
-        const arg = unwrapExpression(node.argument);
-        if (arg?.type === "Identifier") {
-          const variable = findVariable(sourceCode, arg);
-          for (const pending of pendingMaps) {
-            if (pending.variable && pending.variable === variable) {
-              pending.returned = true;
-            }
-          }
-        }
-      },
-      CallExpression(node) {
-        if (isPromiseCombinatorCall(node)) {
-          const firstArg = unwrapExpression(node.arguments[0]);
-          if (firstArg?.type === "Identifier") {
-            const variable = findVariable(sourceCode, firstArg);
-            for (const pending of pendingMaps) {
-              if (pending.variable && pending.variable === variable) {
-                pending.awaited = true;
-              }
-            }
-          }
-        }
-        const callee = unwrapExpression(node.callee);
-        if (
-          callee?.type !== "MemberExpression" ||
-          callee.computed ||
-          callee.property?.type !== "Identifier"
-        ) {
-          return;
-        }
-        const method = callee.property.name;
-        const callback = unwrapExpression(node.arguments[0]);
-        if (!isFunctionLike(callback) || !callback.async) return;
-
-        if (NEVER_AWAIT.has(method)) {
-          if (!branches.has("never-await")) return;
-          context.report({
-            node: callback,
-            message: `.${method}() does not await its callback, so an async callback here runs unhandled. Use a for...of loop.`,
-          });
-          return;
-        }
-        if (
-          !REQUIRE_COLLECTION.has(method) ||
-          !branches.has("requires-collection")
-        ) {
-          return;
-        }
-        if (isWrappedInPromiseCombinator(node) || isReturnedExpression(node)) {
-          return;
-        }
-        const parent = node.parent;
-        if (
-          parent?.type === "VariableDeclarator" &&
-          parent.id?.type === "Identifier"
-        ) {
-          const variable = findVariable(sourceCode, parent.id);
-          if (variable) {
-            pendingMaps.push({
-              variable,
-              node: callback,
-              method,
-              awaited: false,
-              returned: false,
-            });
-            return;
-          }
-        }
-        context.report({
-          node: callback,
-          message: `Wrap .${method}() with an async callback in Promise.all(...) (or Promise.allSettled) so the promises are awaited.`,
-        });
-      },
-    };
+    return new AsyncArrayCallbacks(context).listeners();
   },
 };

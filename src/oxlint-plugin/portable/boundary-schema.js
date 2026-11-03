@@ -1,3 +1,4 @@
+import { checkRedundantSchemaParse } from "./schema-reparse-checks.js";
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import {
   hasRuntimeSchemaProvenance,
@@ -24,18 +25,6 @@ const SCHEMA_DECODE_METHODS = new Set([
   "decodeUnknownPromise",
   "decodeSync",
 ]);
-const DECODED_VALUE_METHODS = new Set([
-  "parse",
-  "parseAsync",
-  "decodeUnknownSync",
-  "decodeSync",
-]);
-const REPARSE_METHODS = new Set([
-  ...DECODED_VALUE_METHODS,
-  "safeParse",
-  "safeParseAsync",
-]);
-
 function isRawDeserializeCall(node) {
   const expr = unwrapExpression(node);
   if (expr?.type === "AwaitExpression") {
@@ -211,9 +200,9 @@ function isUnknownPreservingAssertionType(typeNode) {
     return (
       typeNode.members.length > 0 &&
       typeNode.members.every(
-        (m) =>
-          m.type === "TSPropertySignature" &&
-          m.typeAnnotation?.typeAnnotation?.type === "TSUnknownKeyword"
+        (member) =>
+          member.type === "TSPropertySignature" &&
+          member.typeAnnotation?.typeAnnotation?.type === "TSUnknownKeyword"
       )
     );
   }
@@ -223,17 +212,17 @@ function isUnknownPreservingAssertionType(typeNode) {
 function checkUnknownFunction(node, context) {
   const sourceCode = context.sourceCode;
   if (node.returnType?.typeAnnotation?.type === "TSTypePredicate") return;
-  for (const param of node.params) {
+  for (const parameter of node.params) {
     if (
-      param.type !== "Identifier" ||
-      param.typeAnnotation?.typeAnnotation?.type !== "TSUnknownKeyword"
+      parameter.type !== "Identifier" ||
+      parameter.typeAnnotation?.typeAnnotation?.type !== "TSUnknownKeyword"
     ) {
       continue;
     }
-    const variable = findVariable(sourceCode, param);
-    if (!variable) continue;
+    const binding = findVariable(sourceCode, parameter);
+    if (!binding) continue;
     let inCheckCount = 0;
-    for (const ref of variable.references) {
+    for (const ref of binding.references) {
       const parent = ref.identifier?.parent;
       if (
         parent?.type === "TSAsExpression" &&
@@ -241,7 +230,7 @@ function checkUnknownFunction(node, context) {
       ) {
         context.report({
           node: parent,
-          message: `Unknown input '${param.name}' is cast directly instead of decoded through a boundary schema.`,
+          message: `Unknown input '${parameter.name}' is cast directly instead of decoded through a boundary schema.`,
         });
       }
       if (
@@ -254,8 +243,8 @@ function checkUnknownFunction(node, context) {
     }
     if (inCheckCount >= 4) {
       context.report({
-        node: param,
-        message: `Unknown input '${param.name}' is probed with ${inCheckCount} ad-hoc 'in' checks; decode once with a boundary schema instead.`,
+        node: parameter,
+        message: `Unknown input '${parameter.name}' is probed with ${inCheckCount} ad-hoc 'in' checks; decode once with a boundary schema instead.`,
       });
     }
   }
@@ -285,95 +274,6 @@ export const unknownInputMustBeDecodedRule = {
   },
 };
 
-function parseCallInfo(node, sourceCode) {
-  let expr = unwrapExpression(node);
-  if (expr?.type === "AwaitExpression") {
-    expr = unwrapExpression(expr.argument);
-  }
-  if (expr?.type !== "CallExpression" || expr.arguments.length !== 1) {
-    return null;
-  }
-  const callee = unwrapExpression(expr.callee);
-  if (
-    callee?.type !== "MemberExpression" ||
-    callee.computed ||
-    callee.property?.type !== "Identifier" ||
-    !isSchemaReceiver(callee.object, sourceCode)
-  ) {
-    return null;
-  }
-  const method = callee.property.name;
-  if (!REPARSE_METHODS.has(method)) return null;
-  return {
-    method,
-    returnsDecodedValue: DECODED_VALUE_METHODS.has(method),
-    schemaText: sourceCode.getText(callee.object).replace(/\s+/gu, ""),
-  };
-}
-
-function matchesInferredParameterSchema(def, schemaText, sourceCode) {
-  if (def.type !== "Parameter") return false;
-  const ann = def.name?.typeAnnotation?.typeAnnotation;
-  if (
-    ann?.type !== "TSTypeReference" ||
-    ann.typeName?.type !== "TSQualifiedName"
-  ) {
-    return false;
-  }
-  const rightName = ann.typeName.right?.name;
-  if (rightName !== "infer" && rightName !== "output") return false;
-  const typeArg = ann.typeArguments?.params?.[0];
-  if (typeArg?.type !== "TSTypeQuery" || !typeArg.exprName) return false;
-  return (
-    sourceCode.getText(typeArg.exprName).replace(/\s+/gu, "") === schemaText
-  );
-}
-
-function isSchemaReceiver(expression, sourceCode) {
-  if (hasRuntimeSchemaProvenance(expression, sourceCode)) return true;
-  if (
-    expression?.type !== "Identifier" ||
-    /^(?:URL|Date|JSON|path)$/u.test(expression.name)
-  ) {
-    return false;
-  }
-  const definition = findVariable(sourceCode, expression)?.defs?.[0];
-  return (
-    definition?.node?.type === "VariableDeclarator" ||
-    definition?.type === "Parameter"
-  );
-}
-
-function isMappedSchemaDecode(node, sourceCode) {
-  if (!hasRuntimeSchemaProvenance(node.callee.object, sourceCode)) return false;
-  let callback = node.parent;
-  if (callback?.type === "ReturnStatement" && callback.argument === node) {
-    while (callback && !isFunctionLike(callback)) callback = callback.parent;
-  } else if (
-    callback?.type !== "ArrowFunctionExpression" ||
-    callback.body !== node
-  ) {
-    return false;
-  }
-  const call = callback?.parent;
-  if (
-    call?.type !== "CallExpression" ||
-    call.arguments[0] !== callback ||
-    call.callee?.type !== "MemberExpression" ||
-    call.callee.computed ||
-    call.callee.property?.name !== "map"
-  ) {
-    return false;
-  }
-  const parameter = callback.params[0];
-  const argument = node.arguments[0];
-  return (
-    parameter?.type === "Identifier" &&
-    argument?.type === "Identifier" &&
-    findVariable(sourceCode, parameter) === findVariable(sourceCode, argument)
-  );
-}
-
 export const noRedundantZodParseRule = {
   meta: {
     type: "problem",
@@ -385,77 +285,28 @@ export const noRedundantZodParseRule = {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-    const sourceCode = context.sourceCode;
-
     return {
       CallExpression(node) {
-        const outer = parseCallInfo(node, sourceCode);
-        if (!outer) return;
-        if (
-          outer.returnsDecodedValue &&
-          isMappedSchemaDecode(node, sourceCode)
-        ) {
-          context.report({
-            node,
-            message:
-              "Decode the collection once with an array schema instead of `.map(item => Schema.parse(item))`.",
-          });
-          return;
-        }
-        const arg = unwrapExpression(node.arguments[0]);
-        const inner = parseCallInfo(arg, sourceCode);
-        if (
-          inner?.returnsDecodedValue &&
-          inner.schemaText === outer.schemaText
-        ) {
-          context.report({
-            node,
-            message:
-              "Redundant schema parse on an already-parsed expression; decode once at the boundary and reuse the typed value.",
-          });
-          return;
-        }
-        if (arg?.type !== "Identifier") return;
-        const def = findVariable(sourceCode, arg)?.defs?.[0];
-        if (!def) return;
-        if (def.node?.type === "VariableDeclarator") {
-          const initInfo = parseCallInfo(def.node.init, sourceCode);
-          if (
-            initInfo?.returnsDecodedValue &&
-            initInfo.schemaText === outer.schemaText
-          ) {
-            context.report({
-              node,
-              message: `Binding '${arg.name}' was already decoded by '${outer.schemaText}' in this scope; reuse the decoded value instead of re-parsing.`,
-            });
-            return;
-          }
-        }
-        if (matchesInferredParameterSchema(def, outer.schemaText, sourceCode)) {
-          context.report({
-            node,
-            message: `Parameter '${arg.name}' is already typed as a decoded schema output; do not re-parse internal typed values.`,
-          });
-        }
+        checkRedundantSchemaParse(node, context);
       },
     };
   },
 };
 
-function isIdentityTransform(param, body) {
+function isIdentityTransform(parameter, body) {
   const expr = unwrapExpression(body);
   if (!expr) return false;
-  if (param.type === "Identifier") {
-    return expr.type === "Identifier" && expr.name === param.name;
+  if (parameter.type === "Identifier") {
+    return expr.type === "Identifier" && expr.name === parameter.name;
   }
   if (
-    param.type === "ObjectPattern" &&
-    param.properties.length > 0 &&
+    parameter.type === "ObjectPattern" &&
+    parameter.properties.length > 0 &&
     expr.type === "ObjectExpression" &&
-    expr.properties.length === param.properties.length
+    expr.properties.length === parameter.properties.length
   ) {
     const bindings = new Map();
-    for (const prop of param.properties) {
+    for (const prop of parameter.properties) {
       if (
         prop.type !== "Property" ||
         prop.computed ||
@@ -467,12 +318,12 @@ function isIdentityTransform(param, body) {
       bindings.set(prop.key.name, prop.value.name);
     }
     return expr.properties.every(
-      (p) =>
-        p.type === "Property" &&
-        !p.computed &&
-        p.key?.type === "Identifier" &&
-        p.value?.type === "Identifier" &&
-        bindings.get(p.key.name) === p.value.name
+      (property) =>
+        property.type === "Property" &&
+        !property.computed &&
+        property.key?.type === "Identifier" &&
+        property.value?.type === "Identifier" &&
+        bindings.get(property.key.name) === property.value.name
     );
   }
   return false;
@@ -500,16 +351,22 @@ export const noIdentitySchemaTransformRule = {
         ) {
           return;
         }
-        const cb = unwrapExpression(node.arguments[0]);
-        if (!isFunctionLike(cb) || cb.async || cb.params.length !== 1) return;
-        const param = cb.params[0];
+        const callback = unwrapExpression(node.arguments[0]);
+        if (
+          !isFunctionLike(callback) ||
+          callback.async ||
+          callback.params.length !== 1
+        ) {
+          return;
+        }
+        const parameter = callback.params[0];
         const returned =
-          cb.body?.type === "BlockStatement" &&
-          cb.body.body.length === 1 &&
-          cb.body.body[0].type === "ReturnStatement"
-            ? cb.body.body[0].argument
-            : cb.body;
-        if (isIdentityTransform(param, returned)) {
+          callback.body?.type === "BlockStatement" &&
+          callback.body.body.length === 1 &&
+          callback.body.body[0].type === "ReturnStatement"
+            ? callback.body.body[0].argument
+            : callback.body;
+        if (isIdentityTransform(parameter, returned)) {
           context.report({
             node,
             message:
@@ -550,8 +407,8 @@ export const noSchemaValidatorTranscodingRule = {
     function isLocalFunctionCall(node) {
       const callee = unwrapExpression(node.callee);
       if (callee?.type !== "Identifier") return false;
-      const v = findVariable(context.sourceCode, callee);
-      const def = v?.defs?.[0];
+      const binding = findVariable(context.sourceCode, callee);
+      const def = binding?.defs?.[0];
       return (
         def?.type === "FunctionName" ||
         (def?.type === "Variable" && isFunctionLike(def.node?.init))

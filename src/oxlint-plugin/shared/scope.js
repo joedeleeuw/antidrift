@@ -116,7 +116,9 @@ function statementReturnsJsx(stmt) {
     );
   }
   if (stmt.type === "SwitchStatement" && Array.isArray(stmt.cases)) {
-    return stmt.cases.some((c) => c.consequent?.some(statementReturnsJsx));
+    return stmt.cases.some((switchCase) =>
+      switchCase.consequent?.some(statementReturnsJsx)
+    );
   }
   if (stmt.type === "TryStatement") {
     return (

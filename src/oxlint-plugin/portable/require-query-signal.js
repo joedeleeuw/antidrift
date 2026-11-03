@@ -65,12 +65,12 @@ const isQueryFnProperty = (property) => {
       getPropertyName(sibling.key) === "queryKey"
   );
 };
-const isQueryFnFunction = (fn) => {
-  const property = skipWrapperAncestors(fn.parent);
+const isQueryFnFunction = (queryFunction) => {
+  const property = skipWrapperAncestors(queryFunction.parent);
   return isQueryFnProperty(property);
 };
-const signalBindingName = (fn) => {
-  const firstParam = fn.params?.at(0);
+const signalBindingName = (queryFunction) => {
+  const firstParam = queryFunction.params?.at(0);
   if (firstParam?.type !== "ObjectPattern") {
     return null;
   }
@@ -79,12 +79,12 @@ const signalBindingName = (fn) => {
       property?.type === "Property" &&
       getPropertyName(property.key) === "signal"
   );
-  const value = unwrapTS(signalProperty?.value);
-  if (value?.type === "Identifier") {
-    return value.name;
+  const expression = unwrapTS(signalProperty?.value);
+  if (expression?.type === "Identifier") {
+    return expression.name;
   }
-  if (value?.type === "AssignmentPattern") {
-    const left = unwrapTS(value.left);
+  if (expression?.type === "AssignmentPattern") {
+    const left = unwrapTS(expression.left);
     return left?.type === "Identifier" ? left.name : null;
   }
   return null;
@@ -149,17 +149,19 @@ const containsSignalIdentifier = (node, bindingName) => {
   if (unwrapped.type === "Property" && !unwrapped.computed) {
     return containsSignalIdentifier(unwrapped.value, bindingName);
   }
-  return Object.entries(unwrapped).some(([key, value]) => {
+  return Object.entries(unwrapped).some(([key, expression]) => {
     if (key === "parent") {
       return false;
     }
-    if (Array.isArray(value)) {
-      return value.some((item) => containsSignalIdentifier(item, bindingName));
+    if (Array.isArray(expression)) {
+      return expression.some((child) =>
+        containsSignalIdentifier(child, bindingName)
+      );
     }
-    return containsSignalIdentifier(value, bindingName);
+    return containsSignalIdentifier(expression, bindingName);
   });
 };
-const getObjectPropertyValue = (node, name) => {
+const objectPropertyExpression = (node, name) => {
   const object = unwrapTS(node);
   if (object?.type !== "ObjectExpression") {
     return null;
@@ -176,20 +178,185 @@ const callThreadsSignal = ({ bindingName, kind, node }) => {
     call !== null && Array.isArray(call.arguments) ? call.arguments : [];
   if (kind === "fetch") {
     return containsSignalIdentifier(
-      getObjectPropertyValue(argumentsList.at(1), "signal"),
+      objectPropertyExpression(argumentsList.at(1), "signal"),
       bindingName
     );
   }
   return argumentsList.some((argument) =>
     containsSignalIdentifier(
-      getObjectPropertyValue(
-        getObjectPropertyValue(argument, "fetch"),
+      objectPropertyExpression(
+        objectPropertyExpression(argument, "fetch"),
         "signal"
       ),
       bindingName
     )
   );
 };
+class QuerySignalAnalysis {
+  constructor(context) {
+    this.context = context;
+    this.networkCalls = [];
+    this.queryFnReferences = [];
+  }
+  isEstreeIdentifier = (node) =>
+    isIdentifier(node) && Array.isArray(node.range);
+
+  resolveVariable = (identifier) => {
+    let scope = this.context.sourceCode.getScope(identifier);
+    while (scope !== null) {
+      const bindingSymbol = scope.set.get(identifier.name);
+      if (bindingSymbol !== undefined) {
+        return bindingSymbol;
+      }
+      scope = scope.upper;
+    }
+    return null;
+  };
+
+  isGlobalReference = (node, name) => {
+    if (!this.isEstreeIdentifier(node) || node.name !== name) {
+      return false;
+    }
+    const bindingSymbol = this.resolveVariable(node);
+    return bindingSymbol === null || bindingSymbol.defs.length === 0;
+  };
+
+  isEdenApiRoot = (node) => {
+    if (!this.isEstreeIdentifier(node)) {
+      return false;
+    }
+    const bindingSymbol = this.resolveVariable(node);
+    if (bindingSymbol === null || bindingSymbol.defs.length !== 1) {
+      return false;
+    }
+    const definition = bindingSymbol.defs.at(0);
+    return (
+      definition?.type === "ImportBinding" &&
+      isAstNode(definition.node) &&
+      getImportedName(definition.node) === "api" &&
+      isAstNode(definition.parent) &&
+      definition.parent.type === "ImportDeclaration" &&
+      isStringLiteral(definition.parent.source) &&
+      definition.parent.source.value === this.context.options[0]?.apiModule
+    );
+  };
+
+  networkKind = (callee) => {
+    if (isFetchCallee(callee, this.isGlobalReference)) {
+      return "fetch";
+    }
+    return isEdenApiCallee(callee, this.isEdenApiRoot) ? "eden" : null;
+  };
+
+  hasReassignment = (bindingSymbol) =>
+    bindingSymbol.references.some(
+      (reference) => reference.init !== true && reference.isWrite?.() === true
+    );
+
+  resolveLocalQueryFunction = (identifier, visited = new Set()) => {
+    const bindingSymbol = this.resolveVariable(identifier);
+    if (
+      bindingSymbol === null ||
+      bindingSymbol.defs.length !== 1 ||
+      visited.has(bindingSymbol) ||
+      this.hasReassignment(bindingSymbol)
+    ) {
+      return null;
+    }
+    visited.add(bindingSymbol);
+    const definition = bindingSymbol.defs.at(0);
+    if (
+      definition?.type === "FunctionName" &&
+      isAstNode(definition.node) &&
+      definition.node.type === "FunctionDeclaration"
+    ) {
+      return definition.node;
+    }
+    if (
+      definition?.type !== "Variable" ||
+      !isAstNode(definition.node) ||
+      definition.node.type !== "VariableDeclarator" ||
+      !isIdentifier(definition.node.id, identifier.name) ||
+      !isAstNode(definition.parent) ||
+      definition.parent.type !== "VariableDeclaration" ||
+      definition.parent.kind !== "const"
+    ) {
+      return null;
+    }
+    const initializer = unwrapTS(definition.node.init);
+    if (isFunctionNode(initializer)) {
+      return initializer;
+    }
+    return this.isEstreeIdentifier(initializer)
+      ? this.resolveLocalQueryFunction(initializer, visited)
+      : null;
+  };
+
+  onProperty = (node) => {
+    if (!isQueryFnProperty(node)) {
+      return;
+    }
+    const expression = unwrapTS(node.value);
+    if (this.isEstreeIdentifier(expression)) {
+      this.queryFnReferences.push(expression);
+    }
+  };
+
+  onCallExpression = (node) => {
+    const kind = this.networkKind(node.callee);
+    if (kind === null) {
+      return;
+    }
+    const owner = nearestEnclosingFunction(node);
+    if (!isAstNode(owner)) {
+      return;
+    }
+    if (!isQueryFnFunction(owner)) {
+      this.networkCalls.push({ kind, node, owner });
+      return;
+    }
+    const bindingName = signalBindingName(owner);
+    if (
+      bindingName !== null &&
+      callThreadsSignal({ bindingName, kind, node })
+    ) {
+      return;
+    }
+    this.context.report({ node, messageId: "missingQuerySignal" });
+  };
+
+  onProgramExit = () => {
+    const queryFunctions = new Set();
+    for (const reference of this.queryFnReferences) {
+      const queryFunction = this.resolveLocalQueryFunction(reference);
+      if (queryFunction !== null) {
+        queryFunctions.add(queryFunction);
+      }
+    }
+    for (const { kind, node, owner } of this.networkCalls) {
+      if (!queryFunctions.has(owner)) {
+        continue;
+      }
+      const bindingName = signalBindingName(owner);
+      if (
+        bindingName !== null &&
+        callThreadsSignal({ bindingName, kind, node })
+      ) {
+        continue;
+      }
+      this.context.report({ node, messageId: "missingQuerySignal" });
+    }
+  };
+
+  listeners() {
+    return {
+      Property: this.onProperty,
+      CallExpression: this.onCallExpression,
+      "Program:exit": this.onProgramExit,
+    };
+  }
+}
+
 export default {
   meta: {
     schema: [
@@ -212,158 +379,6 @@ export default {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-
-    const networkCalls = [];
-    const queryFnReferences = [];
-    const isEstreeIdentifier = (node) =>
-      isIdentifier(node) && Array.isArray(node.range);
-    const resolveVariable = (identifier) => {
-      let scope = context.sourceCode.getScope(identifier);
-      while (scope !== null) {
-        const variable = scope.set.get(identifier.name);
-        if (variable !== undefined) {
-          return variable;
-        }
-        scope = scope.upper;
-      }
-      return null;
-    };
-    const isGlobalReference = (node, name) => {
-      if (!isEstreeIdentifier(node) || node.name !== name) {
-        return false;
-      }
-      const variable = resolveVariable(node);
-      return variable === null || variable.defs.length === 0;
-    };
-    const isEdenApiRoot = (node) => {
-      if (!isEstreeIdentifier(node)) {
-        return false;
-      }
-      const variable = resolveVariable(node);
-      if (variable === null || variable.defs.length !== 1) {
-        return false;
-      }
-      const definition = variable.defs.at(0);
-      return (
-        definition?.type === "ImportBinding" &&
-        isAstNode(definition.node) &&
-        getImportedName(definition.node) === "api" &&
-        isAstNode(definition.parent) &&
-        definition.parent.type === "ImportDeclaration" &&
-        isStringLiteral(definition.parent.source) &&
-        definition.parent.source.value === context.options[0]?.apiModule
-      );
-    };
-    const networkKind = (callee) => {
-      if (isFetchCallee(callee, isGlobalReference)) {
-        return "fetch";
-      }
-      return isEdenApiCallee(callee, isEdenApiRoot) ? "eden" : null;
-    };
-    const hasReassignment = (variable) =>
-      variable.references.some(
-        (reference) => reference.init !== true && reference.isWrite?.() === true
-      );
-    const resolveLocalQueryFunction = (identifier, visited = new Set()) => {
-      const variable = resolveVariable(identifier);
-      if (
-        variable === null ||
-        variable.defs.length !== 1 ||
-        visited.has(variable) ||
-        hasReassignment(variable)
-      ) {
-        return null;
-      }
-      visited.add(variable);
-      const definition = variable.defs.at(0);
-      if (
-        definition?.type === "FunctionName" &&
-        isAstNode(definition.node) &&
-        definition.node.type === "FunctionDeclaration"
-      ) {
-        return definition.node;
-      }
-      if (
-        definition?.type !== "Variable" ||
-        !isAstNode(definition.node) ||
-        definition.node.type !== "VariableDeclarator" ||
-        !isIdentifier(definition.node.id, identifier.name) ||
-        !isAstNode(definition.parent) ||
-        definition.parent.type !== "VariableDeclaration" ||
-        definition.parent.kind !== "const"
-      ) {
-        return null;
-      }
-      const initializer = unwrapTS(definition.node.init);
-      if (isFunctionNode(initializer)) {
-        return initializer;
-      }
-      return isEstreeIdentifier(initializer)
-        ? resolveLocalQueryFunction(initializer, visited)
-        : null;
-    };
-    if (
-      (() => {
-        networkCalls.length = 0;
-        queryFnReferences.length = 0;
-      })() === false
-    ) {
-      return {};
-    }
-    return {
-      Property(node) {
-        if (!isQueryFnProperty(node)) {
-          return;
-        }
-        const value = unwrapTS(node.value);
-        if (isEstreeIdentifier(value)) {
-          queryFnReferences.push(value);
-        }
-      },
-      CallExpression(node) {
-        const kind = networkKind(node.callee);
-        if (kind === null) {
-          return;
-        }
-        const owner = nearestEnclosingFunction(node);
-        if (!isAstNode(owner)) {
-          return;
-        }
-        if (!isQueryFnFunction(owner)) {
-          networkCalls.push({ kind, node, owner });
-          return;
-        }
-        const bindingName = signalBindingName(owner);
-        if (
-          bindingName !== null &&
-          callThreadsSignal({ bindingName, kind, node })
-        ) {
-          return;
-        }
-        context.report({ node, messageId: "missingQuerySignal" });
-      },
-      "Program:exit"() {
-        const queryFunctions = new Set();
-        for (const reference of queryFnReferences) {
-          const queryFunction = resolveLocalQueryFunction(reference);
-          if (queryFunction !== null) {
-            queryFunctions.add(queryFunction);
-          }
-        }
-        for (const { kind, node, owner } of networkCalls) {
-          if (!queryFunctions.has(owner)) {
-            continue;
-          }
-          const bindingName = signalBindingName(owner);
-          if (
-            bindingName !== null &&
-            callThreadsSignal({ bindingName, kind, node })
-          ) {
-            continue;
-          }
-          context.report({ node, messageId: "missingQuerySignal" });
-        }
-      },
-    };
+    return new QuerySignalAnalysis(context).listeners();
   },
 };

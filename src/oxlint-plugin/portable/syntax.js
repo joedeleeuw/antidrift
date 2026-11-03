@@ -2,48 +2,51 @@ const TEST_FILENAME_PATTERN =
   /(?:\.(?:test|spec)\.[cm]?[jt]sx?$|(?:^|\/)(?:test|tests|__tests__)(?:\/|$))/;
 export const isTestFilename = (filename) =>
   typeof filename === "string" && TEST_FILENAME_PATTERN.test(filename);
-export const toNode = (value) => {
-  if (!value || typeof value !== "object") {
+export const toNode = (candidate) => {
+  if (!candidate || typeof candidate !== "object") {
     return null;
   }
-  const type = value.type;
+  const type = candidate.type;
   if (typeof type !== "string") {
     return null;
   }
-  return value;
+  return candidate;
 };
-export const toNodeArray = (value) => {
-  if (!Array.isArray(value)) {
+export const toNodeArray = (candidate) => {
+  if (!Array.isArray(candidate)) {
     return [];
   }
-  return value.map((entry) => toNode(entry)).filter((entry) => entry !== null);
+  return candidate
+    .map((entry) => toNode(entry))
+    .filter((entry) => entry !== null);
 };
 export const getNode = (node, key) => toNode(node[key]);
 export const getNodeArray = (node, key) => toNodeArray(node[key]);
-export const getString = (value) => (typeof value === "string" ? value : null);
-export const getCommentText = (value) => {
-  const node = toNode(value);
+export const getString = (candidate) =>
+  typeof candidate === "string" ? candidate : null;
+export const getCommentText = (candidate) => {
+  const node = toNode(candidate);
   if (!node) {
     return "";
   }
   return getString(node.value) ?? getString(node.raw) ?? "";
 };
-export const getIdentifierName = (value) => {
-  const node = toNode(value);
+export const getIdentifierName = (candidate) => {
+  const node = toNode(candidate);
   if (!node || node.type !== "Identifier") {
     return null;
   }
   return getString(node.name);
 };
-export const getLiteralString = (value) => {
-  const node = toNode(value);
+export const getLiteralString = (candidate) => {
+  const node = toNode(candidate);
   if (!node || node.type !== "Literal") {
     return null;
   }
   return getString(node.value);
 };
-export const getMemberPropertyName = (value) => {
-  const member = toNode(value);
+export const getMemberPropertyName = (candidate) => {
+  const member = toNode(candidate);
   if (!member || member.type !== "MemberExpression") {
     return null;
   }
@@ -62,8 +65,8 @@ const appendCallChainMember = (chain, memberName) => {
     members: [...chain.members, memberName],
   };
 };
-export const getCallChain = (value) => {
-  const node = toNode(value);
+export const getCallChain = (candidate) => {
+  const node = toNode(candidate);
   if (!node) {
     return null;
   }
@@ -91,10 +94,10 @@ export const getFunctionStatements = (node) => {
   }
   return getNodeArray(body, "body");
 };
-export const isFunctionValue = (node) =>
+const isFunctionExpression = (node) =>
   node.type === "ArrowFunctionExpression" || node.type === "FunctionExpression";
-export const unwrapChainExpression = (value) => {
-  const node = toNode(value);
+export const unwrapChainExpression = (candidate) => {
+  const node = toNode(candidate);
   if (!node) {
     return null;
   }
@@ -114,3 +117,5 @@ export const isMigrationFile = (filename) =>
 const DOMAIN_PATTERN = /(?:^|\/)(?:domain|model)\//;
 export const isDomainFile = (filename) =>
   typeof filename === "string" && DOMAIN_PATTERN.test(filename);
+
+export { isFunctionExpression as isFunctionValue };

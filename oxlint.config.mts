@@ -35,10 +35,7 @@ export default defineConfig({
     browser: true,
     node: true,
   },
-  ignorePatterns: [
-    ...new Set(tooling.ignorePatterns ?? []),
-    "src/oxlint-plugin/anti-slop/**",
-  ],
+  ignorePatterns: [...new Set(tooling.ignorePatterns ?? [])],
   jsPlugins: [...(tooling.jsPlugins ?? []), ...antidrift.jsPlugins],
   options: {
     ...tooling.options,
@@ -51,8 +48,6 @@ export default defineConfig({
   rules: {
     ...toolingBaseRules,
     ...antidrift.rules,
-    "max-lines": "off",
-    "max-lines-per-function": "off",
     "preserve-caught-error": "error",
     "no-console": "error",
     "no-debugger": "error",
@@ -104,23 +99,10 @@ export default defineConfig({
     {
       files: ["src/oxlint-plugin/**"],
       rules: {
-        "antidrift/max-function-lines": "off",
-        "antidrift/max-module-lines": "off",
-        "antidrift/no-pass-through-parameters": "off",
-        "antidrift/no-query-join-or-tree-reshape": "off",
         "antidrift/no-unlisted-external-imports": [
           "error",
           { allowDevDependencies: false },
         ],
-        "antidrift/no-vague-names": "off",
-      },
-    },
-    {
-      files: ["scripts/**"],
-      rules: {
-        "antidrift/max-function-lines": "off",
-        "antidrift/no-vague-names": "off",
-        "no-console": "off",
       },
     },
   ],

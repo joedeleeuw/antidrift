@@ -25,10 +25,10 @@ export const schemaDiscriminantKeys = new Set([
   "variant",
 ]);
 
-export function isRuntimeSchemaLibrarySource(value) {
-  if (typeof value !== "string") return false;
+export function isRuntimeSchemaLibrarySource(specifier) {
+  if (typeof specifier !== "string") return false;
   return runtimeSchemaLibrarySources.some(
-    (source) => value === source || value.startsWith(`${source}/`)
+    (source) => specifier === source || specifier.startsWith(`${source}/`)
   );
 }
 

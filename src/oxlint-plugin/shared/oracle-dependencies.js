@@ -10,84 +10,87 @@ const mutatingMethods = new Set([
   "add",
 ]);
 
+function enqueueIdentifierMutation(identifier, pending) {
+  let target = identifier;
+  while (
+    target.parent?.type === "MemberExpression" &&
+    target.parent.object === target
+  ) {
+    target = target.parent;
+  }
+  const parent = target.parent;
+  if (parent?.type === "AssignmentExpression" && parent.left === target) {
+    pending.push(parent.right);
+  }
+  if (
+    parent?.type === "CallExpression" &&
+    parent.callee === target &&
+    mutatingMethods.has(staticPropertyName(target))
+  ) {
+    for (const argument of parent.arguments) pending.push(argument);
+  }
+  if (
+    parent?.type === "CallExpression" &&
+    parent.arguments[0] === identifier &&
+    parent.callee.type === "MemberExpression" &&
+    parent.callee.object.type === "Identifier" &&
+    parent.callee.object.name === "Object" &&
+    staticPropertyName(parent.callee) === "assign"
+  ) {
+    for (const argument of parent.arguments.slice(1)) pending.push(argument);
+  }
+}
+
+function enqueueBindingDependencies(
+  identifier,
+  sourceCode,
+  dependencies,
+  pending
+) {
+  const binding = findVariable(sourceCode, identifier);
+  if (!binding || dependencies.has(binding)) return;
+  dependencies.add(binding);
+  for (const definition of binding.defs) {
+    if (definition.type === "Variable") {
+      pending.push(definition.node.init);
+      const loop = definition.parent?.parent;
+      if (loop?.type === "ForOfStatement") pending.push(loop.right);
+    }
+    if (definition.type === "FunctionName") {
+      pending.push(definition.node.body);
+    }
+  }
+  for (const reference of binding.references) {
+    if (reference.isWrite()) pending.push(reference.writeExpr);
+    enqueueIdentifierMutation(reference.identifier, pending);
+  }
+}
+
+function enqueueCallDependencies(call, sourceCode, pending) {
+  for (const argument of call.arguments) pending.push(argument);
+  const callee = unwrapExpression(call.callee);
+  if (callee.type === "MemberExpression") {
+    pending.push(callee.object);
+    if (callee.computed) pending.push(callee.property);
+  }
+  if (callee.type !== "Identifier") return;
+  const definition = findVariable(sourceCode, callee)?.defs[0];
+  const callable = unwrapExpression(definition?.node.init ?? definition?.node);
+  if (
+    [
+      "FunctionDeclaration",
+      "FunctionExpression",
+      "ArrowFunctionExpression",
+    ].includes(callable?.type)
+  ) {
+    pending.push(callable.body);
+  }
+}
+
 function expressionDependencies(expression, sourceCode) {
   const pending = [expression];
   const dependencies = new Set();
   const visited = new Set();
-
-  function visitMutation(identifier) {
-    let target = identifier;
-    while (
-      target.parent?.type === "MemberExpression" &&
-      target.parent.object === target
-    ) {
-      target = target.parent;
-    }
-    const parent = target.parent;
-    if (parent?.type === "AssignmentExpression" && parent.left === target) {
-      pending.push(parent.right);
-    }
-    if (
-      parent?.type === "CallExpression" &&
-      parent.callee === target &&
-      mutatingMethods.has(staticPropertyName(target))
-    ) {
-      for (const argument of parent.arguments) pending.push(argument);
-    }
-    if (
-      parent?.type === "CallExpression" &&
-      parent.arguments[0] === identifier &&
-      parent.callee.type === "MemberExpression" &&
-      parent.callee.object.type === "Identifier" &&
-      parent.callee.object.name === "Object" &&
-      staticPropertyName(parent.callee) === "assign"
-    ) {
-      for (const argument of parent.arguments.slice(1)) pending.push(argument);
-    }
-  }
-
-  function visitBinding(identifier) {
-    const binding = findVariable(sourceCode, identifier);
-    if (!binding || dependencies.has(binding)) return;
-    dependencies.add(binding);
-    for (const definition of binding.defs) {
-      if (definition.type === "Variable") {
-        pending.push(definition.node.init);
-        const loop = definition.parent?.parent;
-        if (loop?.type === "ForOfStatement") pending.push(loop.right);
-      }
-      if (definition.type === "FunctionName") {
-        pending.push(definition.node.body);
-      }
-    }
-    for (const reference of binding.references) {
-      if (reference.isWrite()) pending.push(reference.writeExpr);
-      visitMutation(reference.identifier);
-    }
-  }
-
-  function visitCall(call) {
-    for (const argument of call.arguments) pending.push(argument);
-    const callee = unwrapExpression(call.callee);
-    if (callee.type === "MemberExpression") {
-      pending.push(callee.object);
-      if (callee.computed) pending.push(callee.property);
-    }
-    if (callee.type !== "Identifier") return;
-    const definition = findVariable(sourceCode, callee)?.defs[0];
-    const callable = unwrapExpression(
-      definition?.node.init ?? definition?.node
-    );
-    if (
-      [
-        "FunctionDeclaration",
-        "FunctionExpression",
-        "ArrowFunctionExpression",
-      ].includes(callable?.type)
-    ) {
-      pending.push(callable.body);
-    }
-  }
 
   while (pending.length > 0) {
     const node = unwrapExpression(pending.pop());
@@ -96,7 +99,7 @@ function expressionDependencies(expression, sourceCode) {
     dependencies.add(node);
     switch (node.type) {
       case "Identifier":
-        visitBinding(node);
+        enqueueBindingDependencies(node, sourceCode, dependencies, pending);
         break;
       case "MemberExpression":
         pending.push(node.object);
@@ -108,7 +111,7 @@ function expressionDependencies(expression, sourceCode) {
         break;
       case "CallExpression":
       case "NewExpression":
-        visitCall(node);
+        enqueueCallDependencies(node, sourceCode, pending);
         break;
       default:
         for (const key of sourceCode.visitorKeys[node.type] ?? []) {

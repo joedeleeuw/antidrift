@@ -22,6 +22,24 @@ const isSafeTemplateLiteral = (node) => {
   );
 };
 
+const isAnchorHref = (node) => {
+  if (node.name.type !== "JSXIdentifier" || node.name.name !== "href") {
+    return false;
+  }
+  const opening = node.parent;
+  if (opening.type !== "JSXOpeningElement") {
+    return false;
+  }
+  const tag = opening.name;
+  if (tag.type !== "JSXIdentifier" || tag.name !== "a") {
+    return false;
+  }
+  if (!node.value) {
+    return false;
+  }
+  return true;
+};
+
 export default {
   meta: {
     schema: [
@@ -45,20 +63,7 @@ export default {
 
     return {
       JSXAttribute(node) {
-        if (node.name.type !== "JSXIdentifier" || node.name.name !== "href") {
-          return;
-        }
-        const opening = node.parent;
-        if (opening.type !== "JSXOpeningElement") {
-          return;
-        }
-        const tag = opening.name;
-        if (tag.type !== "JSXIdentifier" || tag.name !== "a") {
-          return;
-        }
-        if (!node.value) {
-          return;
-        }
+        if (!isAnchorHref(node)) return;
         if (node.value.type === "Literal") {
           if (isSafeStringLiteral(node.value)) {
             return;

@@ -26,6 +26,121 @@ const isNoSubstitutionTemplateLiteral = (node) =>
   node.type === "TemplateLiteral" &&
   Array.isArray(node.expressions) &&
   node.expressions.length === 0;
+class ReplacementArguments {
+  constructor(context) {
+    this.context = context;
+  }
+  resolveVariable = (identifierNode) => {
+    if (!isIdentifier(identifierNode)) {
+      return null;
+    }
+    let scope = this.context.sourceCode.getScope(identifierNode);
+    while (scope) {
+      const binding = scope.set.get(identifierNode.name);
+      if (binding) {
+        return binding;
+      }
+      scope = scope.upper;
+    }
+    return null;
+  };
+
+  isFunctionBinding = (identifierNode) => {
+    const binding = this.resolveVariable(identifierNode);
+    if (binding === null) {
+      return false;
+    }
+    return binding.defs.some((def) => {
+      if (def.type === "FunctionName") {
+        return isAstNode(def.node) && def.node.type === "FunctionDeclaration";
+      }
+      if (def.type !== "Variable" || !isAstNode(def.node)) {
+        return false;
+      }
+      if (def.node.type !== "VariableDeclarator") {
+        return false;
+      }
+      if (
+        !isAstNode(def.parent) ||
+        def.parent.type !== "VariableDeclaration" ||
+        def.parent.kind === "var"
+      ) {
+        return false;
+      }
+      return isFunctionExpressionLike(unwrapExpression(def.node.init));
+    });
+  };
+
+  isAllowedReplacement = (argument) => {
+    if (
+      argument?.type === "TaggedTemplateExpression" &&
+      argument.tag.type === "MemberExpression" &&
+      isIdentifier(argument.tag.object, "String") &&
+      isIdentifier(argument.tag.property, "raw") &&
+      !this.resolveVariable(argument.tag.object)?.defs.length &&
+      isNoSubstitutionTemplateLiteral(argument.quasi)
+    ) {
+      return true;
+    }
+    if (isFunctionExpressionLike(argument)) {
+      return true;
+    }
+    if (isStringLiteral(argument)) {
+      return true;
+    }
+    if (isNoSubstitutionTemplateLiteral(argument)) {
+      return true;
+    }
+    if (isIdentifier(argument)) {
+      return this.isFunctionBinding(argument);
+    }
+    return false;
+  };
+
+  visitCallExpression = (node) => {
+    const callee = unwrapExpression(node.callee);
+    if (!isAstNode(callee) || callee.type !== "MemberExpression") {
+      return;
+    }
+    const method = getStaticPropertyName(callee.property);
+    if (method === null || !REPLACE_METHODS.has(method)) {
+      return;
+    }
+    if (node.arguments.length !== 2) {
+      return;
+    }
+    const [pattern, replacement] = node.arguments;
+    if (
+      !isAstNode(pattern) ||
+      pattern.type === "SpreadElement" ||
+      !isAstNode(replacement) ||
+      replacement.type === "SpreadElement"
+    ) {
+      return;
+    }
+    const unwrappedReplacement = unwrapExpression(replacement);
+    if (
+      isAstNode(unwrappedReplacement) &&
+      unwrappedReplacement.type === "ObjectExpression"
+    ) {
+      return;
+    }
+    if (this.isAllowedReplacement(unwrappedReplacement)) {
+      return;
+    }
+    this.context.report({
+      node: replacement,
+      messageId: "requireFunctionReplacer",
+      data: { method },
+    });
+  };
+  listeners() {
+    return {
+      CallExpression: this.visitCallExpression,
+    };
+  }
+}
+
 export default {
   meta: {
     schema: [
@@ -49,109 +164,6 @@ export default {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-
-    const resolveVariable = (identifierNode) => {
-      if (!isIdentifier(identifierNode)) {
-        return null;
-      }
-      let scope = context.sourceCode.getScope(identifierNode);
-      while (scope) {
-        const variable = scope.set.get(identifierNode.name);
-        if (variable) {
-          return variable;
-        }
-        scope = scope.upper;
-      }
-      return null;
-    };
-    const isFunctionBinding = (identifierNode) => {
-      const variable = resolveVariable(identifierNode);
-      if (variable === null) {
-        return false;
-      }
-      return variable.defs.some((def) => {
-        if (def.type === "FunctionName") {
-          return isAstNode(def.node) && def.node.type === "FunctionDeclaration";
-        }
-        if (def.type !== "Variable" || !isAstNode(def.node)) {
-          return false;
-        }
-        if (def.node.type !== "VariableDeclarator") {
-          return false;
-        }
-        if (
-          !isAstNode(def.parent) ||
-          def.parent.type !== "VariableDeclaration" ||
-          def.parent.kind === "var"
-        ) {
-          return false;
-        }
-        return isFunctionExpressionLike(unwrapExpression(def.node.init));
-      });
-    };
-    const isAllowedReplacement = (argument) => {
-      if (
-        argument?.type === "TaggedTemplateExpression" &&
-        argument.tag.type === "MemberExpression" &&
-        isIdentifier(argument.tag.object, "String") &&
-        isIdentifier(argument.tag.property, "raw") &&
-        !resolveVariable(argument.tag.object)?.defs.length &&
-        isNoSubstitutionTemplateLiteral(argument.quasi)
-      ) {
-        return true;
-      }
-      if (isFunctionExpressionLike(argument)) {
-        return true;
-      }
-      if (isStringLiteral(argument)) {
-        return true;
-      }
-      if (isNoSubstitutionTemplateLiteral(argument)) {
-        return true;
-      }
-      if (isIdentifier(argument)) {
-        return isFunctionBinding(argument);
-      }
-      return false;
-    };
-    return {
-      CallExpression(node) {
-        const callee = unwrapExpression(node.callee);
-        if (!isAstNode(callee) || callee.type !== "MemberExpression") {
-          return;
-        }
-        const method = getStaticPropertyName(callee.property);
-        if (method === null || !REPLACE_METHODS.has(method)) {
-          return;
-        }
-        if (node.arguments.length !== 2) {
-          return;
-        }
-        const [pattern, replacement] = node.arguments;
-        if (
-          !isAstNode(pattern) ||
-          pattern.type === "SpreadElement" ||
-          !isAstNode(replacement) ||
-          replacement.type === "SpreadElement"
-        ) {
-          return;
-        }
-        const unwrappedReplacement = unwrapExpression(replacement);
-        if (
-          isAstNode(unwrappedReplacement) &&
-          unwrappedReplacement.type === "ObjectExpression"
-        ) {
-          return;
-        }
-        if (isAllowedReplacement(unwrappedReplacement)) {
-          return;
-        }
-        context.report({
-          node: replacement,
-          messageId: "requireFunctionReplacer",
-          data: { method },
-        });
-      },
-    };
+    return new ReplacementArguments(context).listeners();
   },
 };

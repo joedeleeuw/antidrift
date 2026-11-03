@@ -111,6 +111,29 @@ const literalKeysOf = (keyTypeNode) => {
   }
   return [];
 };
+const omittedIntersectionKeys = (typeNode, localTypes, open) => {
+  const members = typeNode.types.map((member) => ({
+    keys: omittedKeysOf(member, localTypes, open),
+    suppliers: suppliersOf(member, localTypes, open),
+  }));
+  return members.flatMap(({ keys }, index) =>
+    keys.filter(
+      (key) =>
+        !members.some(
+          (sibling, siblingIndex) =>
+            siblingIndex !== index &&
+            sibling.suppliers.some(
+              (supplier) =>
+                !supplier.removed.has(key) &&
+                members[index]?.suppliers.some(
+                  (own) =>
+                    own.removed.has(key) && own.source === supplier.source
+                )
+            )
+        )
+    )
+  );
+};
 const omittedKeysOf = (typeNode, localTypes, open = new Set()) => {
   if (typeNode === null || typeNode === undefined) {
     return [];
@@ -119,27 +142,7 @@ const omittedKeysOf = (typeNode, localTypes, open = new Set()) => {
     return omittedKeysOf(typeNode.typeAnnotation, localTypes, open);
   }
   if (typeNode.type === "TSIntersectionType") {
-    const members = typeNode.types.map((member) => ({
-      keys: omittedKeysOf(member, localTypes, open),
-      suppliers: suppliersOf(member, localTypes, open),
-    }));
-    return members.flatMap(({ keys }, index) =>
-      keys.filter(
-        (key) =>
-          !members.some(
-            (sibling, siblingIndex) =>
-              siblingIndex !== index &&
-              sibling.suppliers.some(
-                (supplier) =>
-                  !supplier.removed.has(key) &&
-                  members[index]?.suppliers.some(
-                    (own) =>
-                      own.removed.has(key) && own.source === supplier.source
-                  )
-              )
-          )
-      )
-    );
+    return omittedIntersectionKeys(typeNode, localTypes, open);
   }
   if (typeNode.type === "TSUnionType") {
     return intersectAll(
@@ -217,29 +220,29 @@ const reintroducedKeysOf = (typeNode, localTypes, open = new Set()) => {
   }
   return [];
 };
-const patternOf = (param) =>
-  param?.type === "AssignmentPattern" ? param.left : param;
-const propsParamOf = (params = []) => {
-  const first = params.at(0);
-  return isIdentifier(first, "this") ? params.at(1) : first;
+const patternOf = (parameter) =>
+  parameter?.type === "AssignmentPattern" ? parameter.left : parameter;
+const propsParamOf = (functionParameters = []) => {
+  const first = functionParameters.at(0);
+  return isIdentifier(first, "this") ? functionParameters.at(1) : first;
 };
-const propsBindingOf = (param) => {
-  if (isIdentifier(param)) {
-    return param;
+const propsBindingOf = (parameter) => {
+  if (isIdentifier(parameter)) {
+    return parameter;
   }
-  if (param?.type !== "ObjectPattern") {
+  if (parameter?.type !== "ObjectPattern") {
     return null;
   }
-  const rest = param.properties?.find(
+  const rest = parameter.properties?.find(
     (property) => property.type === "RestElement"
   );
   return isIdentifier(rest?.argument) ? rest.argument : null;
 };
-const destructuredKeysOf = (param) => {
-  if (param?.type !== "ObjectPattern") {
+const destructuredKeysOf = (parameter) => {
+  if (parameter?.type !== "ObjectPattern") {
     return [];
   }
-  return (param.properties ?? [])
+  return (parameter.properties ?? [])
     .filter((property) => property.type === "Property" && !property.computed)
     .map((property) => getPropertyName(property.key))
     .filter((name) => name !== null);
@@ -278,6 +281,174 @@ const spreadCanDeliver = (attribute, key) => {
       getPropertyName(property.key) === key
   );
 };
+class OmittedProps {
+  constructor(context) {
+    this.context = context;
+    this.localTypes = new Map();
+    this.omittedByBinding = new Map();
+    this.propsParams = [];
+    this.spreadElements = [];
+  }
+  declareLocalType = (declaration) => {
+    if (declaration?.type !== "TSTypeAliasDeclaration") {
+      return;
+    }
+    const name = declaration.id?.name;
+    if (typeof name !== "string") {
+      return;
+    }
+    if ((declaration.typeParameters?.params?.length ?? 0) > 0) {
+      this.localTypes.set(name, null);
+      return;
+    }
+    const start = declaration.range[0];
+    const existing = this.localTypes.get(name);
+    if (existing === undefined) {
+      this.localTypes.set(name, {
+        start,
+        typeNode: declaration.typeAnnotation,
+      });
+      return;
+    }
+    if (existing !== null && existing.start !== start) {
+      this.localTypes.set(name, null);
+    }
+  };
+
+  collectPropsParam = (node) => {
+    const parameter = patternOf(propsParamOf(node.params));
+    const binding = propsBindingOf(parameter);
+    if (binding !== null) {
+      this.propsParams.push({ binding, param: parameter });
+    }
+  };
+
+  indexOmittedKeys = () => {
+    for (const { binding, param: parameter } of this.propsParams) {
+      const propsType = parameter.typeAnnotation?.typeAnnotation;
+      const carried = new Set([
+        ...destructuredKeysOf(parameter),
+        ...reintroducedKeysOf(propsType, this.localTypes),
+      ]);
+      const keys = omittedKeysOf(propsType, this.localTypes).filter(
+        (key) => !carried.has(key)
+      );
+      if (keys.length > 0) {
+        this.omittedByBinding.set(binding.range[0], new Set(keys));
+      }
+    }
+  };
+
+  omittedKeysForSpread = (identifier) => {
+    let scope = this.context.sourceCode.getScope(identifier);
+    while (scope !== null) {
+      const binding = scope.set.get(identifier.name);
+      if (binding !== undefined) {
+        return binding.defs
+          .map((definition) =>
+            this.omittedByBinding.get(definition.name.range[0])
+          )
+          .find((keys) => keys !== undefined);
+      }
+      scope = scope.upper;
+    }
+    return undefined;
+  };
+
+  reportElement = (node) => {
+    const attributes = node.openingElement.attributes;
+    const omitted = new Set();
+    for (const attribute of attributes) {
+      if (attribute.type !== "JSXSpreadAttribute") {
+        continue;
+      }
+      const argument = unwrapSpread(attribute.argument);
+      if (!isIdentifier(argument)) {
+        continue;
+      }
+      for (const key of this.omittedKeysForSpread(argument) ?? []) {
+        omitted.add(key);
+      }
+    }
+    for (const key of omitted) {
+      if (key === "children" && node.children.some(isRenderedChild)) {
+        continue;
+      }
+      const lastOverrideIndex = attributes.findLastIndex(
+        (attribute) =>
+          attribute.type === "JSXSpreadAttribute" &&
+          spreadCanDeliver(attribute, key)
+      );
+      if (lastOverrideIndex === -1) {
+        continue;
+      }
+      const pin = attributes.find(
+        (attribute) => attributeName(attribute) === key
+      );
+      if (pin !== undefined && attributes.indexOf(pin) > lastOverrideIndex) {
+        continue;
+      }
+      this.context.report({
+        node: pin ?? node.openingElement,
+        messageId:
+          pin === undefined ? "suppliedBySpread" : "pinnedBeforeSpread",
+        data: { key },
+      });
+    }
+  };
+
+  visitProgram = () => {
+    this.localTypes.clear();
+    this.omittedByBinding.clear();
+    this.propsParams.length = 0;
+    this.spreadElements.length = 0;
+  };
+
+  visitImportDeclaration = (node) => {
+    for (const specifier of node.specifiers) {
+      if (typeof specifier.local?.name === "string") {
+        this.localTypes.set(specifier.local.name, null);
+      }
+    }
+  };
+
+  visitTSTypeParameter = (node) => {
+    if (typeof node.name?.name === "string") {
+      this.localTypes.set(node.name.name, null);
+    }
+  };
+
+  visitJSXElement = (node) => {
+    if (
+      node.openingElement.attributes.some(
+        (attribute) => attribute.type === "JSXSpreadAttribute"
+      )
+    ) {
+      this.spreadElements.push(node);
+    }
+  };
+
+  visitProgramExit = () => {
+    this.indexOmittedKeys();
+    for (const element of this.spreadElements) {
+      this.reportElement(element);
+    }
+  };
+  listeners() {
+    return {
+      Program: this.visitProgram,
+      ImportDeclaration: this.visitImportDeclaration,
+      TSTypeParameter: this.visitTSTypeParameter,
+      TSTypeAliasDeclaration: this.declareLocalType,
+      ArrowFunctionExpression: this.collectPropsParam,
+      FunctionDeclaration: this.collectPropsParam,
+      FunctionExpression: this.collectPropsParam,
+      JSXElement: this.visitJSXElement,
+      "Program:exit": this.visitProgramExit,
+    };
+  }
+}
+
 export default {
   meta: {
     schema: [
@@ -298,150 +469,6 @@ export default {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-
-    const localTypes = new Map();
-    const omittedByBinding = new Map();
-    const propsParams = [];
-    const spreadElements = [];
-    const declareLocalType = (declaration) => {
-      if (declaration?.type !== "TSTypeAliasDeclaration") {
-        return;
-      }
-      const name = declaration.id?.name;
-      if (typeof name !== "string") {
-        return;
-      }
-      if ((declaration.typeParameters?.params?.length ?? 0) > 0) {
-        localTypes.set(name, null);
-        return;
-      }
-      const start = declaration.range[0];
-      const existing = localTypes.get(name);
-      if (existing === undefined) {
-        localTypes.set(name, {
-          start,
-          typeNode: declaration.typeAnnotation,
-        });
-        return;
-      }
-      if (existing !== null && existing.start !== start) {
-        localTypes.set(name, null);
-      }
-    };
-    const collectPropsParam = (node) => {
-      const param = patternOf(propsParamOf(node.params));
-      const binding = propsBindingOf(param);
-      if (binding !== null) {
-        propsParams.push({ binding, param });
-      }
-    };
-    const indexOmittedKeys = () => {
-      for (const { binding, param } of propsParams) {
-        const propsType = param.typeAnnotation?.typeAnnotation;
-        const carried = new Set([
-          ...destructuredKeysOf(param),
-          ...reintroducedKeysOf(propsType, localTypes),
-        ]);
-        const keys = omittedKeysOf(propsType, localTypes).filter(
-          (key) => !carried.has(key)
-        );
-        if (keys.length > 0) {
-          omittedByBinding.set(binding.range[0], new Set(keys));
-        }
-      }
-    };
-    const omittedKeysForSpread = (identifier) => {
-      let scope = context.sourceCode.getScope(identifier);
-      while (scope !== null) {
-        const variable = scope.set.get(identifier.name);
-        if (variable !== undefined) {
-          return variable.defs
-            .map((definition) => omittedByBinding.get(definition.name.range[0]))
-            .find((keys) => keys !== undefined);
-        }
-        scope = scope.upper;
-      }
-      return undefined;
-    };
-    const reportElement = (node) => {
-      const attributes = node.openingElement.attributes;
-      const omitted = new Set();
-      for (const attribute of attributes) {
-        if (attribute.type !== "JSXSpreadAttribute") {
-          continue;
-        }
-        const argument = unwrapSpread(attribute.argument);
-        if (!isIdentifier(argument)) {
-          continue;
-        }
-        for (const key of omittedKeysForSpread(argument) ?? []) {
-          omitted.add(key);
-        }
-      }
-      for (const key of omitted) {
-        if (key === "children" && node.children.some(isRenderedChild)) {
-          continue;
-        }
-        const lastOverrideIndex = attributes.findLastIndex(
-          (attribute) =>
-            attribute.type === "JSXSpreadAttribute" &&
-            spreadCanDeliver(attribute, key)
-        );
-        if (lastOverrideIndex === -1) {
-          continue;
-        }
-        const pin = attributes.find(
-          (attribute) => attributeName(attribute) === key
-        );
-        if (pin !== undefined && attributes.indexOf(pin) > lastOverrideIndex) {
-          continue;
-        }
-        context.report({
-          node: pin ?? node.openingElement,
-          messageId:
-            pin === undefined ? "suppliedBySpread" : "pinnedBeforeSpread",
-          data: { key },
-        });
-      }
-    };
-    return {
-      Program() {
-        localTypes.clear();
-        omittedByBinding.clear();
-        propsParams.length = 0;
-        spreadElements.length = 0;
-      },
-      ImportDeclaration(node) {
-        for (const specifier of node.specifiers) {
-          if (typeof specifier.local?.name === "string") {
-            localTypes.set(specifier.local.name, null);
-          }
-        }
-      },
-      TSTypeParameter(node) {
-        if (typeof node.name?.name === "string") {
-          localTypes.set(node.name.name, null);
-        }
-      },
-      TSTypeAliasDeclaration: declareLocalType,
-      ArrowFunctionExpression: collectPropsParam,
-      FunctionDeclaration: collectPropsParam,
-      FunctionExpression: collectPropsParam,
-      JSXElement(node) {
-        if (
-          node.openingElement.attributes.some(
-            (attribute) => attribute.type === "JSXSpreadAttribute"
-          )
-        ) {
-          spreadElements.push(node);
-        }
-      },
-      "Program:exit"() {
-        indexOmittedKeys();
-        for (const element of spreadElements) {
-          reportElement(element);
-        }
-      },
-    };
+    return new OmittedProps(context).listeners();
   },
 };

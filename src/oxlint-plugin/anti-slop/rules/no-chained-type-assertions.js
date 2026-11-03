@@ -56,8 +56,9 @@ export const noChainedTypeAssertionsRule = {
       if (
         !isOutermostAssertionInChain(node) ||
         !isForbiddenAssertionChain(node)
-      )
+      ) {
         return;
+      }
       context.report({ node, messageId: "chained" });
     };
     return {

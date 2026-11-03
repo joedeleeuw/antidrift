@@ -1,10 +1,12 @@
 import {
   equalityMatcherMethods,
   equalityMethods,
+} from "../shared/test-block-arrangement.js";
+import {
   resolutionDepthLimit,
   unwrapAwaitedExpression,
   unwrapExpression,
-} from "../shared/test-block-arrangement.js";
+} from "../shared/test-block-shapes.js";
 import { staticPropertyName } from "../shared/test-files.js";
 
 const outcomeFlagProperties = new Set(["success", "ok"]);

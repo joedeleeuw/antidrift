@@ -52,6 +52,42 @@ function isErrorMemberRead(node, errorName, allowedProperties) {
   return propertyName !== null && allowedProperties.has(propertyName);
 }
 
+function isBareCaughtErrorCall(target, errorName) {
+  const args = getNodeArray(target, "arguments");
+  if (
+    getIdentifierName(target.callee) === "String" &&
+    args.length === 1 &&
+    (getIdentifierName(args[0]) === errorName ||
+      isErrorMemberRead(args[0], errorName, new Set(["message"])))
+  ) {
+    return true;
+  }
+  if (
+    args.length === 0 &&
+    isErrorMemberRead(target.callee, errorName, new Set(["toString"]))
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function isBareCaughtErrorTemplate(target, errorName) {
+  const expressions = getNodeArray(target, "expressions");
+  const quasis = getNodeArray(target, "quasis");
+  const staticText = quasis
+    .map(
+      (quasi) =>
+        getString(quasi.value?.cooked) ?? getString(quasi.value?.raw) ?? ""
+    )
+    .join("")
+    .trim();
+  return (
+    staticText.length === 0 &&
+    expressions.length === 1 &&
+    isBareCaughtErrorMessage(expressions[0], errorName)
+  );
+}
+
 function isBareCaughtErrorMessage(node, errorName) {
   const target = unwrapChainExpression(node);
   if (!target) {
@@ -63,38 +99,14 @@ function isBareCaughtErrorMessage(node, errorName) {
   if (isErrorMemberRead(target, errorName, new Set(["message", "stack"]))) {
     return true;
   }
-  if (target.type === "CallExpression") {
-    const args = getNodeArray(target, "arguments");
-    if (
-      getIdentifierName(target.callee) === "String" &&
-      args.length === 1 &&
-      (getIdentifierName(args[0]) === errorName ||
-        isErrorMemberRead(args[0], errorName, new Set(["message"])))
-    ) {
-      return true;
-    }
-    if (
-      args.length === 0 &&
-      isErrorMemberRead(target.callee, errorName, new Set(["toString"]))
-    ) {
-      return true;
-    }
+  if (
+    target.type === "CallExpression" &&
+    isBareCaughtErrorCall(target, errorName)
+  ) {
+    return true;
   }
   if (target.type === "TemplateLiteral") {
-    const expressions = getNodeArray(target, "expressions");
-    const quasis = getNodeArray(target, "quasis");
-    const staticText = quasis
-      .map(
-        (quasi) =>
-          getString(quasi.value?.cooked) ?? getString(quasi.value?.raw) ?? ""
-      )
-      .join("")
-      .trim();
-    return (
-      staticText.length === 0 &&
-      expressions.length === 1 &&
-      isBareCaughtErrorMessage(expressions[0], errorName)
-    );
+    return isBareCaughtErrorTemplate(target, errorName);
   }
   if (target.type === "ConditionalExpression") {
     return (
@@ -187,6 +199,149 @@ function promiseCatchCallbackParamName(node) {
     : null;
 }
 
+class ErrorDiagnostics {
+  constructor(context) {
+    this.context = context;
+    this.catchParamStack = [];
+  }
+  enterPromiseCatchCallback = (node) => {
+    const errorName = promiseCatchCallbackParamName(node);
+    if (!errorName) {
+      return;
+    }
+    this.catchParamStack.push(errorName);
+    inspectCatchStatements(
+      getFunctionStatements(node),
+      errorName,
+      this.context
+    );
+  };
+
+  exitPromiseCatchCallback = (node) => {
+    if (promiseCatchCallbackParamName(node)) {
+      this.catchParamStack.pop();
+    }
+  };
+
+  visitCatchClause = (node) => {
+    const errorName = getIdentifierName(node.param);
+    if (!errorName) {
+      return;
+    }
+    this.catchParamStack.push(errorName);
+    const body = getNode(node, "body");
+    if (body && body.type === "BlockStatement") {
+      inspectCatchStatements(
+        getNodeArray(body, "body"),
+        errorName,
+        this.context
+      );
+    }
+  };
+
+  visitCatchClauseexit = (node) => {
+    if (getIdentifierName(node.param)) {
+      this.catchParamStack.pop();
+    }
+  };
+
+  visitThrowStatement = (node) => {
+    const argument = getNode(node, "argument");
+    if (
+      !argument ||
+      !["NewExpression", "CallExpression"].includes(argument.type)
+    ) {
+      return;
+    }
+    const calleeName = getIdentifierName(argument.callee);
+    if (!calleeName || !BARE_ERROR_CONSTRUCTORS.has(calleeName)) {
+      return;
+    }
+    const args = getNodeArray(argument, "arguments");
+    const firstArg = args[0];
+    if (!firstArg) {
+      return;
+    }
+    const message = getLiteralString(firstArg);
+    if (
+      calleeName === "Error" &&
+      message &&
+      VAGUE_ERROR_PATTERN.test(message)
+    ) {
+      this.context.report({
+        node,
+        messageId: "anemicThrow",
+        data: { message },
+      });
+      return;
+    }
+    const activeCatchParam =
+      this.catchParamStack[this.catchParamStack.length - 1];
+    if (
+      activeCatchParam &&
+      args.length === 1 &&
+      isBareCaughtErrorMessage(firstArg, activeCatchParam)
+    ) {
+      this.context.report({
+        node,
+        messageId: "lossyErrorRethrow",
+        data: { name: activeCatchParam },
+      });
+    }
+  };
+
+  visitReturnStatement = (node) => {
+    const returnVal = getNode(node, "argument");
+    if (!returnVal || returnVal.type !== "ObjectExpression") {
+      return;
+    }
+    const properties = getNodeArray(returnVal, "properties");
+    let hasSuccessFalse = false;
+    let hasVagueError = false;
+    for (const prop of properties) {
+      const keyName = getIdentifierName(prop.key) ?? getLiteralString(prop.key);
+      if (!keyName) {
+        continue;
+      }
+      if (keyName === "success") {
+        const propertyInitializer = getNode(prop, "value");
+        if (
+          propertyInitializer &&
+          propertyInitializer.type === "Literal" &&
+          propertyInitializer.value === false
+        ) {
+          hasSuccessFalse = true;
+        }
+      }
+      if (keyName === "error") {
+        const propertyInitializer = getNode(prop, "value");
+        if (!propertyInitializer) {
+          continue;
+        }
+        const errorStr = getString(propertyInitializer.value);
+        if (errorStr && VAGUE_ERROR_PATTERN.test(errorStr)) {
+          hasVagueError = true;
+        }
+      }
+    }
+    if (hasSuccessFalse && hasVagueError) {
+      this.context.report({ node, messageId: "anemicReturn" });
+    }
+  };
+  listeners() {
+    return {
+      CatchClause: this.visitCatchClause,
+      "CatchClause:exit": this.visitCatchClauseexit,
+      ArrowFunctionExpression: this.enterPromiseCatchCallback,
+      "ArrowFunctionExpression:exit": this.exitPromiseCatchCallback,
+      FunctionExpression: this.enterPromiseCatchCallback,
+      "FunctionExpression:exit": this.exitPromiseCatchCallback,
+      ThrowStatement: this.visitThrowStatement,
+      ReturnStatement: this.visitReturnStatement,
+    };
+  }
+}
+
 const noAnemicErrorsRule = {
   meta: {
     schema: [
@@ -217,136 +372,13 @@ const noAnemicErrorsRule = {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-
-    const catchParamStack = [];
-
-    function enterPromiseCatchCallback(node) {
-      const errorName = promiseCatchCallbackParamName(node);
-      if (!errorName) {
-        return;
-      }
-      catchParamStack.push(errorName);
-      inspectCatchStatements(getFunctionStatements(node), errorName, context);
-    }
-
-    function exitPromiseCatchCallback(node) {
-      if (promiseCatchCallbackParamName(node)) {
-        catchParamStack.pop();
-      }
-    }
-
     if (isTestFilename(context.filename)) {
       return emptyFailureFallbackVisitors(context);
     }
-    const anemicVisitors = {
-      CatchClause(node) {
-        const errorName = getIdentifierName(node.param);
-        if (!errorName) {
-          return;
-        }
-        catchParamStack.push(errorName);
-        const body = getNode(node, "body");
-        if (body && body.type === "BlockStatement") {
-          inspectCatchStatements(
-            getNodeArray(body, "body"),
-            errorName,
-            context
-          );
-        }
-      },
-      "CatchClause:exit"(node) {
-        if (getIdentifierName(node.param)) {
-          catchParamStack.pop();
-        }
-      },
-      ArrowFunctionExpression: enterPromiseCatchCallback,
-      "ArrowFunctionExpression:exit": exitPromiseCatchCallback,
-      FunctionExpression: enterPromiseCatchCallback,
-      "FunctionExpression:exit": exitPromiseCatchCallback,
-      ThrowStatement(node) {
-        const argument = getNode(node, "argument");
-        if (
-          !argument ||
-          !["NewExpression", "CallExpression"].includes(argument.type)
-        ) {
-          return;
-        }
-        const calleeName = getIdentifierName(argument.callee);
-        if (!calleeName || !BARE_ERROR_CONSTRUCTORS.has(calleeName)) {
-          return;
-        }
-        const args = getNodeArray(argument, "arguments");
-        const firstArg = args[0];
-        if (!firstArg) {
-          return;
-        }
-        const message = getLiteralString(firstArg);
-        if (
-          calleeName === "Error" &&
-          message &&
-          VAGUE_ERROR_PATTERN.test(message)
-        ) {
-          context.report({
-            node,
-            messageId: "anemicThrow",
-            data: { message },
-          });
-          return;
-        }
-        const activeCatchParam = catchParamStack[catchParamStack.length - 1];
-        if (
-          activeCatchParam &&
-          args.length === 1 &&
-          isBareCaughtErrorMessage(firstArg, activeCatchParam)
-        ) {
-          context.report({
-            node,
-            messageId: "lossyErrorRethrow",
-            data: { name: activeCatchParam },
-          });
-        }
-      },
-      ReturnStatement(node) {
-        const returnVal = getNode(node, "argument");
-        if (!returnVal || returnVal.type !== "ObjectExpression") {
-          return;
-        }
-        const properties = getNodeArray(returnVal, "properties");
-        let hasSuccessFalse = false;
-        let hasVagueError = false;
-        for (const prop of properties) {
-          const keyName =
-            getIdentifierName(prop.key) ?? getLiteralString(prop.key);
-          if (!keyName) {
-            continue;
-          }
-          if (keyName === "success") {
-            const propertyInitializer = getNode(prop, "value");
-            if (
-              propertyInitializer &&
-              propertyInitializer.type === "Literal" &&
-              propertyInitializer.value === false
-            ) {
-              hasSuccessFalse = true;
-            }
-          }
-          if (keyName === "error") {
-            const propertyInitializer = getNode(prop, "value");
-            if (!propertyInitializer) {
-              continue;
-            }
-            const errorStr = getString(propertyInitializer.value);
-            if (errorStr && VAGUE_ERROR_PATTERN.test(errorStr)) {
-              hasVagueError = true;
-            }
-          }
-        }
-        if (hasSuccessFalse && hasVagueError) {
-          context.report({ node, messageId: "anemicReturn" });
-        }
-      },
-    };
-    return mergeVisitors(emptyFailureFallbackVisitors(context), anemicVisitors);
+    return mergeVisitors(
+      emptyFailureFallbackVisitors(context),
+      new ErrorDiagnostics(context).listeners()
+    );
   },
 };
 export default noAnemicErrorsRule;

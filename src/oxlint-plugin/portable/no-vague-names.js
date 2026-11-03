@@ -116,6 +116,198 @@ function* patternIdentifiers(node) {
   }
 }
 
+class BindingNames {
+  constructor(context) {
+    this.context = context;
+  }
+  isParameterIdentifier = (identifier) => {
+    let cur = identifier;
+    while (cur?.parent) {
+      const parent = cur.parent;
+      if (FUNCTION_TYPES.has(parent.type)) {
+        return parent.params.includes(cur);
+      }
+      if (
+        parent.type === "AssignmentPattern" ||
+        parent.type === "RestElement" ||
+        parent.type === "ArrayPattern" ||
+        parent.type === "ObjectPattern" ||
+        parent.type === "Property" ||
+        parent.type === "TSParameterProperty"
+      ) {
+        cur = parent;
+        continue;
+      }
+      return false;
+    }
+    return false;
+  };
+
+  isQueryBuilderParam = (identifier) => {
+    if (identifier.name !== "q") return false;
+    const fnNode = identifier.parent;
+    if (!FUNCTION_TYPES.has(fnNode?.type) || fnNode.params[0] !== identifier) {
+      return false;
+    }
+    const callNode = fnNode.parent;
+    return (
+      callNode?.type === "CallExpression" &&
+      callNode.callee?.type === "MemberExpression" &&
+      !callNode.callee.computed &&
+      callNode.callee.property?.type === "Identifier" &&
+      QUERY_BUILDER_METHODS.has(callNode.callee.property.name)
+    );
+  };
+
+  isUnknownCandidateParam = (identifier) => {
+    if (identifier.name !== "value") return false;
+    if (
+      identifier.typeAnnotation?.typeAnnotation?.type === "TSUnknownKeyword"
+    ) {
+      return true;
+    }
+    const fnNode = identifier.parent;
+    return (
+      FUNCTION_TYPES.has(fnNode?.type) &&
+      fnNode.returnType?.typeAnnotation?.type === "TSTypePredicate"
+    );
+  };
+
+  isTestHarnessVariable = (identifier) => {
+    if (identifier.name !== "t") return false;
+    const decl = identifier.parent;
+    if (decl?.type !== "VariableDeclarator" || decl.id !== identifier) {
+      return false;
+    }
+    const init = decl.init;
+    return (
+      init?.type === "CallExpression" &&
+      init.callee?.type === "Identifier" &&
+      (init.callee.name === "convexTest" ||
+        init.callee.name === "useTranslation")
+    );
+  };
+
+  check = (identifier) => {
+    if (identifier?.type !== "Identifier") return;
+    if (identifier.name === "ctx" && this.isParameterIdentifier(identifier)) {
+      return;
+    }
+    if (this.isQueryBuilderParam(identifier)) return;
+    if (this.isUnknownCandidateParam(identifier)) return;
+    if (this.isTestHarnessVariable(identifier)) return;
+    const reason = vagueReason(identifier.name);
+    if (reason) {
+      this.context.report({
+        node: identifier,
+        messageId: "vague",
+        data: { name: identifier.name, reason },
+      });
+    }
+  };
+
+  checkDuplicateContext = (nameNode, reportNode) => {
+    let name = null;
+    if (nameNode?.type === "Identifier") name = nameNode.name;
+    if (nameNode?.type === "Literal" && typeof nameNode.value === "string") {
+      name = nameNode.value;
+    }
+    if (!name) return;
+    const word = duplicateContextWord(name);
+    if (word) {
+      this.context.report({
+        node: reportNode,
+        messageId: "duplicate",
+        data: { name, word },
+      });
+    }
+  };
+
+  checkPattern = (pattern) => {
+    for (const identifier of patternIdentifiers(pattern)) {
+      this.check(identifier);
+    }
+  };
+
+  returnsJsx = (node) => {
+    if (node.body.type !== "BlockStatement") return isJsx(node.body);
+    const pending = [node.body];
+    while (pending.length > 0) {
+      const current = pending.pop();
+      if (current.type === "ReturnStatement" && isJsx(current.argument)) {
+        return true;
+      }
+      for (const key of this.context.sourceCode.visitorKeys[current.type] ??
+        []) {
+        for (const child of [current[key]].flat()) {
+          if (child?.type && !FUNCTION_TYPES.has(child.type)) {
+            pending.push(child);
+          }
+        }
+      }
+    }
+    return false;
+  };
+
+  isComponent = (node) => {
+    const name =
+      node.id?.name ??
+      (node.parent.type === "VariableDeclarator" ? node.parent.id.name : "");
+    return /^[A-Z]/.test(name ?? "") || this.returnsJsx(node);
+  };
+
+  checkFunction = (node) => {
+    if (node.type !== "ArrowFunctionExpression") this.check(node.id);
+    if (node.type === "FunctionDeclaration") {
+      this.checkDuplicateContext(node.id, node);
+    }
+    for (const [index, parameter] of node.params.entries()) {
+      if (
+        index === 0 &&
+        parameter.type === "Identifier" &&
+        parameter.name === "props" &&
+        this.isComponent(node)
+      ) {
+        continue;
+      }
+      this.checkPattern(parameter);
+    }
+  };
+
+  visitVariableDeclarator = (node) => {
+    this.checkPattern(node.id);
+    if (
+      node.init?.type === "ArrowFunctionExpression" ||
+      node.init?.type === "FunctionExpression"
+    ) {
+      this.checkDuplicateContext(node.id, node);
+    }
+  };
+
+  visitMethodDefinition = (node) => {
+    this.checkDuplicateContext(node.key, node);
+  };
+
+  visitCatchClause = (node) => {
+    this.checkPattern(node.param);
+  };
+
+  visitClassDeclaration = (node) => {
+    this.check(node.id);
+  };
+  listeners() {
+    return {
+      VariableDeclarator: this.visitVariableDeclarator,
+      FunctionDeclaration: this.checkFunction,
+      FunctionExpression: this.checkFunction,
+      ArrowFunctionExpression: this.checkFunction,
+      MethodDefinition: this.visitMethodDefinition,
+      CatchClause: this.visitCatchClause,
+      ClassDeclaration: this.visitClassDeclaration,
+    };
+  }
+}
+
 export default {
   meta: {
     type: "suggestion",
@@ -139,178 +331,6 @@ export default {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-
-    function isParameterIdentifier(identifier) {
-      let cur = identifier;
-      while (cur?.parent) {
-        const parent = cur.parent;
-        if (FUNCTION_TYPES.has(parent.type)) {
-          return parent.params.includes(cur);
-        }
-        if (
-          parent.type === "AssignmentPattern" ||
-          parent.type === "RestElement" ||
-          parent.type === "ArrayPattern" ||
-          parent.type === "ObjectPattern" ||
-          parent.type === "Property" ||
-          parent.type === "TSParameterProperty"
-        ) {
-          cur = parent;
-          continue;
-        }
-        return false;
-      }
-      return false;
-    }
-
-    function isQueryBuilderParam(identifier) {
-      if (identifier.name !== "q") return false;
-      const fnNode = identifier.parent;
-      if (
-        !FUNCTION_TYPES.has(fnNode?.type) ||
-        fnNode.params[0] !== identifier
-      ) {
-        return false;
-      }
-      const callNode = fnNode.parent;
-      return (
-        callNode?.type === "CallExpression" &&
-        callNode.callee?.type === "MemberExpression" &&
-        !callNode.callee.computed &&
-        callNode.callee.property?.type === "Identifier" &&
-        QUERY_BUILDER_METHODS.has(callNode.callee.property.name)
-      );
-    }
-
-    function isUnknownCandidateParam(identifier) {
-      if (identifier.name !== "value") return false;
-      if (
-        identifier.typeAnnotation?.typeAnnotation?.type === "TSUnknownKeyword"
-      ) {
-        return true;
-      }
-      const fnNode = identifier.parent;
-      return (
-        FUNCTION_TYPES.has(fnNode?.type) &&
-        fnNode.returnType?.typeAnnotation?.type === "TSTypePredicate"
-      );
-    }
-
-    function isTestHarnessVariable(identifier) {
-      if (identifier.name !== "t") return false;
-      const decl = identifier.parent;
-      if (decl?.type !== "VariableDeclarator" || decl.id !== identifier) {
-        return false;
-      }
-      const init = decl.init;
-      return (
-        init?.type === "CallExpression" &&
-        init.callee?.type === "Identifier" &&
-        (init.callee.name === "convexTest" ||
-          init.callee.name === "useTranslation")
-      );
-    }
-
-    function check(identifier) {
-      if (identifier?.type !== "Identifier") return;
-      if (identifier.name === "ctx" && isParameterIdentifier(identifier)) {
-        return;
-      }
-      if (isQueryBuilderParam(identifier)) return;
-      if (isUnknownCandidateParam(identifier)) return;
-      if (isTestHarnessVariable(identifier)) return;
-      const reason = vagueReason(identifier.name);
-      if (reason) {
-        context.report({
-          node: identifier,
-          messageId: "vague",
-          data: { name: identifier.name, reason },
-        });
-      }
-    }
-    function checkDuplicateContext(nameNode, reportNode) {
-      let name = null;
-      if (nameNode?.type === "Identifier") name = nameNode.name;
-      if (nameNode?.type === "Literal" && typeof nameNode.value === "string") {
-        name = nameNode.value;
-      }
-      if (!name) return;
-      const word = duplicateContextWord(name);
-      if (word) {
-        context.report({
-          node: reportNode,
-          messageId: "duplicate",
-          data: { name, word },
-        });
-      }
-    }
-    function checkPattern(pattern) {
-      for (const identifier of patternIdentifiers(pattern)) check(identifier);
-    }
-    function returnsJsx(node) {
-      if (node.body.type !== "BlockStatement") return isJsx(node.body);
-      const pending = [node.body];
-      while (pending.length > 0) {
-        const current = pending.pop();
-        if (current.type === "ReturnStatement" && isJsx(current.argument)) {
-          return true;
-        }
-        for (const key of context.sourceCode.visitorKeys[current.type] ?? []) {
-          for (const child of [current[key]].flat()) {
-            if (child?.type && !FUNCTION_TYPES.has(child.type)) {
-              pending.push(child);
-            }
-          }
-        }
-      }
-      return false;
-    }
-    function isComponent(node) {
-      const name =
-        node.id?.name ??
-        (node.parent.type === "VariableDeclarator" ? node.parent.id.name : "");
-      return /^[A-Z]/.test(name ?? "") || returnsJsx(node);
-    }
-    function checkFunction(node) {
-      if (node.type !== "ArrowFunctionExpression") check(node.id);
-      if (node.type === "FunctionDeclaration") {
-        checkDuplicateContext(node.id, node);
-      }
-      for (const [index, parameter] of node.params.entries()) {
-        if (
-          index === 0 &&
-          parameter.type === "Identifier" &&
-          parameter.name === "props" &&
-          isComponent(node)
-        ) {
-          continue;
-        }
-        checkPattern(parameter);
-      }
-    }
-
-    return {
-      VariableDeclarator(node) {
-        checkPattern(node.id);
-        if (
-          node.init?.type === "ArrowFunctionExpression" ||
-          node.init?.type === "FunctionExpression"
-        ) {
-          checkDuplicateContext(node.id, node);
-        }
-      },
-      FunctionDeclaration: checkFunction,
-      FunctionExpression: checkFunction,
-      ArrowFunctionExpression: checkFunction,
-      MethodDefinition(node) {
-        checkDuplicateContext(node.key, node);
-      },
-      CatchClause(node) {
-        checkPattern(node.param);
-      },
-      ClassDeclaration(node) {
-        check(node.id);
-      },
-    };
+    return new BindingNames(context).listeners();
   },
 };

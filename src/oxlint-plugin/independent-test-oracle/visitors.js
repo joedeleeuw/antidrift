@@ -14,17 +14,29 @@ import {
 import { isStaticPropertyEcho } from "./static-property-loop.js";
 import { validatorOutputOracleFinding } from "./validator-output.js";
 
+function reportMembershipCall(node, context, blockFacts) {
+  const callback = enclosingTestBlockCallback(node);
+  const record = parseExpectAssertion(node) ?? parseAssertAssertion(node);
+  if (
+    callback &&
+    record &&
+    classifyErrorShapeAssertion(record, blockFacts(callback))
+  ) {
+    return;
+  }
+  context.report({ node, messageId: "noBareMembership" });
+}
+
 export function createIndependentTestOracleListeners(context) {
   const filename = contextFilename(context);
   const sourceCode = context.sourceCode ?? context.getSourceCode();
+  const reportForOf = (node) => {
+    if (isStaticPropertyEcho(node, sourceCode, filename)) {
+      context.report({ node, messageId: "staticPropertyEcho" });
+    }
+  };
   if (!isTestFilename(filename)) {
-    return {
-      ForOfStatement(node) {
-        if (isStaticPropertyEcho(node, sourceCode, filename)) {
-          context.report({ node, messageId: "staticPropertyEcho" });
-        }
-      },
-    };
+    return { ForOfStatement: reportForOf };
   }
   const factsByCallback = new WeakMap();
   const blockFacts = (callback) => {
@@ -42,16 +54,7 @@ export function createIndependentTestOracleListeners(context) {
         context.report({ node, messageId: validatorMessage });
       }
       if (isMembershipAssertionNode(node)) {
-        const callback = enclosingTestBlockCallback(node);
-        const record = parseExpectAssertion(node) ?? parseAssertAssertion(node);
-        if (
-          callback &&
-          record &&
-          classifyErrorShapeAssertion(record, blockFacts(callback))
-        ) {
-          return;
-        }
-        context.report({ node, messageId: "noBareMembership" });
+        reportMembershipCall(node, context, blockFacts);
         return;
       }
       const callback = testBlockCallback(node);
@@ -59,10 +62,6 @@ export function createIndependentTestOracleListeners(context) {
         analyzeTestBlock(blockFacts(callback), context, sourceCode);
       }
     },
-    ForOfStatement(node) {
-      if (isStaticPropertyEcho(node, sourceCode, filename)) {
-        context.report({ node, messageId: "staticPropertyEcho" });
-      }
-    },
+    ForOfStatement: reportForOf,
   };
 }

@@ -6,14 +6,14 @@ const TICKET_PATTERN = /\b(?:TODO|FIXME|HACK)\s*(?:\(|\[|:)\s*[A-Z]{2,}-\d+/i;
 const DEBT_TOKEN_PATTERN = /\b(todo|fixme|hack|temporary|later|cleanup)\b/i;
 const AI_TOKEN_PATTERN =
   /\b(ai|llm|gpt|copilot|claude|gemini|cursor|generated)\b/i;
-const getCommentText = (value) => {
-  const commentNode = toNode(value);
+const getCommentText = (comment) => {
+  const commentNode = toNode(comment);
   if (!commentNode) {
     return "";
   }
-  const fromValue = getString(commentNode.value);
-  if (fromValue) {
-    return fromValue;
+  const commentText = getString(commentNode.value);
+  if (commentText) {
+    return commentText;
   }
   const fromRaw = getString(commentNode.raw);
   if (fromRaw) {

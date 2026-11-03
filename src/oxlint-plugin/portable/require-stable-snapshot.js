@@ -52,65 +52,59 @@ const isFreshReferenceExpression = (node) => {
   }
   return isFreshReferenceCall(unwrapped);
 };
-const collectReturnArguments = (node, results) => {
+const collectReturnArguments = (node, returnArguments) => {
   if (!node || typeof node !== "object") {
     return;
   }
   switch (node.type) {
-    case "BlockStatement": {
+    case "BlockStatement":
       for (const statement of node.body) {
-        collectReturnArguments(statement, results);
+        collectReturnArguments(statement, returnArguments);
       }
       return;
-    }
-    case "IfStatement": {
-      collectReturnArguments(node.consequent, results);
-      collectReturnArguments(node.alternate, results);
+    case "IfStatement":
+      collectReturnArguments(node.consequent, returnArguments);
+      collectReturnArguments(node.alternate, returnArguments);
       return;
-    }
-    case "SwitchStatement": {
+    case "SwitchStatement":
       for (const switchCase of node.cases) {
         for (const statement of switchCase.consequent) {
-          collectReturnArguments(statement, results);
+          collectReturnArguments(statement, returnArguments);
         }
       }
       return;
-    }
-    case "TryStatement": {
-      collectReturnArguments(node.block, results);
+    case "TryStatement":
+      collectReturnArguments(node.block, returnArguments);
       if (node.handler) {
-        collectReturnArguments(node.handler.body, results);
+        collectReturnArguments(node.handler.body, returnArguments);
       }
-      collectReturnArguments(node.finalizer, results);
+      collectReturnArguments(node.finalizer, returnArguments);
       return;
-    }
     case "ForStatement":
     case "ForInStatement":
     case "ForOfStatement":
     case "WhileStatement":
     case "DoWhileStatement":
-    case "LabeledStatement": {
-      collectReturnArguments(node.body, results);
+    case "LabeledStatement":
+      collectReturnArguments(node.body, returnArguments);
       return;
-    }
-    case "ReturnStatement": {
+    case "ReturnStatement":
       if (node.argument) {
-        results.push(node.argument);
+        returnArguments.push(node.argument);
       }
       return;
-    }
     default:
       return;
   }
 };
-const isFreshReturnedValue = (expr, fnScope, sourceCode) => {
+const isFreshReturnExpression = (expr, fnScope, sourceCode) => {
   const unwrapped = unwrapExpression(expr);
   if (!unwrapped) return false;
   if (isFreshReferenceExpression(unwrapped)) return true;
   if (unwrapped.type === "Identifier" && fnScope) {
-    const variable = findVariable(sourceCode, unwrapped);
-    if (variable && variable.scope === fnScope) {
-      const def = variable.defs?.[0];
+    const bindingSymbol = findVariable(sourceCode, unwrapped);
+    if (bindingSymbol && bindingSymbol.scope === fnScope) {
+      const def = bindingSymbol.defs?.[0];
       if (def?.node?.type === "VariableDeclarator") {
         return isFreshReferenceExpression(def.node.init);
       }
@@ -118,15 +112,15 @@ const isFreshReturnedValue = (expr, fnScope, sourceCode) => {
   }
   return false;
 };
-const snapshotReturnsFreshReference = (fn, sourceCode) => {
-  const fnScope = sourceCode?.getScope?.(fn);
-  if (fn.body.type !== "BlockStatement") {
-    return isFreshReturnedValue(fn.body, fnScope, sourceCode);
+const snapshotReturnsFreshReference = (snapshotCallback, sourceCode) => {
+  const fnScope = sourceCode?.getScope?.(snapshotCallback);
+  if (snapshotCallback.body.type !== "BlockStatement") {
+    return isFreshReturnExpression(snapshotCallback.body, fnScope, sourceCode);
   }
   const returnArguments = [];
-  collectReturnArguments(fn.body, returnArguments);
+  collectReturnArguments(snapshotCallback.body, returnArguments);
   return returnArguments.some((argument) =>
-    isFreshReturnedValue(argument, fnScope, sourceCode)
+    isFreshReturnExpression(argument, fnScope, sourceCode)
   );
 };
 const resolveObjectMethodCallback = (expr, sourceCode) => {
@@ -138,8 +132,8 @@ const resolveObjectMethodCallback = (expr, sourceCode) => {
   ) {
     return null;
   }
-  const variable = findVariable(sourceCode, expr.object);
-  const init = unwrapExpression(variable?.defs?.[0]?.node?.init);
+  const bindingSymbol = findVariable(sourceCode, expr.object);
+  const init = unwrapExpression(bindingSymbol?.defs?.[0]?.node?.init);
   if (init?.type !== "ObjectExpression") return null;
   for (const prop of init.properties) {
     if (
@@ -148,8 +142,8 @@ const resolveObjectMethodCallback = (expr, sourceCode) => {
       prop.key?.type === "Identifier" &&
       prop.key.name === expr.property.name
     ) {
-      const value = unwrapExpression(prop.value);
-      return isFunctionLike(value) ? value : null;
+      const propertyExpression = unwrapExpression(prop.value);
+      return isFunctionLike(propertyExpression) ? propertyExpression : null;
     }
   }
   return null;
@@ -159,14 +153,86 @@ const resolveSnapshotCallback = (arg, sourceCode) => {
   if (!expr) return null;
   if (isFunctionLike(expr)) return expr;
   if (expr.type === "Identifier") {
-    const variable = findVariable(sourceCode, expr);
-    const defNode = variable?.defs?.[0]?.node;
+    const bindingSymbol = findVariable(sourceCode, expr);
+    const defNode = bindingSymbol?.defs?.[0]?.node;
     if (isFunctionLike(defNode)) return defNode;
     const init = unwrapExpression(defNode?.init);
     return isFunctionLike(init) ? init : null;
   }
   return resolveObjectMethodCallback(expr, sourceCode);
 };
+class SnapshotAnalysis {
+  constructor(context) {
+    this.context = context;
+    this.useSyncExternalStoreAliases = new Set();
+    this.reactNamespaces = new Set();
+  }
+  isUseSyncExternalStoreCallee = (callee) => {
+    if (
+      isIdentifier(callee) &&
+      this.useSyncExternalStoreAliases.has(callee.name)
+    ) {
+      return true;
+    }
+    return (
+      callee.type === "MemberExpression" &&
+      callee.computed === false &&
+      isIdentifier(callee.object) &&
+      this.reactNamespaces.has(callee.object.name) &&
+      isIdentifier(callee.property, HOOK_NAME)
+    );
+  };
+
+  onImportDeclaration = (node) => {
+    if (node.source?.value !== REACT_MODULE) {
+      return;
+    }
+    for (const specifier of node.specifiers) {
+      if (
+        specifier.type === "ImportDefaultSpecifier" ||
+        specifier.type === "ImportNamespaceSpecifier"
+      ) {
+        this.reactNamespaces.add(specifier.local.name);
+        continue;
+      }
+      if (
+        specifier.type === "ImportSpecifier" &&
+        getImportedName(specifier) === HOOK_NAME
+      ) {
+        this.useSyncExternalStoreAliases.add(specifier.local.name);
+      }
+    }
+  };
+
+  onCallExpression = (node) => {
+    if (!this.isUseSyncExternalStoreCallee(node.callee)) {
+      return;
+    }
+    for (const index of SNAPSHOT_ARG_INDICES) {
+      const snapshotCallback = resolveSnapshotCallback(
+        node.arguments[index],
+        this.context.sourceCode
+      );
+      if (!snapshotCallback) {
+        continue;
+      }
+      if (
+        snapshotReturnsFreshReference(snapshotCallback, this.context.sourceCode)
+      ) {
+        this.context.report({ node, messageId: "requireStableSnapshot" });
+        return;
+      }
+    }
+  };
+
+  listeners() {
+    return {
+      ImportDeclaration: this.onImportDeclaration,
+      CallExpression: this.onCallExpression,
+    };
+  }
+}
+
 export default {
   meta: {
     type: "problem",
@@ -184,71 +250,6 @@ export default {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-
-    const useSyncExternalStoreAliases = new Set();
-    const reactNamespaces = new Set();
-    const isUseSyncExternalStoreCallee = (callee) => {
-      if (
-        isIdentifier(callee) &&
-        useSyncExternalStoreAliases.has(callee.name)
-      ) {
-        return true;
-      }
-      return (
-        callee.type === "MemberExpression" &&
-        callee.computed === false &&
-        isIdentifier(callee.object) &&
-        reactNamespaces.has(callee.object.name) &&
-        isIdentifier(callee.property, HOOK_NAME)
-      );
-    };
-    if (
-      (() => {
-        useSyncExternalStoreAliases.clear();
-        reactNamespaces.clear();
-      })() === false
-    ) {
-      return {};
-    }
-    return {
-      ImportDeclaration(node) {
-        if (node.source?.value !== REACT_MODULE) {
-          return;
-        }
-        for (const specifier of node.specifiers) {
-          if (
-            specifier.type === "ImportDefaultSpecifier" ||
-            specifier.type === "ImportNamespaceSpecifier"
-          ) {
-            reactNamespaces.add(specifier.local.name);
-            continue;
-          }
-          if (
-            specifier.type === "ImportSpecifier" &&
-            getImportedName(specifier) === HOOK_NAME
-          ) {
-            useSyncExternalStoreAliases.add(specifier.local.name);
-          }
-        }
-      },
-      CallExpression(node) {
-        if (!isUseSyncExternalStoreCallee(node.callee)) {
-          return;
-        }
-        for (const index of SNAPSHOT_ARG_INDICES) {
-          const cb = resolveSnapshotCallback(
-            node.arguments[index],
-            context.sourceCode
-          );
-          if (!cb) {
-            continue;
-          }
-          if (snapshotReturnsFreshReference(cb, context.sourceCode)) {
-            context.report({ node, messageId: "requireStableSnapshot" });
-            return;
-          }
-        }
-      },
-    };
+    return new SnapshotAnalysis(context).listeners();
   },
 };

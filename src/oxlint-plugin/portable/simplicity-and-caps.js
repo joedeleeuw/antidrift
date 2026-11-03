@@ -1,3 +1,5 @@
+import { createBranchChecks } from "./branch-and-ternary-checks.js";
+import { createComponentPropChecks } from "./component-prop-checks.js";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
@@ -5,7 +7,6 @@ import {
   findVariable,
   functionReturnsJsx,
   isFunctionLike,
-  unwrapExpression,
 } from "../shared/scope.js";
 
 function nonBlankLineCount(text) {
@@ -16,24 +17,9 @@ function nonBlankLineCount(text) {
   return count;
 }
 
-function createLineCapRule({
-  unitLabel,
-  warnAbove: defaultWarnAbove,
-  max: defaultMax,
-  filterNode,
-}) {
-  const capSchema = [
-    {
-      type: "object",
-      properties: {
-        ...scopeProperties,
-        max: { type: "number" },
-        warnAbove: { type: "number" },
-      },
-      additionalProperties: false,
-    },
-  ];
-  const baseRule = {
+function createBaseLineCapRule(cap, capSchema) {
+  const { unitLabel, max: defaultMax, filterNode } = cap;
+  return {
     meta: {
       type: "problem",
       schema: capSchema,
@@ -72,7 +58,16 @@ function createLineCapRule({
       };
     },
   };
-  const nearRule = {
+}
+
+function createNearLineCapRule(cap, capSchema) {
+  const {
+    unitLabel,
+    max: defaultMax,
+    warnAbove: defaultWarnAbove,
+    filterNode,
+  } = cap;
+  return {
     meta: {
       type: "suggestion",
       schema: capSchema,
@@ -112,7 +107,35 @@ function createLineCapRule({
       };
     },
   };
-  return { baseRule, nearRule };
+}
+
+function createLineCapRule({
+  unitLabel,
+  warnAbove: defaultWarnAbove,
+  max: defaultMax,
+  filterNode,
+}) {
+  const capSchema = [
+    {
+      type: "object",
+      properties: {
+        ...scopeProperties,
+        max: { type: "number" },
+        warnAbove: { type: "number" },
+      },
+      additionalProperties: false,
+    },
+  ];
+  const cap = {
+    unitLabel,
+    max: defaultMax,
+    warnAbove: defaultWarnAbove,
+    filterNode,
+  };
+  return {
+    baseRule: createBaseLineCapRule(cap, capSchema),
+    nearRule: createNearLineCapRule(cap, capSchema),
+  };
 }
 
 export const moduleLineCaps = createLineCapRule({
@@ -174,278 +197,9 @@ export const reactMaxComponentPropsRule = {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-    const max = context.options[0]?.max ?? 12;
-    const typeDeclarations = new Map();
-
-    function hasWidgetDirective(fnNode) {
-      if (fnNode?.body?.type !== "BlockStatement") return false;
-      for (const stmt of fnNode.body.body) {
-        if (stmt.type !== "ExpressionStatement") break;
-        const dir =
-          stmt.directive ??
-          (stmt.expression?.type === "Literal" &&
-          typeof stmt.expression.value === "string"
-            ? stmt.expression.value
-            : null);
-        if (!dir) break;
-        if (dir === "widget") return true;
-      }
-      return false;
-    }
-
-    function extractOmittedKeys(typeNode, keys = new Set()) {
-      if (
-        typeNode?.type === "TSTypeReference" &&
-        typeNode.typeName?.type === "Identifier" &&
-        typeNode.typeName.name === "Omit"
-      ) {
-        const keyArg = typeNode.typeArguments?.params?.[1];
-        let parts = [];
-        if (keyArg?.type === "TSUnionType") {
-          parts = keyArg.types;
-        } else if (keyArg) {
-          parts = [keyArg];
-        }
-        for (const part of parts) {
-          if (
-            part?.type === "TSLiteralType" &&
-            part.literal?.type === "Literal" &&
-            typeof part.literal.value === "string"
-          ) {
-            keys.add(part.literal.value);
-          }
-        }
-      }
-      return keys;
-    }
-
-    function collectTypePropertyNames(
-      typeNode,
-      names = new Set(),
-      seen = new Set()
-    ) {
-      if (!typeNode) return names;
-      if (typeNode.type === "TSTypeLiteral") {
-        for (const m of typeNode.members) {
-          if (
-            m.type === "TSPropertySignature" &&
-            m.key?.type === "Identifier"
-          ) {
-            names.add(m.key.name);
-          }
-        }
-        return names;
-      }
-      if (typeNode.type === "TSInterfaceBody") {
-        for (const m of typeNode.body) {
-          if (
-            m.type === "TSPropertySignature" &&
-            m.key?.type === "Identifier"
-          ) {
-            names.add(m.key.name);
-          }
-        }
-        return names;
-      }
-      if (typeNode.type === "TSIntersectionType") {
-        const omittedKeys = new Set();
-        for (const part of typeNode.types) {
-          extractOmittedKeys(part, omittedKeys);
-          collectTypePropertyNames(part, names, seen);
-        }
-        for (const key of omittedKeys) {
-          names.delete(key);
-        }
-        return names;
-      }
-      if (
-        typeNode.type === "TSTypeReference" &&
-        typeNode.typeName?.type === "Identifier" &&
-        !seen.has(typeNode.typeName.name)
-      ) {
-        seen.add(typeNode.typeName.name);
-        collectTypePropertyNames(
-          typeDeclarations.get(typeNode.typeName.name),
-          names,
-          seen
-        );
-      }
-      return names;
-    }
-
-    function countTypeMembers(typeNode) {
-      return collectTypePropertyNames(typeNode).size;
-    }
-
-    function checkComponent(node) {
-      if (
-        !functionReturnsJsx(node) ||
-        hasWidgetDirective(node) ||
-        node.params.length === 0 ||
-        node.params.length > 2
-      ) {
-        return;
-      }
-      const first = node.params[0];
-      let propCount = 0;
-      if (first.type === "ObjectPattern") {
-        propCount = first.properties.filter(
-          (p) => p.type === "Property"
-        ).length;
-      }
-      const annotationCount = countTypeMembers(
-        first.typeAnnotation?.typeAnnotation
-      );
-      const total = Math.max(propCount, annotationCount);
-      if (total > max) {
-        context.report({
-          node: first,
-          message: `Component accepts ${total} props (max ${max}); group cohesive props or compose children instead.`,
-        });
-      }
-    }
-
-    return {
-      Program(node) {
-        for (const stmt of node.body) {
-          const decl =
-            stmt.type === "ExportNamedDeclaration" ? stmt.declaration : stmt;
-          if (decl?.type === "TSInterfaceDeclaration" && decl.id?.name) {
-            typeDeclarations.set(decl.id.name, decl.body);
-          } else if (decl?.type === "TSTypeAliasDeclaration" && decl.id?.name) {
-            typeDeclarations.set(decl.id.name, decl.typeAnnotation);
-          }
-        }
-      },
-      FunctionDeclaration: checkComponent,
-      FunctionExpression: checkComponent,
-      ArrowFunctionExpression: checkComponent,
-    };
+    return createComponentPropChecks(context);
   },
 };
-
-const DISCRIMINANT_KEYS = new Set([
-  "kind",
-  "type",
-  "status",
-  "tag",
-  "_tag",
-  "state",
-  "mode",
-  "phase",
-  "variant",
-]);
-
-function isNullishNode(node) {
-  const expr = unwrapExpression(node);
-  return (
-    (expr?.type === "Literal" && expr.value === null) ||
-    (expr?.type === "Identifier" && expr.name === "undefined")
-  );
-}
-
-function extractDiscriminantShred(initNode) {
-  const expr = unwrapExpression(initNode);
-  if (expr?.type !== "ConditionalExpression") return null;
-  if (!isNullishNode(expr.alternate) && !isNullishNode(expr.consequent)) {
-    return null;
-  }
-  const test = unwrapExpression(expr.test);
-  if (
-    test?.type !== "BinaryExpression" ||
-    (test.operator !== "===" && test.operator !== "!==")
-  ) {
-    return null;
-  }
-  let member = null;
-  if (test.left?.type === "MemberExpression") {
-    member = test.left;
-  } else if (test.right?.type === "MemberExpression") {
-    member = test.right;
-  }
-  const literal = member === test.left ? test.right : test.left;
-  if (
-    !member ||
-    member.computed ||
-    member.object?.type !== "Identifier" ||
-    member.property?.type !== "Identifier" ||
-    !DISCRIMINANT_KEYS.has(member.property.name) ||
-    literal?.type !== "Literal" ||
-    typeof literal.value !== "string"
-  ) {
-    return null;
-  }
-  return {
-    baseName: member.object.name,
-    discKey: member.property.name,
-    literalValue: literal.value,
-  };
-}
-
-function testedNullableIdentifier(condNode) {
-  const test = unwrapExpression(condNode.test);
-  let identName = null;
-  if (test?.type === "Identifier") {
-    identName = test.name;
-  } else if (
-    test?.type === "BinaryExpression" &&
-    (test.operator === "!==" || test.operator === "!=") &&
-    test.left?.type === "Identifier" &&
-    isNullishNode(test.right)
-  ) {
-    identName = test.left.name;
-  }
-  if (!identName) return null;
-  const cons = unwrapExpression(condNode.consequent);
-  if (
-    cons?.type === "MemberExpression" &&
-    cons.object?.type === "Identifier" &&
-    cons.object.name === identName
-  ) {
-    return identName;
-  }
-  return null;
-}
-
-function enclosingTernaryScope(node) {
-  for (let cur = node.parent; cur; cur = cur.parent) {
-    if (
-      cur.type === "BlockStatement" ||
-      cur.type === "ObjectExpression" ||
-      cur.type === "JSXElement" ||
-      cur.type === "JSXFragment" ||
-      isFunctionLike(cur) ||
-      cur.type === "Program"
-    ) {
-      return cur;
-    }
-  }
-  return null;
-}
-
-function hasLiteralEqualityTest(test) {
-  if (!test) return false;
-  if (test.type === "LogicalExpression") {
-    return (
-      hasLiteralEqualityTest(test.left) || hasLiteralEqualityTest(test.right)
-    );
-  }
-  if (
-    test.type === "BinaryExpression" &&
-    (test.operator === "===" ||
-      test.operator === "!==" ||
-      test.operator === "==" ||
-      test.operator === "!=")
-  ) {
-    return (
-      test.left?.type === "Literal" ||
-      test.right?.type === "Literal" ||
-      test.left?.type === "TemplateLiteral" ||
-      test.right?.type === "TemplateLiteral"
-    );
-  }
-  return false;
-}
 
 export const noBranchTreeRule = {
   meta: {
@@ -464,87 +218,7 @@ export const noBranchTreeRule = {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-    const scopeCounts = new Map();
-    return {
-      BlockStatement(blockNode) {
-        const byBase = new Map();
-        for (const stmt of blockNode.body) {
-          if (stmt.type !== "VariableDeclaration") continue;
-          for (const decl of stmt.declarations) {
-            if (decl.id?.type !== "Identifier" || !decl.init) continue;
-            const shred = extractDiscriminantShred(decl.init);
-            if (!shred) continue;
-            const key = `${shred.baseName}.${shred.discKey}`;
-            const entry = byBase.get(key) ?? {
-              baseName: shred.baseName,
-              literals: new Set(),
-            };
-            entry.literals.add(shred.literalValue);
-            byBase.set(key, entry);
-            if (entry.literals.size === 2) {
-              context.report({
-                node: decl,
-                message: `Discriminated union '${shred.baseName}' is shredded into parallel nullable bindings; narrow '${shred.baseName}' once via switch or a case table instead.`,
-              });
-            }
-          }
-        }
-      },
-      ConditionalExpression(node) {
-        if (
-          node.parent?.type === "ConditionalExpression" ||
-          node.consequent?.type === "ConditionalExpression" ||
-          node.alternate?.type === "ConditionalExpression"
-        ) {
-          return;
-        }
-        const identName = testedNullableIdentifier(node);
-        if (!identName) return;
-        const container = enclosingTernaryScope(node);
-        if (!container) return;
-        let byIdent = scopeCounts.get(container);
-        if (!byIdent) {
-          byIdent = new Map();
-          scopeCounts.set(container, byIdent);
-        }
-        const count = (byIdent.get(identName) ?? 0) + 1;
-        byIdent.set(identName, count);
-        if (count === 3) {
-          context.report({
-            node,
-            message: `Nullable binding '${identName}' is tested across 3+ ternaries in the same scope; narrow '${identName}' once or use a resolved default object.`,
-          });
-        }
-      },
-      IfStatement(node) {
-        if (
-          node.parent?.type === "IfStatement" &&
-          node.parent.alternate === node
-        ) {
-          return;
-        }
-        let branches = 1;
-        let allLiteralTests = hasLiteralEqualityTest(node.test);
-        let cur = node;
-        while (cur.alternate) {
-          branches += 1;
-          if (cur.alternate.type === "IfStatement") {
-            cur = cur.alternate;
-            if (!hasLiteralEqualityTest(cur.test)) {
-              allLiteralTests = false;
-            }
-          } else {
-            break;
-          }
-        }
-        if (branches >= 5 && allLiteralTests) {
-          context.report({
-            node,
-            message: `Branch tree has ${branches} arms; declare a typed case table instead of chaining if/else branches.`,
-          });
-        }
-      },
-    };
+    return createBranchChecks(context);
   },
 };
 
@@ -571,13 +245,15 @@ export const noMutableLetAliasRule = {
         if (node.kind !== "let") return;
         for (const decl of node.declarations) {
           if (decl.id?.type !== "Identifier" || decl.init !== null) continue;
-          const variable = findVariable(sourceCode, decl.id);
-          if (!variable) continue;
-          const writes = variable.references.filter((r) => r.isWrite());
+          const binding = findVariable(sourceCode, decl.id);
+          if (!binding) continue;
+          const writes = binding.references.filter((reference) =>
+            reference.isWrite()
+          );
           if (
             writes.length >= 2 &&
-            writes.every((w) => {
-              for (let cur = w.identifier?.parent; cur; cur = cur.parent) {
+            writes.every((write) => {
+              for (let cur = write.identifier?.parent; cur; cur = cur.parent) {
                 if (cur.type === "IfStatement") return true;
                 if (
                   isFunctionLike(cur) ||
@@ -625,6 +301,45 @@ function isOwnSliceReexport(stem, stmt) {
   return src.startsWith(`./${stem}.`) || src.startsWith(`./${stem}-`);
 }
 
+function checkReexports(node, stem, context) {
+  if (node.body.length === 0) return;
+  const allReexports = node.body.every(
+    (stmt) =>
+      stmt.type === "ExportAllDeclaration" ||
+      (stmt.type === "ExportNamedDeclaration" &&
+        stmt.source !== null &&
+        stmt.declaration === null)
+  );
+  if (allReexports) {
+    if (node.body.every((stmt) => isOwnSliceReexport(stem, stmt))) {
+      return;
+    }
+    context.report({
+      node,
+      message:
+        "Module only re-exports symbols from other modules; import from the owning module directly.",
+    });
+    return;
+  }
+  for (const stmt of node.body) {
+    if (
+      stmt.type === "ExportNamedDeclaration" &&
+      stmt.declaration === null &&
+      stmt.exportKind !== "type" &&
+      typeof stmt.source?.value === "string" &&
+      stmt.source.value.startsWith("./") &&
+      !isOwnSliceReexport(stem, stmt) &&
+      stmt.specifiers.some((spec) => spec.exportKind !== "type")
+    ) {
+      context.report({
+        node: stmt,
+        message:
+          "Do not re-export runtime symbols from a relative sibling in a non-index module; import from the owning module directly.",
+      });
+    }
+  }
+}
+
 export const noReexportOnlyModuleRule = {
   meta: {
     type: "problem",
@@ -660,42 +375,7 @@ export const noReexportOnlyModuleRule = {
     if (hasPlatformSibling(filename, stem)) return {};
     return {
       Program(node) {
-        if (node.body.length === 0) return;
-        const allReexports = node.body.every(
-          (stmt) =>
-            stmt.type === "ExportAllDeclaration" ||
-            (stmt.type === "ExportNamedDeclaration" &&
-              stmt.source !== null &&
-              stmt.declaration === null)
-        );
-        if (allReexports) {
-          if (node.body.every((stmt) => isOwnSliceReexport(stem, stmt))) {
-            return;
-          }
-          context.report({
-            node,
-            message:
-              "Module only re-exports symbols from other modules; import from the owning module directly.",
-          });
-          return;
-        }
-        for (const stmt of node.body) {
-          if (
-            stmt.type === "ExportNamedDeclaration" &&
-            stmt.declaration === null &&
-            stmt.exportKind !== "type" &&
-            typeof stmt.source?.value === "string" &&
-            stmt.source.value.startsWith("./") &&
-            !isOwnSliceReexport(stem, stmt) &&
-            stmt.specifiers.some((spec) => spec.exportKind !== "type")
-          ) {
-            context.report({
-              node: stmt,
-              message:
-                "Do not re-export runtime symbols from a relative sibling in a non-index module; import from the owning module directly.",
-            });
-          }
-        }
+        checkReexports(node, stem, context);
       },
     };
   },

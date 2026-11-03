@@ -106,8 +106,8 @@ function hasKnownAnnotation(identifiers) {
   return false;
 }
 
-function constInitOfVariable(variable) {
-  const def = variable?.defs?.[0];
+function constInitOfVariable(binding) {
+  const def = binding?.defs?.[0];
   if (def?.type !== "Variable") return null;
   const decl = def.node;
   if (decl?.type !== "VariableDeclarator" || decl.parent?.kind !== "const") {
@@ -122,11 +122,11 @@ function hasKnownValueOrigin(sourceCode, expr, seen = new Set()) {
   if (isKnownEvidenceExpression(expr)) return !isContractFreeLiteral(expr);
   const rootIdent = rootIdentifierOf(expr);
   if (!rootIdent) return false;
-  const variable = findVariable(sourceCode, rootIdent);
-  if (!variable || seen.has(variable)) return false;
-  seen.add(variable);
-  if (hasKnownAnnotation(variable.identifiers)) return true;
-  const init = constInitOfVariable(variable);
+  const binding = findVariable(sourceCode, rootIdent);
+  if (!binding || seen.has(binding)) return false;
+  seen.add(binding);
+  if (hasKnownAnnotation(binding.identifiers)) return true;
+  const init = constInitOfVariable(binding);
   return init ? hasKnownValueOrigin(sourceCode, init, seen) : false;
 }
 
@@ -198,10 +198,10 @@ export const noAppeasementErasureRule = {
         }
         const init = erasedUnknownInitializer(sourceCode, node);
         if (!init) return;
-        const variable = findVariable(sourceCode, node.id);
-        if (!variable) return;
+        const binding = findVariable(sourceCode, node.id);
+        if (!binding) return;
         if (
-          variable.references.some(
+          binding.references.some(
             (ref) => ref.isRead() && isReestablishingRef(ref.identifier)
           )
         ) {
@@ -226,7 +226,7 @@ function isNullableType(typeNode, aliases, seen = new Set()) {
   }
   if (typeNode.type === "TSOptionalType") return true;
   if (typeNode.type === "TSUnionType") {
-    return typeNode.types.some((t) => isNullableType(t, aliases, seen));
+    return typeNode.types.some((type) => isNullableType(type, aliases, seen));
   }
   if (
     typeNode.type === "TSTypeReference" &&
@@ -381,10 +381,11 @@ export const noRedundantTypePredicateRule = {
           ? pred.parameterName.name
           : null;
       if (!paramName) return;
-      const param = node.params.find(
-        (p) => p.type === "Identifier" && p.name === paramName
+      const parameter = node.params.find(
+        (candidate) =>
+          candidate.type === "Identifier" && candidate.name === paramName
       );
-      const paramType = param?.typeAnnotation?.typeAnnotation;
+      const paramType = parameter?.typeAnnotation?.typeAnnotation;
       if (!paramType) return;
       const targetType = pred.typeAnnotation.typeAnnotation;
       if (
@@ -408,13 +409,13 @@ export const noRedundantTypePredicateRule = {
 
 function extractRequiredFields(members) {
   const fields = [];
-  for (const m of members ?? []) {
+  for (const member of members ?? []) {
     if (
-      m.type === "TSPropertySignature" &&
-      !m.optional &&
-      m.key?.type === "Identifier"
+      member.type === "TSPropertySignature" &&
+      !member.optional &&
+      member.key?.type === "Identifier"
     ) {
-      fields.push(m.key.name);
+      fields.push(member.key.name);
     }
   }
   return fields;
@@ -427,10 +428,11 @@ function checkUndercheckedPredicate(node, typeFields, context) {
   const paramName =
     pred.parameterName?.type === "Identifier" ? pred.parameterName.name : null;
   if (!paramName) return;
-  const param = node.params.find(
-    (p) => p.type === "Identifier" && p.name === paramName
+  const parameter = node.params.find(
+    (candidate) =>
+      candidate.type === "Identifier" && candidate.name === paramName
   );
-  if (param?.typeAnnotation?.typeAnnotation?.type !== "TSUnknownKeyword") {
+  if (parameter?.typeAnnotation?.typeAnnotation?.type !== "TSUnknownKeyword") {
     return;
   }
   const target = pred.typeAnnotation?.typeAnnotation;
@@ -451,10 +453,10 @@ function checkUndercheckedPredicate(node, typeFields, context) {
     return;
   }
   const checkedCount = required.filter(
-    (f) =>
-      bodyText.includes(`"${f}"`) ||
-      bodyText.includes(`'${f}'`) ||
-      bodyText.includes(`.${f}`)
+    (field) =>
+      bodyText.includes(`"${field}"`) ||
+      bodyText.includes(`'${field}'`) ||
+      bodyText.includes(`.${field}`)
   ).length;
   if (checkedCount < required.length) {
     context.report({

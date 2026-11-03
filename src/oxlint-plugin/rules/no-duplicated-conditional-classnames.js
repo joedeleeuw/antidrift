@@ -44,8 +44,8 @@ function staticString(node) {
   return null;
 }
 
-function classTokens(value) {
-  return value.trim().split(/\s+/u).filter(Boolean);
+function classTokens(classText) {
+  return classText.trim().split(/\s+/u).filter(Boolean);
 }
 
 function uniqueTokens(tokens) {
@@ -74,8 +74,12 @@ function jsxAttributeName(node) {
   return "";
 }
 
-function isRecord(value) {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+function isRecord(candidate) {
+  return (
+    Boolean(candidate) &&
+    typeof candidate === "object" &&
+    !Array.isArray(candidate)
+  );
 }
 
 function invalidOptions(message) {
@@ -96,30 +100,29 @@ function requireOption(options, key) {
 }
 
 function uniqueStringList(options, key) {
-  const value = requireOption(options, key);
+  const entries = requireOption(options, key);
   if (
-    !Array.isArray(value) ||
-    value.some((item) => typeof item !== "string" || item.length === 0)
+    !Array.isArray(entries) ||
+    entries.some((entry) => typeof entry !== "string" || entry.length === 0)
   ) {
     invalidOptions(`'${key}' must be an array of non-empty strings.`);
   }
-  const unique = new Set(value);
-  if (unique.size !== value.length) {
+  const unique = new Set(entries);
+  if (unique.size !== entries.length) {
     invalidOptions(`'${key}' must not contain duplicate entries.`);
   }
   return [...unique];
 }
 
-function boundedNumber(options, key, predicate, description) {
-  const value = requireOption(options, key);
+function boundedNumber(rawNumber, key, predicate, description) {
   if (
-    typeof value !== "number" ||
-    !Number.isFinite(value) ||
-    !predicate(value)
+    typeof rawNumber !== "number" ||
+    !Number.isFinite(rawNumber) ||
+    !predicate(rawNumber)
   ) {
     invalidOptions(`'${key}' must be ${description}.`);
   }
-  return value;
+  return rawNumber;
 }
 
 function normalizeOptionShape(options) {
@@ -128,15 +131,15 @@ function normalizeOptionShape(options) {
     attributeNames: new Set(uniqueStringList(options, "attributes")),
     helperNames: new Set(uniqueStringList(options, "helpers")),
     minSharedRatio: boundedNumber(
-      options,
+      requireOption(options, "minSharedRatio"),
       "minSharedRatio",
-      (value) => value >= 0 && value <= 1,
+      (ratio) => ratio >= 0 && ratio <= 1,
       "between 0 and 1"
     ),
     minSharedTokens: boundedNumber(
-      options,
+      requireOption(options, "minSharedTokens"),
       "minSharedTokens",
-      (value) => Number.isInteger(value) && value >= 1,
+      (tokenCount) => Number.isInteger(tokenCount) && tokenCount >= 1,
       "an integer greater than or equal to 1"
     ),
   };
@@ -173,8 +176,6 @@ function isWithinClassAttributeExpression(node, options) {
   return false;
 }
 
-// Class helpers accept nested arrays, objects and spreads (`cn([a, { b: c }])`),
-// so climb through those wrappers to the enclosing call's argument list.
 function classValueWrapperParent(node) {
   const parent = node.parent;
   if (parent?.type === "ArrayExpression") return parent;
@@ -211,9 +212,9 @@ function isClassStringContext(node, options) {
   );
 }
 
-function overlapEvidence(leftValue, rightValue, options) {
-  const leftTokens = uniqueTokens(classTokens(leftValue));
-  const rightTokens = uniqueTokens(classTokens(rightValue));
+function overlapEvidence(consequentClass, alternateClass, options) {
+  const leftTokens = uniqueTokens(classTokens(consequentClass));
+  const rightTokens = uniqueTokens(classTokens(alternateClass));
   if (leftTokens.length === 0 || rightTokens.length === 0) return null;
 
   const rightSet = new Set(rightTokens);
@@ -233,6 +234,35 @@ function overlapEvidence(leftValue, rightValue, options) {
   };
 }
 
+const ruleSchema = [
+  {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      ...scopeProperties,
+      attributes: {
+        type: "array",
+        items: { type: "string", minLength: 1 },
+        uniqueItems: true,
+      },
+      helpers: {
+        type: "array",
+        items: { type: "string", minLength: 1 },
+        uniqueItems: true,
+      },
+      minSharedRatio: {
+        type: "number",
+        minimum: 0,
+        maximum: 1,
+      },
+      minSharedTokens: {
+        type: "integer",
+        minimum: 1,
+      },
+    },
+  },
+];
+
 export default function ruleNoDuplicatedConditionalClassnames() {
   return {
     meta: {
@@ -241,34 +271,7 @@ export default function ruleNoDuplicatedConditionalClassnames() {
         description:
           "Disallow conditional class strings that duplicate the same base class list in both branches",
       },
-      schema: [
-        {
-          type: "object",
-          additionalProperties: false,
-          properties: {
-            ...scopeProperties,
-            attributes: {
-              type: "array",
-              items: { type: "string", minLength: 1 },
-              uniqueItems: true,
-            },
-            helpers: {
-              type: "array",
-              items: { type: "string", minLength: 1 },
-              uniqueItems: true,
-            },
-            minSharedRatio: {
-              type: "number",
-              minimum: 0,
-              maximum: 1,
-            },
-            minSharedTokens: {
-              type: "integer",
-              minimum: 1,
-            },
-          },
-        },
-      ],
+      schema: ruleSchema,
       messages: {
         duplicatedConditionalClassnames:
           "Conditional class strings share {{count}} class tokens ({{shared}}). Hoist the shared class list and keep only the differing tokens conditional.",
@@ -280,14 +283,15 @@ export default function ruleNoDuplicatedConditionalClassnames() {
       return {
         ConditionalExpression(node) {
           if (!isClassStringContext(node, options)) return;
-
-          const leftValue = staticString(node.consequent);
-          const rightValue = staticString(node.alternate);
-          if (leftValue == null || rightValue == null) return;
-
-          const evidence = overlapEvidence(leftValue, rightValue, options);
+          const consequentClass = staticString(node.consequent);
+          const alternateClass = staticString(node.alternate);
+          if (consequentClass == null || alternateClass == null) return;
+          const evidence = overlapEvidence(
+            consequentClass,
+            alternateClass,
+            options
+          );
           if (!evidence) return;
-
           context.report({
             node,
             messageId: "duplicatedConditionalClassnames",

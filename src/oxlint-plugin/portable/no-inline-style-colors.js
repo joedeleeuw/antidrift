@@ -5,11 +5,11 @@ const HEX_IN_STRING = /#[0-9a-f]{3,8}\b/i;
 const COLOR_FUNC_IN_STRING = /\b(?:rgb|rgba|hsl|hsla)\s*\(/i;
 const NAMED_COLOR_PATTERN = /\b(?:white|black|red|blue|green|gray|grey)\b/i;
 const CSS_PROP_FALSE_POSITIVES = /\bwhite-space\b/gi;
-function isSafe(value) {
-  if (value.startsWith("var(")) {
+function isSafe(cssText) {
+  if (cssText.startsWith("var(")) {
     return true;
   }
-  const lower = value.toLowerCase().trim();
+  const lower = cssText.toLowerCase().trim();
   if (
     lower === "transparent" ||
     lower === "inherit" ||
@@ -23,33 +23,33 @@ function isSafe(value) {
   }
   return false;
 }
-function stripVarExpressions(value) {
-  let result = "";
+function stripVarExpressions(cssText) {
+  let strippedCss = "";
   let i = 0;
-  while (i < value.length) {
-    if (value[i] === "v" && value.slice(i, i + 4) === "var(") {
+  while (i < cssText.length) {
+    if (cssText[i] === "v" && cssText.slice(i, i + 4) === "var(") {
       let depth = 1;
       i += 4;
-      while (i < value.length && depth > 0) {
-        if (value[i] === "(") {
+      while (i < cssText.length && depth > 0) {
+        if (cssText[i] === "(") {
           depth++;
-        } else if (value[i] === ")") {
+        } else if (cssText[i] === ")") {
           depth--;
         }
         i++;
       }
     } else {
-      result += value[i];
+      strippedCss += cssText[i];
       i++;
     }
   }
-  return result;
+  return strippedCss;
 }
-function containsHardcodedColor(value) {
-  if (isSafe(value)) {
+function containsHardcodedColor(cssText) {
+  if (isSafe(cssText)) {
     return null;
   }
-  const stripped = stripVarExpressions(value);
+  const stripped = stripVarExpressions(cssText);
   const hexMatch = HEX_IN_STRING.exec(stripped);
   if (hexMatch) {
     return hexMatch[0];
@@ -65,14 +65,17 @@ function containsHardcodedColor(value) {
   }
   return null;
 }
-function getStaticStyleValue(value) {
-  if (value.type === "Literal" && typeof value.value === "string") {
-    return value.value;
+function getStaticStyleText(expression) {
+  if (expression.type === "Literal" && typeof expression.value === "string") {
+    return expression.value;
   }
-  if (value.type !== "TemplateLiteral" || value.expressions.length > 0) {
+  if (
+    expression.type !== "TemplateLiteral" ||
+    expression.expressions.length > 0
+  ) {
     return undefined;
   }
-  const quasi = value.quasis.at(0);
+  const quasi = expression.quasis.at(0);
   return quasi?.value.cooked ?? quasi?.value.raw;
 }
 const isObjectExpression = (node) =>
@@ -97,22 +100,22 @@ export default {
   create(context) {
     if (!isRuleFile(context)) return {};
 
-    const checkStyleObject = (styleObject) => {
-      for (const property of styleObject.properties) {
+    const checkStyleProperties = (styleExpression) => {
+      for (const property of styleExpression.properties) {
         if (property.type !== "Property") {
           continue;
         }
-        const value = property.value;
-        const staticValue = getStaticStyleValue(value);
-        if (staticValue === undefined) {
+        const initializer = property.value;
+        const staticCss = getStaticStyleText(initializer);
+        if (staticCss === undefined) {
           continue;
         }
-        const match = containsHardcodedColor(staticValue);
+        const match = containsHardcodedColor(staticCss);
         if (match === null) {
           continue;
         }
         context.report({
-          node: value,
+          node: initializer,
           messageId: "inlineColor",
           data: {
             match,
@@ -132,7 +135,7 @@ export default {
         }
         const expression = unwrapExpression(node.value.expression);
         if (isObjectExpression(expression)) {
-          checkStyleObject(expression);
+          checkStyleProperties(expression);
         }
       },
     };

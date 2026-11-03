@@ -8,17 +8,21 @@ import {
 } from "./ast.js";
 
 const GLOBAL_ROOTS = ["window", "globalThis", "self"];
-const stringsFrom = (value) =>
-  Array.isArray(value) ? value.filter((item) => typeof item === "string") : [];
+const stringsFrom = (candidates) =>
+  Array.isArray(candidates)
+    ? candidates.filter((candidate) => typeof candidate === "string")
+    : [];
 const allowedPathsFrom = (entry, enforcement) => {
   const owner = stringsFrom(entry.owner);
   const allowed = enforcement.allowed;
   const allowedPaths = Array.isArray(allowed)
     ? allowed
-        .map((item) =>
-          typeof item === "object" && item !== null ? item.path : undefined
+        .map((candidate) =>
+          typeof candidate === "object" && candidate !== null
+            ? candidate.path
+            : undefined
         )
-        .filter((item) => typeof item === "string")
+        .filter((candidate) => typeof candidate === "string")
     : [];
   return [...owner, ...allowedPaths];
 };
@@ -87,7 +91,7 @@ const isOwnedSpecifier = (specifiers, source) => {
     );
   });
 };
-const isGlobalObject = (node, object) =>
+const isGlobalRoot = (node, object) =>
   isIdentifier(node, object) ||
   GLOBAL_ROOTS.some((root) => isMemberAccess(node, root, object));
 const isMemberStep = (node, segment) =>
@@ -103,7 +107,19 @@ const isOwnedMemberPath = (node, object, memberPath) => {
     }
     current = current.object;
   }
-  return isGlobalObject(current, object);
+  return isGlobalRoot(current, object);
+};
+const reportUnownedUse = (context, node, entry) => {
+  context.report({
+    node,
+    messageId: "unownedUse",
+    data: {
+      id: entry.id,
+      owner: entry.owner,
+      registry:
+        context.options[0]?.registry ?? "this rule’s entries configuration",
+    },
+  });
 };
 export default {
   meta: {
@@ -175,60 +191,29 @@ export default {
   create(context) {
     if (!isRuleFile(context)) return {};
 
-    let configured = null;
-    let activeImports = [];
-    let activeGlobalMembers = [];
-    if (
-      (() => {
-        const filename = filenameForContext(context);
-        configured ??= configuredEntries(context);
-        const { importEntries, globalMemberEntries } = configured;
-        const applies = (entry) =>
-          !entry.paths.some((allowedPath) => coversFile(allowedPath, filename));
-        activeImports = importEntries.filter(applies);
-        activeGlobalMembers = globalMemberEntries.filter(applies);
-        return activeImports.length > 0 || activeGlobalMembers.length > 0;
-      })() === false
-    ) {
+    const filename = filenameForContext(context);
+    const { importEntries, globalMemberEntries } = configuredEntries(context);
+    const applies = (entry) =>
+      !entry.paths.some((allowedPath) => coversFile(allowedPath, filename));
+    const activeImports = importEntries.filter(applies);
+    const activeGlobalMembers = globalMemberEntries.filter(applies);
+    if (activeImports.length === 0 && activeGlobalMembers.length === 0) {
       return {};
     }
-    return {
-      ImportDeclaration(node) {
-        for (const entry of activeImports) {
-          if (isOwnedSpecifier(entry.specifiers, node.source.value)) {
-            context.report({
-              node,
-              messageId: "unownedUse",
-              data: {
-                id: entry.id,
-                owner: entry.owner,
-                registry:
-                  context.options[0]?.registry ??
-                  "this rule’s entries configuration",
-              },
-            });
-          }
+    const inspectImport = (node) => {
+      for (const entry of activeImports) {
+        if (isOwnedSpecifier(entry.specifiers, node.source.value)) {
+          reportUnownedUse(context, node, entry);
         }
-      },
+      }
+    };
+    return {
+      ImportDeclaration: inspectImport,
       ImportExpression(node) {
         if (!isAstNode(node.source) || !isStringLiteral(node.source)) {
           return;
         }
-        for (const entry of activeImports) {
-          if (isOwnedSpecifier(entry.specifiers, node.source.value)) {
-            context.report({
-              node,
-              messageId: "unownedUse",
-              data: {
-                id: entry.id,
-                owner: entry.owner,
-                registry:
-                  context.options[0]?.registry ??
-                  "this rule’s entries configuration",
-              },
-            });
-          }
-        }
+        inspectImport(node);
       },
       MemberExpression(node) {
         if (node.computed) {
@@ -236,17 +221,7 @@ export default {
         }
         for (const entry of activeGlobalMembers) {
           if (isOwnedMemberPath(node, entry.object, entry.memberPath)) {
-            context.report({
-              node,
-              messageId: "unownedUse",
-              data: {
-                id: entry.id,
-                owner: entry.owner,
-                registry:
-                  context.options[0]?.registry ??
-                  "this rule’s entries configuration",
-              },
-            });
+            reportUnownedUse(context, node, entry);
           }
         }
       },

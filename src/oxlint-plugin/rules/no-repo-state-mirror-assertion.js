@@ -272,6 +272,181 @@ function sourceFileReadCallName(callNode, sourceCode) {
     : null;
 }
 
+const repoStateMirrorSchema = [
+  {
+    type: "object",
+    properties: {
+      sources: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            module: { type: "string" },
+            names: {
+              type: "array",
+              items: { type: "string" },
+            },
+          },
+          required: ["module"],
+          additionalProperties: false,
+        },
+      },
+    },
+    additionalProperties: false,
+  },
+];
+
+function sourceForImport(sources, moduleSpecifier, importedName) {
+  for (const source of sources) {
+    if (!moduleSpecifier.includes(source.module)) continue;
+    if (!source.names || source.names.includes(importedName)) {
+      return importedName;
+    }
+  }
+  return null;
+}
+
+function definitionIsTainted(
+  def,
+  resolvedBinding,
+  taintedImports,
+  taintRootName
+) {
+  if (def.type === "ImportBinding") {
+    return taintedImports.has(resolvedBinding.name);
+  }
+  if (def.type === "Variable" && def.node.type === "VariableDeclarator") {
+    if (def.node.init && taintRootName(def.node.init) !== null) return true;
+    const loop = def.node.parent?.parent;
+    return (
+      loop?.type === "ForOfStatement" &&
+      loop.left === def.node.parent &&
+      taintRootName(loop.right) !== null
+    );
+  }
+  if (def.type === "Parameter") {
+    const callbackFn = def.node;
+    const call = callbackFn.parent;
+    return (
+      call?.type === "CallExpression" &&
+      call.arguments.includes(callbackFn) &&
+      call.callee.type === "MemberExpression" &&
+      taintRootName(call.callee.object) !== null
+    );
+  }
+  return false;
+}
+
+function literalKeyedSourceCall(node, taintedImports) {
+  const target = unwrap(node);
+  if (!target) return null;
+  if (target.type === "CallExpression") {
+    const callee = unwrap(target.callee);
+    if (
+      callee.type === "Identifier" &&
+      taintedImports.has(callee.name) &&
+      target.arguments.length > 0 &&
+      target.arguments.every((argument) => isLiteralLike(argument))
+    ) {
+      return callee.name;
+    }
+    return literalKeyedSourceCall(target.callee, taintedImports);
+  }
+  return target.type === "MemberExpression"
+    ? literalKeyedSourceCall(target.object, taintedImports)
+    : null;
+}
+
+function createTaintTracker(sourceCode, taintedImports) {
+  const taintCache = new Map();
+
+  function bindingIsTainted(resolvedBinding) {
+    if (taintCache.has(resolvedBinding)) return taintCache.get(resolvedBinding);
+    taintCache.set(resolvedBinding, false);
+    const tainted = (resolvedBinding.defs ?? []).some((def) =>
+      definitionIsTainted(def, resolvedBinding, taintedImports, taintRootName)
+    );
+    taintCache.set(resolvedBinding, tainted);
+    return tainted;
+  }
+
+  function taintRootName(node) {
+    const target = unwrap(node);
+    if (!target) return null;
+    switch (target.type) {
+      case "Identifier": {
+        const resolvedBinding = findVariable(sourceCode, target);
+        if (!resolvedBinding) return null;
+        if (taintedImports.has(target.name)) return target.name;
+        return bindingIsTainted(resolvedBinding) ? target.name : null;
+      }
+      case "CallExpression":
+        return (
+          sourceFileReadCallName(target, sourceCode) ??
+          taintRootName(target.callee)
+        );
+      case "MemberExpression":
+        return taintRootName(target.object);
+      case "ConditionalExpression":
+        return (
+          taintRootName(target.consequent) ?? taintRootName(target.alternate)
+        );
+      case "LogicalExpression":
+        return taintRootName(target.left) ?? taintRootName(target.right);
+      default:
+        return null;
+    }
+  }
+
+  return {
+    taintRootName,
+    literalKeyedSourceCall: (node) =>
+      literalKeyedSourceCall(node, taintedImports),
+  };
+}
+
+function checkMatcherCall(node, context, tracker) {
+  if (
+    node.callee.type !== "MemberExpression" ||
+    node.callee.computed ||
+    node.callee.property.type !== "Identifier"
+  ) {
+    return;
+  }
+  const matcher = node.callee.property.name;
+  const isEquality = EQUALITY_MATCHERS.has(matcher);
+  const isExistence = EXISTENCE_MATCHERS.has(matcher);
+  if (!isEquality && !isExistence) return;
+
+  const expectCall = expectCallOf(node.callee);
+  if (!expectCall) return;
+  const subject = expectCall.arguments[0];
+
+  if (isEquality) {
+    const isSnapshot = SNAPSHOT_MATCHERS.has(matcher);
+    if (!isSnapshot && node.arguments.length === 0) return;
+    if (!node.arguments.every((argument) => isLiteralLike(argument))) return;
+    const name = tracker.taintRootName(subject);
+    if (name) {
+      context.report({
+        node,
+        messageId: "mirroredLiteral",
+        data: { name },
+      });
+    }
+    return;
+  }
+
+  const pinned = tracker.literalKeyedSourceCall(subject);
+  if (pinned) {
+    context.report({
+      node,
+      messageId: "pinnedLookup",
+      data: { name: pinned },
+    });
+  }
+}
+
 export default function ruleNoRepoStateMirrorAssertion() {
   return {
     meta: {
@@ -280,29 +455,7 @@ export default function ruleNoRepoStateMirrorAssertion() {
         description:
           "Disallow test assertions that mirror repo-owned state (confs, manifests, registries, or source files read from disk) as literals instead of asserting behavior or invariants.",
       },
-      schema: [
-        {
-          type: "object",
-          properties: {
-            sources: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  module: { type: "string" },
-                  names: {
-                    type: "array",
-                    items: { type: "string" },
-                  },
-                },
-                required: ["module"],
-                additionalProperties: false,
-              },
-            },
-          },
-          additionalProperties: false,
-        },
-      ],
+      schema: repoStateMirrorSchema,
       messages: {
         mirroredLiteral:
           'This assertion mirrors repo-owned state loaded through "{{name}}" against a literal. It restates values the repo already defines and breaks on every legitimate tune. Assert an invariant or behavior, or arrange the data as a fixture the test owns.',
@@ -313,115 +466,9 @@ export default function ruleNoRepoStateMirrorAssertion() {
     create(context) {
       if (!isTestFilename(contextFilename(context))) return {};
       const sources = context.options?.[0]?.sources ?? [];
-
       const sourceCode = context.sourceCode ?? context.getSourceCode?.();
       const taintedImports = new Map();
-      const taintCache = new Map();
-
-      function sourceForImport(moduleSpecifier, importedName) {
-        for (const source of sources) {
-          if (!moduleSpecifier.includes(source.module)) continue;
-          if (!source.names || source.names.includes(importedName)) {
-            return importedName;
-          }
-        }
-        return null;
-      }
-
-      function bindingIsTainted(resolvedBinding) {
-        if (taintCache.has(resolvedBinding)) {
-          return taintCache.get(resolvedBinding);
-        }
-        taintCache.set(resolvedBinding, false);
-
-        let tainted = false;
-        for (const def of resolvedBinding.defs ?? []) {
-          if (def.type === "ImportBinding") {
-            tainted = taintedImports.has(resolvedBinding.name);
-          } else if (
-            def.type === "Variable" &&
-            def.node.type === "VariableDeclarator"
-          ) {
-            if (def.node.init) {
-              tainted = expressionIsTainted(def.node.init);
-            }
-            if (
-              !tainted &&
-              def.node.parent?.parent?.type === "ForOfStatement" &&
-              def.node.parent.parent.left === def.node.parent
-            ) {
-              tainted = expressionIsTainted(def.node.parent.parent.right);
-            }
-          } else if (def.type === "Parameter") {
-            const callbackFn = def.node;
-            const call = callbackFn.parent;
-            if (
-              call?.type === "CallExpression" &&
-              call.arguments.includes(callbackFn) &&
-              call.callee.type === "MemberExpression"
-            ) {
-              tainted = expressionIsTainted(call.callee.object);
-            }
-          }
-          if (tainted) break;
-        }
-        taintCache.set(resolvedBinding, tainted);
-        return tainted;
-      }
-
-      function expressionIsTainted(node) {
-        return taintRootName(node) !== null;
-      }
-
-      function taintRootName(node) {
-        const target = unwrap(node);
-        if (!target) return null;
-        switch (target.type) {
-          case "Identifier": {
-            const resolvedBinding = findVariable(sourceCode, target);
-            if (!resolvedBinding) return null;
-            if (taintedImports.has(target.name)) return target.name;
-            return bindingIsTainted(resolvedBinding) ? target.name : null;
-          }
-          case "CallExpression":
-            return (
-              sourceFileReadCallName(target, sourceCode) ??
-              taintRootName(target.callee)
-            );
-          case "MemberExpression":
-            return taintRootName(target.object);
-          case "ConditionalExpression":
-            return (
-              taintRootName(target.consequent) ??
-              taintRootName(target.alternate)
-            );
-          case "LogicalExpression":
-            return taintRootName(target.left) ?? taintRootName(target.right);
-          default:
-            return null;
-        }
-      }
-
-      function literalKeyedSourceCall(node) {
-        const target = unwrap(node);
-        if (!target) return null;
-        if (target.type === "CallExpression") {
-          const callee = unwrap(target.callee);
-          if (
-            callee.type === "Identifier" &&
-            taintedImports.has(callee.name) &&
-            target.arguments.length > 0 &&
-            target.arguments.every((argument) => isLiteralLike(argument))
-          ) {
-            return callee.name;
-          }
-          return literalKeyedSourceCall(target.callee);
-        }
-        if (target.type === "MemberExpression") {
-          return literalKeyedSourceCall(target.object);
-        }
-        return null;
-      }
+      const tracker = createTaintTracker(sourceCode, taintedImports);
 
       return {
         ImportDeclaration(node) {
@@ -434,54 +481,18 @@ export default function ruleNoRepoStateMirrorAssertion() {
               specifier.imported.type === "Identifier"
                 ? specifier.imported.name
                 : specifier.local.name;
-            const matched = sourceForImport(moduleSpecifier, importedName);
+            const matched = sourceForImport(
+              sources,
+              moduleSpecifier,
+              importedName
+            );
             if (matched) {
               taintedImports.set(specifier.local.name, matched);
             }
           }
         },
         CallExpression(node) {
-          if (
-            node.callee.type !== "MemberExpression" ||
-            node.callee.computed ||
-            node.callee.property.type !== "Identifier"
-          ) {
-            return;
-          }
-          const matcher = node.callee.property.name;
-          const isEquality = EQUALITY_MATCHERS.has(matcher);
-          const isExistence = EXISTENCE_MATCHERS.has(matcher);
-          if (!isEquality && !isExistence) return;
-
-          const expectCall = expectCallOf(node.callee);
-          if (!expectCall) return;
-          const subject = expectCall.arguments[0];
-
-          if (isEquality) {
-            const isSnapshot = SNAPSHOT_MATCHERS.has(matcher);
-            if (!isSnapshot && node.arguments.length === 0) return;
-            if (!node.arguments.every((argument) => isLiteralLike(argument))) {
-              return;
-            }
-            const name = taintRootName(subject);
-            if (name) {
-              context.report({
-                node,
-                messageId: "mirroredLiteral",
-                data: { name },
-              });
-            }
-            return;
-          }
-
-          const pinned = literalKeyedSourceCall(subject);
-          if (pinned) {
-            context.report({
-              node,
-              messageId: "pinnedLookup",
-              data: { name: pinned },
-            });
-          }
+          checkMatcherCall(node, context, tracker);
         },
       };
     },

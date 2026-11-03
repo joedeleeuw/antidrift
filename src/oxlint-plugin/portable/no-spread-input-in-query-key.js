@@ -37,7 +37,7 @@ const isLeakySpread = (element) => {
   }
   return !isAllowedCompositionSpread(element.argument);
 };
-const isExplicitObjectSpreadValue = (node) => {
+const isExplicitObjectSpread = (node) => {
   const unwrapped = unwrapExpression(node);
   if (!unwrapped || typeof unwrapped.type !== "string") {
     return false;
@@ -48,25 +48,25 @@ const isExplicitObjectSpreadValue = (node) => {
     }
     return unwrapped.properties.every((property) => {
       if (property?.type === "SpreadElement") {
-        return isExplicitObjectSpreadValue(property.argument);
+        return isExplicitObjectSpread(property.argument);
       }
       return property?.computed !== true;
     });
   }
   if (unwrapped.type === "LogicalExpression" && unwrapped.operator === "&&") {
-    return isExplicitObjectSpreadValue(unwrapped.right);
+    return isExplicitObjectSpread(unwrapped.right);
   }
   if (unwrapped.type === "ConditionalExpression") {
     return (
-      isExplicitObjectSpreadValue(unwrapped.consequent) &&
-      isExplicitObjectSpreadValue(unwrapped.alternate)
+      isExplicitObjectSpread(unwrapped.consequent) &&
+      isExplicitObjectSpread(unwrapped.alternate)
     );
   }
   return false;
 };
 const isLeakyObjectSpread = (property) =>
   property?.type === "SpreadElement" &&
-  !isExplicitObjectSpreadValue(property.argument);
+  !isExplicitObjectSpread(property.argument);
 const startsBefore = (candidate, node) => {
   const candidateStart = candidate?.loc?.start;
   const nodeStart = node?.loc?.start;
@@ -128,7 +128,7 @@ const parentAfterExpressionWrappers = (node) => {
   }
   return current;
 };
-const isInsideKeysFactoryObject = (objectExpression) => {
+const isInsideKeysFactory = (objectExpression) => {
   let current = objectExpression;
   while (current?.type === "ObjectExpression") {
     const owner = parentAfterExpressionWrappers(current);
@@ -139,11 +139,11 @@ const isInsideKeysFactoryObject = (objectExpression) => {
     if (owner?.type !== "Property") {
       return false;
     }
-    const parentObject = owner.parent;
-    if (parentObject?.type !== "ObjectExpression") {
+    const parentExpression = owner.parent;
+    if (parentExpression?.type !== "ObjectExpression") {
       return false;
     }
-    current = parentObject;
+    current = parentExpression;
   }
   return false;
 };
@@ -169,8 +169,115 @@ const isQueryKeyFactoryReturn = (arrayNode) => {
   if (objectExpression?.type !== "ObjectExpression") {
     return false;
   }
-  return isInsideKeysFactoryObject(objectExpression);
+  return isInsideKeysFactory(objectExpression);
 };
+class QueryKeySpreadAnalysis {
+  constructor(context) {
+    this.context = context;
+    this.swrKeyHooks = new Set(["useSWR", "useSWRImmutable", "useSWRMutation"]);
+  }
+  reportLeakySpreads = (node) => {
+    const expression = unwrapExpression(node);
+    if (!expression || typeof expression.type !== "string") {
+      return;
+    }
+    if (
+      expression.type === "LogicalExpression" &&
+      expression.operator === "&&"
+    ) {
+      this.reportLeakySpreads(expression.right);
+      return;
+    }
+    if (expression.type === "ConditionalExpression") {
+      this.reportLeakySpreads(expression.consequent);
+      this.reportLeakySpreads(expression.alternate);
+      return;
+    }
+    if (expression.type === "ArrayExpression") {
+      const elements = Array.isArray(expression.elements)
+        ? expression.elements
+        : [];
+      for (const element of elements) {
+        if (isLeakySpread(element)) {
+          this.context.report({
+            node: element,
+            messageId: "spreadInputInQueryKey",
+          });
+          continue;
+        }
+        this.reportLeakySpreads(element);
+      }
+      return;
+    }
+    if (expression.type !== "ObjectExpression") {
+      return;
+    }
+    this.reportObjectSpreads(expression);
+  };
+
+  reportObjectSpreads = (expression) => {
+    const properties = Array.isArray(expression.properties)
+      ? expression.properties
+      : [];
+    for (const property of properties) {
+      if (isLeakyObjectSpread(property)) {
+        this.context.report({
+          node: property,
+          messageId: "spreadInputInQueryKey",
+        });
+        continue;
+      }
+      if (property?.type === "SpreadElement") {
+        this.reportLeakySpreads(property.argument);
+        continue;
+      }
+      if (property?.type === "Property") {
+        this.reportLeakySpreads(property.value);
+      }
+    }
+  };
+
+  onProperty = (node) => {
+    if (getPropertyName(node.key) !== "queryKey") {
+      return;
+    }
+    const expression = unwrapExpression(node.value);
+    if (isIdentifier(expression)) {
+      this.reportLeakySpreads(findVisibleConstInitializer(expression));
+      return;
+    }
+    this.reportLeakySpreads(expression);
+  };
+
+  onArrayExpression = (node) => {
+    if (!isQueryKeyFactoryReturn(node)) {
+      return;
+    }
+    this.reportLeakySpreads(node);
+  };
+
+  onCallExpression = (node) => {
+    const callee = unwrapExpression(node.callee);
+    if (!isIdentifier(callee) || !this.swrKeyHooks.has(callee.name)) {
+      return;
+    }
+    const keyArg = unwrapExpression(node.arguments?.at(0));
+    if (isIdentifier(keyArg)) {
+      this.reportLeakySpreads(findVisibleConstInitializer(keyArg));
+      return;
+    }
+    this.reportLeakySpreads(keyArg);
+  };
+
+  listeners() {
+    return {
+      Property: this.onProperty,
+      ArrayExpression: this.onArrayExpression,
+      CallExpression: this.onCallExpression,
+    };
+  }
+}
+
 export default {
   meta: {
     schema: [
@@ -194,93 +301,6 @@ export default {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-
-    const reportLeakyValue = (node) => {
-      const value = unwrapExpression(node);
-      if (!value || typeof value.type !== "string") {
-        return;
-      }
-      if (value.type === "LogicalExpression" && value.operator === "&&") {
-        reportLeakyValue(value.right);
-        return;
-      }
-      if (value.type === "ConditionalExpression") {
-        reportLeakyValue(value.consequent);
-        reportLeakyValue(value.alternate);
-        return;
-      }
-      if (value.type === "ArrayExpression") {
-        const elements = Array.isArray(value.elements) ? value.elements : [];
-        for (const element of elements) {
-          if (isLeakySpread(element)) {
-            context.report({
-              node: element,
-              messageId: "spreadInputInQueryKey",
-            });
-            continue;
-          }
-          reportLeakyValue(element);
-        }
-        return;
-      }
-      if (value.type !== "ObjectExpression") {
-        return;
-      }
-      const properties = Array.isArray(value.properties)
-        ? value.properties
-        : [];
-      for (const property of properties) {
-        if (isLeakyObjectSpread(property)) {
-          context.report({
-            node: property,
-            messageId: "spreadInputInQueryKey",
-          });
-          continue;
-        }
-        if (property?.type === "SpreadElement") {
-          reportLeakyValue(property.argument);
-          continue;
-        }
-        if (property?.type === "Property") {
-          reportLeakyValue(property.value);
-        }
-      }
-    };
-    const swrKeyHooks = new Set([
-      "useSWR",
-      "useSWRImmutable",
-      "useSWRMutation",
-    ]);
-    return {
-      Property(node) {
-        if (getPropertyName(node.key) !== "queryKey") {
-          return;
-        }
-        const value = unwrapExpression(node.value);
-        if (isIdentifier(value)) {
-          reportLeakyValue(findVisibleConstInitializer(value));
-          return;
-        }
-        reportLeakyValue(value);
-      },
-      ArrayExpression(node) {
-        if (!isQueryKeyFactoryReturn(node)) {
-          return;
-        }
-        reportLeakyValue(node);
-      },
-      CallExpression(node) {
-        const callee = unwrapExpression(node.callee);
-        if (!isIdentifier(callee) || !swrKeyHooks.has(callee.name)) {
-          return;
-        }
-        const keyArg = unwrapExpression(node.arguments?.at(0));
-        if (isIdentifier(keyArg)) {
-          reportLeakyValue(findVisibleConstInitializer(keyArg));
-          return;
-        }
-        reportLeakyValue(keyArg);
-      },
-    };
+    return new QueryKeySpreadAnalysis(context).listeners();
   },
 };

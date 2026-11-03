@@ -179,11 +179,12 @@ function isConstBinding(identifier, sourceCode) {
   );
 }
 
-function indexedPropertyRoot(node, binding, loopVariable, sourceCode) {
+function indexedPropertyRoot(node, loopScope) {
+  const { binding, loopVariable, sourceCode } = loopScope;
   const expression = unwrapExpression(node);
   const projected = transparentArgument(expression, sourceCode);
   if (projected) {
-    return indexedPropertyRoot(projected, binding, loopVariable, sourceCode);
+    return indexedPropertyRoot(projected, loopScope);
   }
   if (
     expression?.type !== "MemberExpression" ||
@@ -227,16 +228,14 @@ function isNode(field) {
   );
 }
 
-function containsStaticAssertion(root, binding, loopVariable, sourceCode) {
+function containsStaticAssertion(root, loopScope) {
   const stack = [root];
   while (stack.length > 0) {
     const node = stack.pop();
     const subject =
       node.type === "CallExpression" ? assertionSubject(node) : null;
-    const object = subject
-      ? indexedPropertyRoot(subject, binding, loopVariable, sourceCode)
-      : null;
-    if (object && isConstBinding(object, sourceCode)) return true;
+    const object = subject ? indexedPropertyRoot(subject, loopScope) : null;
+    if (object && isConstBinding(object, loopScope.sourceCode)) return true;
     for (const [key, field] of Object.entries(node)) {
       if (key === "parent") continue;
       for (const child of Array.isArray(field) ? field : [field]) {
@@ -254,11 +253,10 @@ export function isStaticPropertyEcho(node, sourceCode, filename) {
     binding &&
     isInsideTestBlock(node) &&
     hasLiteralKeys(node) &&
-    containsStaticAssertion(
-      node.body,
+    containsStaticAssertion(node.body, {
       binding,
-      findVariable(sourceCode, binding),
-      sourceCode
-    )
+      loopVariable: findVariable(sourceCode, binding),
+      sourceCode,
+    })
   );
 }

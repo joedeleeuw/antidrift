@@ -1,7 +1,7 @@
 import { mergeVisitors } from "../shared/merge-visitors.js";
 import { silentEmptyDetectionVisitors } from "./absence-fallback/silent-empty-detection.js";
 
-const sentinelValues = new Set([
+const sentinelLiterals = new Set([
   "unknown",
   "n/a",
   "none",
@@ -41,11 +41,11 @@ function hasOptionalChain(node) {
   return false;
 }
 
-function sentinelValue(node) {
+function matchedSentinelLiteral(node) {
   const expression = unwrapExpression(node);
   if (!expression) return "";
   if (expression.type === "Literal" && typeof expression.value === "string") {
-    return sentinelValues.has(expression.value.toLowerCase())
+    return sentinelLiterals.has(expression.value.toLowerCase())
       ? expression.value
       : "";
   }
@@ -56,11 +56,49 @@ function sentinelValue(node) {
   ) {
     const cooked = expression.quasis[0].value.cooked;
     return typeof cooked === "string" &&
-      sentinelValues.has(cooked.toLowerCase())
+      sentinelLiterals.has(cooked.toLowerCase())
       ? cooked
       : "";
   }
   return "";
+}
+
+function createSentinelVisitors(context, memberSentinels) {
+  return mergeVisitors(
+    memberSentinels
+      ? {
+          LogicalExpression(node) {
+            if (node.operator !== "??") return;
+            if (unwrapExpression(node.left)?.type !== "MemberExpression") {
+              return;
+            }
+            const sentinel = matchedSentinelLiteral(node.right);
+            if (!sentinel) return;
+            context.report({
+              node,
+              messageId: "sentinelAbsenceFallback",
+              data: { sentinel },
+            });
+          },
+        }
+      : {},
+    {
+      BinaryExpression(node) {
+        if (node.operator !== "!==" && node.operator !== "!=") return;
+        const leftChain =
+          hasOptionalChain(node.left) && isZeroLiteral(node.right);
+        const rightChain =
+          hasOptionalChain(node.right) && isZeroLiteral(node.left);
+        if (leftChain || rightChain) {
+          context.report({
+            node,
+            messageId: "optionalChainZeroInequality",
+          });
+        }
+      },
+    },
+    silentEmptyDetectionVisitors(context)
+  );
 }
 
 export default function ruleNoSentinelAbsenceFallback() {
@@ -89,41 +127,7 @@ export default function ruleNoSentinelAbsenceFallback() {
     },
     create(context) {
       const memberSentinels = context.options[0]?.memberSentinels !== false;
-      return mergeVisitors(
-        memberSentinels
-          ? {
-              LogicalExpression(node) {
-                if (node.operator !== "??") return;
-                if (unwrapExpression(node.left)?.type !== "MemberExpression") {
-                  return;
-                }
-                const sentinel = sentinelValue(node.right);
-                if (!sentinel) return;
-                context.report({
-                  node,
-                  messageId: "sentinelAbsenceFallback",
-                  data: { sentinel },
-                });
-              },
-            }
-          : {},
-        {
-          BinaryExpression(node) {
-            if (node.operator !== "!==" && node.operator !== "!=") return;
-            const leftChain =
-              hasOptionalChain(node.left) && isZeroLiteral(node.right);
-            const rightChain =
-              hasOptionalChain(node.right) && isZeroLiteral(node.left);
-            if (leftChain || rightChain) {
-              context.report({
-                node,
-                messageId: "optionalChainZeroInequality",
-              });
-            }
-          },
-        },
-        silentEmptyDetectionVisitors(context)
-      );
+      return createSentinelVisitors(context, memberSentinels);
     },
   };
 }

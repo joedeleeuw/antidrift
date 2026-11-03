@@ -1,8 +1,10 @@
 function referencedAliasName(type) {
-  if (type.type === "TSParenthesizedType")
+  if (type.type === "TSParenthesizedType") {
     return referencedAliasName(type.typeAnnotation);
-  if (type.type !== "TSTypeReference" || type.typeName.type !== "Identifier")
+  }
+  if (type.type !== "TSTypeReference" || type.typeName.type !== "Identifier") {
     return null;
+  }
   return type.typeArguments === null ||
     type.typeArguments === undefined ||
     type.typeArguments.params.length === 0
@@ -25,8 +27,9 @@ export const noUnknownTypeAliasesRule = {
     const aliases = new Map();
     const resolvesToUnknown = (type, visited = new Set()) => {
       if (type.type === "TSUnknownKeyword") return true;
-      if (type.type === "TSParenthesizedType")
+      if (type.type === "TSParenthesizedType") {
         return resolvesToUnknown(type.typeAnnotation, visited);
+      }
       const name = referencedAliasName(type);
       if (name === null || visited.has(name)) return false;
       const alias = aliases.get(name);
@@ -55,8 +58,9 @@ export const noUnknownTypeAliasesRule = {
         for (const alias of aliases.values()) {
           if (
             !resolvesToUnknown(alias.typeAnnotation, new Set([alias.id.name]))
-          )
+          ) {
             continue;
+          }
           context.report({
             node: alias.id,
             messageId: "unknownAlias",

@@ -4,20 +4,20 @@ import { dirname, resolve } from "node:path";
 export function packageOwner(filename) {
   let directory = dirname(resolve(filename));
   for (;;) {
-    const manifest = resolve(directory, "package.json");
-    if (existsSync(manifest)) {
-      const data = JSON.parse(readFileSync(manifest, "utf8"));
+    const manifestPath = resolve(directory, "package.json");
+    if (existsSync(manifestPath)) {
+      const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
       if (
-        typeof data.name === "string" ||
+        typeof manifest.name === "string" ||
         [
           "dependencies",
           "devDependencies",
           "peerDependencies",
           "optionalDependencies",
           "workspaces",
-        ].some((key) => data[key] !== undefined)
+        ].some((key) => manifest[key] !== undefined)
       ) {
-        return { directory, manifest: data };
+        return { directory, manifest };
       }
     }
     const parent = dirname(directory);

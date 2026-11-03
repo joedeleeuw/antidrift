@@ -28,11 +28,11 @@ const unwrapExpression = (node) => {
 };
 const isEstreeIdentifier = (node) =>
   isIdentifier(node) && Array.isArray(node.range);
-const importedPathBinding = (variable) => {
-  if (variable === null) {
+const importedPathBinding = (binding) => {
+  if (binding === null) {
     return null;
   }
-  for (const definition of variable.defs) {
+  for (const definition of binding.defs) {
     if (
       definition.type !== "ImportBinding" ||
       !isAstNode(definition.node) ||
@@ -50,8 +50,8 @@ const importedPathBinding = (variable) => {
   }
   return null;
 };
-const stableInitializer = (variable) => {
-  for (const definition of variable.defs) {
+const stableInitializer = (binding) => {
+  for (const definition of binding.defs) {
     if (
       definition.type !== "Variable" ||
       !isAstNode(definition.node) ||
@@ -63,7 +63,7 @@ const stableInitializer = (variable) => {
     }
     if (
       definition.parent.kind !== "const" &&
-      variable.references.some(
+      binding.references.some(
         (reference) => reference.init !== true && reference.isWrite?.() === true
       )
     ) {
@@ -92,6 +92,228 @@ const staticMemberParts = (node) => {
   parent.parts.push(property);
   return parent;
 };
+class PathContainment {
+  constructor(context) {
+    this.context = context;
+  }
+  resolveVariable = (identifier) => {
+    let scope = this.context.sourceCode.getScope(identifier);
+    while (scope !== null) {
+      const binding = scope.set.get(identifier.name);
+      if (binding !== undefined) {
+        return binding;
+      }
+      scope = scope.upper;
+    }
+    return null;
+  };
+
+  resolveStableExpression = (node, visited = new Set()) => {
+    const expression = unwrapExpression(node);
+    if (!isEstreeIdentifier(expression)) {
+      return expression;
+    }
+    const binding = this.resolveVariable(expression);
+    if (binding === null || visited.has(binding)) {
+      return expression;
+    }
+    const initializer = stableInitializer(binding);
+    if (initializer === null) {
+      return expression;
+    }
+    visited.add(binding);
+    return this.resolveStableExpression(initializer, visited);
+  };
+
+  nodePathApiParts = (node) => {
+    const member = staticMemberParts(node);
+    if (member === null || !isEstreeIdentifier(member.root)) {
+      return null;
+    }
+    const imported = importedPathBinding(this.resolveVariable(member.root));
+    if (imported === null) {
+      return null;
+    }
+    if (
+      imported.type === "ImportDefaultSpecifier" ||
+      imported.type === "ImportNamespaceSpecifier"
+    ) {
+      return member.parts;
+    }
+    if (imported.importedName === null) {
+      return null;
+    }
+    return [imported.importedName, ...member.parts];
+  };
+
+  isNodePathApi = (node, api) => {
+    const parts = this.nodePathApiParts(node);
+    if (parts === null || parts.at(-1) !== api) {
+      return false;
+    }
+    return (
+      parts.length === 1 ||
+      (parts.length === 2 && PATH_PLATFORMS.has(parts[0] ?? ""))
+    );
+  };
+
+  getPathValueCall = (node) => {
+    const expression = this.resolveStableExpression(node);
+    if (
+      expression?.type !== "CallExpression" ||
+      !isAstNode(expression.callee)
+    ) {
+      return null;
+    }
+    const parts = this.nodePathApiParts(expression.callee);
+    const api = parts?.at(-1);
+    if (
+      api === undefined ||
+      !PATH_VALUE_APIS.has(api) ||
+      !this.isNodePathApi(expression.callee, api)
+    ) {
+      return null;
+    }
+    return expression;
+  };
+
+  sameStableExpression = (left, right) => {
+    const stableLeft = this.resolveStableExpression(left);
+    const stableRight = this.resolveStableExpression(right);
+    if (stableLeft === null || stableRight === null) {
+      return false;
+    }
+    if (stableLeft === stableRight) {
+      return true;
+    }
+    if (isEstreeIdentifier(stableLeft) && isEstreeIdentifier(stableRight)) {
+      const leftVariable = this.resolveVariable(stableLeft);
+      return (
+        leftVariable !== null &&
+        leftVariable === this.resolveVariable(stableRight)
+      );
+    }
+    return (
+      isStringLiteral(stableLeft) &&
+      isStringLiteral(stableRight) &&
+      stableLeft.value === stableRight.value
+    );
+  };
+
+  isZeroStartPosition = (node) => {
+    const expression = this.resolveStableExpression(node);
+    if (expression?.type === "Literal") {
+      return expression.value === 0;
+    }
+    if (
+      expression?.type !== "UnaryExpression" ||
+      (expression.operator !== "+" && expression.operator !== "-")
+    ) {
+      return false;
+    }
+    const argument = unwrapExpression(expression.argument);
+    return argument?.type === "Literal" && argument.value === 0;
+  };
+
+  isPathSeparator = (node) => {
+    const expression = this.resolveStableExpression(node);
+    return (
+      (isStringLiteral(expression) && PATH_SEPARATORS.has(expression.value)) ||
+      this.isNodePathApi(expression, "sep")
+    );
+  };
+
+  hasConditionalSeparatorSuffix = (expression) => {
+    if (
+      this.hasPathSeparatorSuffix(expression.consequent) &&
+      this.hasPathSeparatorSuffix(expression.alternate)
+    ) {
+      return true;
+    }
+    const test = unwrapExpression(expression.test);
+    if (
+      test?.type !== "CallExpression" ||
+      !isAstNode(test.callee) ||
+      test.callee.type !== "MemberExpression" ||
+      getPropertyName(test.callee.property) !== "endsWith" ||
+      test.arguments.length !== 1 ||
+      !this.isPathSeparator(test.arguments.at(0)) ||
+      !this.sameStableExpression(test.callee.object, expression.consequent)
+    ) {
+      return false;
+    }
+    return this.hasPathSeparatorSuffix(expression.alternate);
+  };
+
+  hasPathSeparatorSuffix = (node) => {
+    const expression = this.resolveStableExpression(node);
+    if (isStringLiteral(expression)) {
+      return [...PATH_SEPARATORS].some((separator) =>
+        expression.value.endsWith(separator)
+      );
+    }
+    if (expression?.type === "ConditionalExpression") {
+      return this.hasConditionalSeparatorSuffix(expression);
+    }
+    if (
+      expression?.type === "BinaryExpression" &&
+      expression.operator === "+"
+    ) {
+      return this.isPathSeparator(expression.right);
+    }
+    if (expression?.type !== "TemplateLiteral") {
+      return false;
+    }
+    const quasis = Array.isArray(expression.quasis) ? expression.quasis : [];
+    const trailingQuasi = quasis.at(-1);
+    if (!isAstNode(trailingQuasi)) {
+      return false;
+    }
+    const trailingText = trailingQuasi.value.cooked ?? trailingQuasi.value.raw;
+    if (
+      [...PATH_SEPARATORS].some((separator) => trailingText.endsWith(separator))
+    ) {
+      return true;
+    }
+    const expressions = Array.isArray(expression.expressions)
+      ? expression.expressions
+      : [];
+    return trailingText === "" && this.isPathSeparator(expressions.at(-1));
+  };
+
+  visitCallExpression = (node) => {
+    if (
+      !isAstNode(node.callee) ||
+      node.callee.type !== "MemberExpression" ||
+      getPropertyName(node.callee.property) !== "startsWith" ||
+      !Array.isArray(node.arguments)
+    ) {
+      return;
+    }
+    const hasEquivalentStartPosition =
+      node.arguments.length === 1 ||
+      (node.arguments.length === 2 &&
+        this.isZeroStartPosition(node.arguments.at(1)));
+    if (!hasEquivalentStartPosition) {
+      return;
+    }
+    const prefix = node.arguments.at(0);
+    if (this.hasPathSeparatorSuffix(prefix)) {
+      return;
+    }
+    const candidateCall = this.getPathValueCall(node.callee.object);
+    if (candidateCall === null) {
+      return;
+    }
+    this.context.report({ node, messageId: "noPathPrefixContainment" });
+  };
+  listeners() {
+    return {
+      CallExpression: this.visitCallExpression,
+    };
+  }
+}
+
 export default {
   meta: {
     schema: [
@@ -112,209 +334,6 @@ export default {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-
-    const resolveVariable = (identifier) => {
-      let scope = context.sourceCode.getScope(identifier);
-      while (scope !== null) {
-        const variable = scope.set.get(identifier.name);
-        if (variable !== undefined) {
-          return variable;
-        }
-        scope = scope.upper;
-      }
-      return null;
-    };
-    const resolveStableExpression = (node, visited = new Set()) => {
-      const expression = unwrapExpression(node);
-      if (!isEstreeIdentifier(expression)) {
-        return expression;
-      }
-      const variable = resolveVariable(expression);
-      if (variable === null || visited.has(variable)) {
-        return expression;
-      }
-      const initializer = stableInitializer(variable);
-      if (initializer === null) {
-        return expression;
-      }
-      visited.add(variable);
-      return resolveStableExpression(initializer, visited);
-    };
-    const nodePathApiParts = (node) => {
-      const member = staticMemberParts(node);
-      if (member === null || !isEstreeIdentifier(member.root)) {
-        return null;
-      }
-      const imported = importedPathBinding(resolveVariable(member.root));
-      if (imported === null) {
-        return null;
-      }
-      if (
-        imported.type === "ImportDefaultSpecifier" ||
-        imported.type === "ImportNamespaceSpecifier"
-      ) {
-        return member.parts;
-      }
-      if (imported.importedName === null) {
-        return null;
-      }
-      return [imported.importedName, ...member.parts];
-    };
-    const isNodePathApi = (node, api) => {
-      const parts = nodePathApiParts(node);
-      if (parts === null || parts.at(-1) !== api) {
-        return false;
-      }
-      return (
-        parts.length === 1 ||
-        (parts.length === 2 && PATH_PLATFORMS.has(parts[0] ?? ""))
-      );
-    };
-    const getPathValueCall = (node) => {
-      const expression = resolveStableExpression(node);
-      if (
-        expression?.type !== "CallExpression" ||
-        !isAstNode(expression.callee)
-      ) {
-        return null;
-      }
-      const parts = nodePathApiParts(expression.callee);
-      const api = parts?.at(-1);
-      if (
-        api === undefined ||
-        !PATH_VALUE_APIS.has(api) ||
-        !isNodePathApi(expression.callee, api)
-      ) {
-        return null;
-      }
-      return expression;
-    };
-    const sameStableExpression = (left, right) => {
-      const stableLeft = resolveStableExpression(left);
-      const stableRight = resolveStableExpression(right);
-      if (stableLeft === null || stableRight === null) {
-        return false;
-      }
-      if (stableLeft === stableRight) {
-        return true;
-      }
-      if (isEstreeIdentifier(stableLeft) && isEstreeIdentifier(stableRight)) {
-        const leftVariable = resolveVariable(stableLeft);
-        return (
-          leftVariable !== null && leftVariable === resolveVariable(stableRight)
-        );
-      }
-      return (
-        isStringLiteral(stableLeft) &&
-        isStringLiteral(stableRight) &&
-        stableLeft.value === stableRight.value
-      );
-    };
-    const isZeroStartPosition = (node) => {
-      const expression = resolveStableExpression(node);
-      if (expression?.type === "Literal") {
-        return expression.value === 0;
-      }
-      if (
-        expression?.type !== "UnaryExpression" ||
-        (expression.operator !== "+" && expression.operator !== "-")
-      ) {
-        return false;
-      }
-      const argument = unwrapExpression(expression.argument);
-      return argument?.type === "Literal" && argument.value === 0;
-    };
-    const isPathSeparator = (node) => {
-      const expression = resolveStableExpression(node);
-      return (
-        (isStringLiteral(expression) &&
-          PATH_SEPARATORS.has(expression.value)) ||
-        isNodePathApi(expression, "sep")
-      );
-    };
-    const hasPathSeparatorSuffix = (node) => {
-      const expression = resolveStableExpression(node);
-      if (isStringLiteral(expression)) {
-        return [...PATH_SEPARATORS].some((separator) =>
-          expression.value.endsWith(separator)
-        );
-      }
-      if (expression?.type === "ConditionalExpression") {
-        if (
-          hasPathSeparatorSuffix(expression.consequent) &&
-          hasPathSeparatorSuffix(expression.alternate)
-        ) {
-          return true;
-        }
-        const test = unwrapExpression(expression.test);
-        if (
-          test?.type !== "CallExpression" ||
-          !isAstNode(test.callee) ||
-          test.callee.type !== "MemberExpression" ||
-          getPropertyName(test.callee.property) !== "endsWith" ||
-          test.arguments.length !== 1 ||
-          !isPathSeparator(test.arguments.at(0)) ||
-          !sameStableExpression(test.callee.object, expression.consequent)
-        ) {
-          return false;
-        }
-        return hasPathSeparatorSuffix(expression.alternate);
-      }
-      if (
-        expression?.type === "BinaryExpression" &&
-        expression.operator === "+"
-      ) {
-        return isPathSeparator(expression.right);
-      }
-      if (expression?.type !== "TemplateLiteral") {
-        return false;
-      }
-      const quasis = Array.isArray(expression.quasis) ? expression.quasis : [];
-      const trailingQuasi = quasis.at(-1);
-      if (!isAstNode(trailingQuasi)) {
-        return false;
-      }
-      const trailingText =
-        trailingQuasi.value.cooked ?? trailingQuasi.value.raw;
-      if (
-        [...PATH_SEPARATORS].some((separator) =>
-          trailingText.endsWith(separator)
-        )
-      ) {
-        return true;
-      }
-      const expressions = Array.isArray(expression.expressions)
-        ? expression.expressions
-        : [];
-      return trailingText === "" && isPathSeparator(expressions.at(-1));
-    };
-    return {
-      CallExpression(node) {
-        if (
-          !isAstNode(node.callee) ||
-          node.callee.type !== "MemberExpression" ||
-          getPropertyName(node.callee.property) !== "startsWith" ||
-          !Array.isArray(node.arguments)
-        ) {
-          return;
-        }
-        const hasEquivalentStartPosition =
-          node.arguments.length === 1 ||
-          (node.arguments.length === 2 &&
-            isZeroStartPosition(node.arguments.at(1)));
-        if (!hasEquivalentStartPosition) {
-          return;
-        }
-        const prefix = node.arguments.at(0);
-        if (hasPathSeparatorSuffix(prefix)) {
-          return;
-        }
-        const candidateCall = getPathValueCall(node.callee.object);
-        if (candidateCall === null) {
-          return;
-        }
-        context.report({ node, messageId: "noPathPrefixContainment" });
-      },
-    };
+    return new PathContainment(context).listeners();
   },
 };

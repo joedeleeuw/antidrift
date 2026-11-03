@@ -27,11 +27,11 @@ function enclosingSingleReturnFunction(objNode) {
 }
 
 function isExportedFunction(fnNode) {
-  const p = fnNode.parent;
+  const parent = fnNode.parent;
   return (
-    p?.type === "ExportNamedDeclaration" ||
-    p?.type === "ExportDefaultDeclaration" ||
-    p?.parent?.parent?.type === "ExportNamedDeclaration"
+    parent?.type === "ExportNamedDeclaration" ||
+    parent?.type === "ExportDefaultDeclaration" ||
+    parent?.parent?.parent?.type === "ExportNamedDeclaration"
   );
 }
 
@@ -40,11 +40,11 @@ function isUnexportedContractProjectionFunction(objNode, sourceIdent, context) {
   if (!fnNode || fnNode.params.length !== 1 || isExportedFunction(fnNode)) {
     return false;
   }
-  const param = fnNode.params[0];
-  if (param.type !== "Identifier" || param.name !== sourceIdent) {
+  const parameter = fnNode.params[0];
+  if (parameter.type !== "Identifier" || parameter.name !== sourceIdent) {
     return false;
   }
-  const paramType = param.typeAnnotation?.typeAnnotation;
+  const paramType = parameter.typeAnnotation?.typeAnnotation;
   const returnType = fnNode.returnType?.typeAnnotation;
   if (
     paramType?.type !== "TSTypeReference" ||
@@ -72,20 +72,20 @@ function checkContractProjection(node, context) {
       allSameSource = false;
       break;
     }
-    const val = unwrapExpression(prop.value);
+    const member = unwrapExpression(prop.value);
     if (
-      val?.type !== "MemberExpression" ||
-      val.computed ||
-      val.object?.type !== "Identifier" ||
-      val.property?.type !== "Identifier" ||
-      val.property.name !== prop.key.name
+      member?.type !== "MemberExpression" ||
+      member.computed ||
+      member.object?.type !== "Identifier" ||
+      member.property?.type !== "Identifier" ||
+      member.property.name !== prop.key.name
     ) {
       allSameSource = false;
       break;
     }
     if (sourceIdent === null) {
-      sourceIdent = val.object.name;
-    } else if (sourceIdent !== val.object.name) {
+      sourceIdent = member.object.name;
+    } else if (sourceIdent !== member.object.name) {
       allSameSource = false;
       break;
     }
@@ -126,12 +126,12 @@ export const noContractAppeasementProjectionRule = {
       },
       TSTypeLiteral(node) {
         const names = new Set();
-        for (const m of node.members) {
+        for (const member of node.members) {
           if (
-            m.type === "TSPropertySignature" &&
-            m.key?.type === "Identifier"
+            member.type === "TSPropertySignature" &&
+            member.key?.type === "Identifier"
           ) {
-            names.add(m.key.name);
+            names.add(member.key.name);
           }
         }
         if (
@@ -389,7 +389,7 @@ export const noHypotheticalSeamRule = {
         if (node.parent?.type === "ExportNamedDeclaration") return;
         if (
           node.id?.name &&
-          node.body?.body?.some((m) => m.type === "TSMethodSignature")
+          node.body?.body?.some((member) => member.type === "TSMethodSignature")
         ) {
           interfaces.set(node.id.name, node);
         }
@@ -415,6 +415,29 @@ export const noHypotheticalSeamRule = {
     };
   },
 };
+
+function checkAmbientProcessDeclaration(node, filename, context) {
+  if (
+    filename.endsWith(".d.ts") ||
+    filename.endsWith(".d.mts") ||
+    filename.endsWith(".d.cts") ||
+    node.declare !== true
+  ) {
+    return;
+  }
+  for (const declarator of node.declarations) {
+    if (
+      declarator.id?.type === "Identifier" &&
+      declarator.id.name === "process"
+    ) {
+      context.report({
+        node: declarator,
+        message:
+          "Do not redeclare ambient 'process' types inline; import the typed environment owner or install the runtime types.",
+      });
+    }
+  }
+}
 
 export const noUnresolvedDependencyTypesRule = {
   meta: {
@@ -449,26 +472,7 @@ export const noUnresolvedDependencyTypesRule = {
 
     return {
       VariableDeclaration(node) {
-        if (
-          filename.endsWith(".d.ts") ||
-          filename.endsWith(".d.mts") ||
-          filename.endsWith(".d.cts") ||
-          node.declare !== true
-        ) {
-          return;
-        }
-        for (const declarator of node.declarations) {
-          if (
-            declarator.id?.type === "Identifier" &&
-            declarator.id.name === "process"
-          ) {
-            context.report({
-              node: declarator,
-              message:
-                "Do not redeclare ambient 'process' types inline; import the typed environment owner or install the runtime types.",
-            });
-          }
-        }
+        checkAmbientProcessDeclaration(node, filename, context);
       },
       ImportDeclaration: markImportNode,
       ExportAllDeclaration: markImportNode,
