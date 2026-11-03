@@ -1,9 +1,27 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import {
   findVariable,
+  functionReturnsJsx,
   isFunctionLike,
   unwrapExpression,
 } from "../shared/scope.js";
+
+const HOOK_OR_COMPONENT_NAME = /^(?:use[A-Z0-9]|[A-Z])/u;
+
+function enclosingUiFunction(node) {
+  for (let cur = node.parent; cur; cur = cur.parent) {
+    if (!isFunctionLike(cur)) continue;
+    if (functionReturnsJsx(cur)) return cur;
+    const name =
+      cur.id?.name ??
+      (cur.parent?.type === "VariableDeclarator" &&
+      cur.parent.id?.type === "Identifier"
+        ? cur.parent.id.name
+        : null);
+    if (name && HOOK_OR_COMPONENT_NAME.test(name)) return cur;
+  }
+  return null;
+}
 
 function isUseStateCall(node) {
   const unwrapped = unwrapExpression(node);
@@ -169,6 +187,11 @@ export default {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
+    const filename = (
+      context.filename ??
+      context.getFilename?.() ??
+      ""
+    ).replaceAll("\\", "/");
     const sourceCode = context.sourceCode;
     const setterVariables = new Set();
     const fnStack = [];
@@ -268,6 +291,42 @@ export default {
     }
 
     return {
+      Program(programNode) {
+        if (!filename.endsWith(".tsx")) return;
+        for (const stmt of programNode.body) {
+          const decl =
+            stmt.type === "ExportNamedDeclaration" ? stmt.declaration : stmt;
+          if (decl?.type !== "VariableDeclaration") continue;
+          for (const declarator of decl.declarations) {
+            if (declarator.id?.type !== "Identifier") continue;
+            const init = unwrapExpression(declarator.init);
+            if (
+              init?.type === "CallExpression" &&
+              init.callee?.type === "Identifier" &&
+              init.callee.name === "makeMutable"
+            ) {
+              context.report({
+                node: declarator,
+                message: `Module-scope 'makeMutable' binding '${declarator.id.name}' shares mutable UI state across component instances; own the shared value inside a hook or context.`,
+              });
+              continue;
+            }
+            if (decl.kind !== "let") continue;
+            const variable = findVariable(sourceCode, declarator.id);
+            if (!variable) continue;
+            const mutatedInUi = variable.references.some(
+              (ref) =>
+                ref.isWrite() && Boolean(enclosingUiFunction(ref.identifier))
+            );
+            if (mutatedInUi) {
+              context.report({
+                node: declarator,
+                message: `Module-scope 'let ${declarator.id.name}' is mutated inside a React component or hook; move UI state into React state/context or a dedicated store.`,
+              });
+            }
+          }
+        }
+      },
       FunctionDeclaration: enterFunction,
       "FunctionDeclaration:exit": exitFunction,
       FunctionExpression: enterFunction,

@@ -24,6 +24,23 @@ function unwrapExpression(node) {
   return current;
 }
 
+function isZeroLiteral(node) {
+  const expr = unwrapExpression(node);
+  return expr?.type === "Literal" && expr.value === 0;
+}
+
+function hasOptionalChain(node) {
+  const expr = unwrapExpression(node);
+  if (!expr) return false;
+  if (expr.type === "ChainExpression") return true;
+  if (expr.type === "MemberExpression" || expr.type === "CallExpression") {
+    return (
+      Boolean(expr.optional) || hasOptionalChain(expr.object ?? expr.callee)
+    );
+  }
+  return false;
+}
+
 function sentinelValue(node) {
   const expression = unwrapExpression(node);
   if (!expression) return "";
@@ -62,6 +79,8 @@ export default function ruleNoSentinelAbsenceFallback() {
         },
       ],
       messages: {
+        optionalChainZeroInequality:
+          "Optional-chain inequality against 0 evaluates to true when the chain short-circuits to undefined; use `(x?.length ?? 0) > 0` instead.",
         sentinelAbsenceFallback:
           'This fallback hides a missing member behind "{{sentinel}}". Keep the missing value distinct from a reported value.',
         noSilentEmptyFallback:
@@ -88,6 +107,21 @@ export default function ruleNoSentinelAbsenceFallback() {
               },
             }
           : {},
+        {
+          BinaryExpression(node) {
+            if (node.operator !== "!==" && node.operator !== "!=") return;
+            const leftChain =
+              hasOptionalChain(node.left) && isZeroLiteral(node.right);
+            const rightChain =
+              hasOptionalChain(node.right) && isZeroLiteral(node.left);
+            if (leftChain || rightChain) {
+              context.report({
+                node,
+                messageId: "optionalChainZeroInequality",
+              });
+            }
+          },
+        },
         silentEmptyDetectionVisitors(context)
       );
     },

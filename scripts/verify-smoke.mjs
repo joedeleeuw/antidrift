@@ -18,13 +18,16 @@ import {
 } from "../src/index.js";
 
 const repoRoot = resolve(import.meta.dirname, "..");
+const expectedRuleCount = 103;
 
 assert.equal(antidriftPlugin.meta.name, "antidrift");
 const ruleNames = Object.keys(rules);
-assert.ok(
-  ruleNames.length >= 100,
-  `Expected >= 100 rules, got ${ruleNames.length}`
+assert.equal(
+  ruleNames.length,
+  expectedRuleCount,
+  `Expected ${expectedRuleCount} rules, got ${ruleNames.length}`
 );
+assert.equal(Object.keys(recommendedRules).length, expectedRuleCount);
 
 for (const [name, rule] of Object.entries(rules)) {
   assert.equal(
@@ -55,6 +58,10 @@ import { useSyncExternalStore } from "react";
 import { TouchableOpacity } from "react-native";
 import { Text as WidgetText } from "@expo/ui/swift-ui";
 import { z } from "zod";
+
+declare const process: { env: { NODE_ENV: string } };
+declare function makeMutable(initial: number): { current: number };
+export const sharedProgress = makeMutable(0);
 
 type HiddenUnknown = unknown;
 export const ORDER_MODES = ["fast", "slow"] as const;
@@ -115,6 +122,8 @@ export function processLegacyData(
     chosen = 3;
   } else if (mode === "turbo") {
     chosen = 4;
+  } else {
+    chosen = 5;
   }
   const erasedKnown = { id: "known" } as unknown;
   const parsed = z.object({ id: z.string() }).parse(erasedKnown);
@@ -136,6 +145,18 @@ export function BadComponent({ items = [] }: { items?: string[] }) {
   globalUiOpen = items?.length !== 0;
   const randomId = Math.random();
   return <div>{randomId}{items.length}</div>;
+}
+
+function combineLabels(first: string, second: string, third: string, fourth: string) {
+  return [first, second, third, fourth].join(" ");
+}
+
+export function forwardLabels(first: string, second: string, third: string, fourth: string) {
+  return combineLabels(first, second, third, fourth);
+}
+
+export function missingLabel(entry: { label?: string }) {
+  return entry.label ?? "unknown";
 }
 
 export function shredUnionAndRepeatNullable(
@@ -289,15 +310,76 @@ const expectedRules = [
   "antidrift/require-authz-check",
   "antidrift/no-handrolled-resource-lifecycle-cells",
   "antidrift/no-appeasement-erasure",
-  "antidrift/no-optional-chain-zero-length-inequality",
-  "antidrift/no-module-mutable-ui-state",
-  "antidrift/no-shredded-discriminated-union",
-  "antidrift/no-repeated-nullable-ternaries",
-  "antidrift/no-wide-parameter-bags",
-  "antidrift/no-foreign-state-callbacks",
+  "antidrift/no-sentinel-absence-fallback",
+  "antidrift/no-branch-tree",
+  "antidrift/no-pass-through-parameters",
+  "antidrift/no-unresolved-dependency-types",
   "antidrift/no-nullable-positional-tuple",
   "antidrift/unknown-input-must-be-decoded",
   "antidrift/no-query-join-or-tree-reshape",
+];
+
+const expectedDiagnostics = [
+  {
+    ruleId: "antidrift/no-branch-tree",
+    message:
+      "Discriminated union 'scope' is shredded into parallel nullable bindings; narrow 'scope' once via switch or a case table instead.",
+  },
+  {
+    ruleId: "antidrift/no-branch-tree",
+    message:
+      "Nullable binding 'entry' is tested across 3+ ternaries in the same scope; narrow 'entry' once or use a resolved default object.",
+  },
+  {
+    ruleId: "antidrift/no-branch-tree",
+    message:
+      "Branch tree has 5 arms; declare a typed case table instead of chaining if/else branches.",
+  },
+  {
+    ruleId: "antidrift/no-sentinel-absence-fallback",
+    message:
+      "Optional-chain inequality against 0 evaluates to true when the chain short-circuits to undefined; use `(x?.length ?? 0) > 0` instead.",
+  },
+  {
+    ruleId: "antidrift/no-sentinel-absence-fallback",
+    message:
+      'This fallback hides a missing member behind "unknown". Keep the missing value distinct from a reported value.',
+  },
+  {
+    ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
+    message:
+      "Module-scope 'let globalUiOpen' is mutated inside a React component or hook; move UI state into React state/context or a dedicated store.",
+  },
+  {
+    ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
+    message:
+      "Module-scope 'makeMutable' binding 'sharedProgress' shares mutable UI state across component instances; own the shared value inside a hook or context.",
+  },
+  {
+    ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
+    message:
+      "Reducer co-mutates >= 3 boolean activity flags as mutually exclusive phases; replace with a single discriminated phase union.",
+  },
+  {
+    ruleId: "antidrift/no-pass-through-parameters",
+    message:
+      "Function parameter bag accepts 11 properties (max 10); group cohesive domain concepts or move behavior onto the owning object.",
+  },
+  {
+    ruleId: "antidrift/no-pass-through-parameters",
+    message:
+      "Parameter bag accepts multiple foreign state callbacks (setA, setB, getC); return a state transition value or move the logic into the state owner.",
+  },
+  {
+    ruleId: "antidrift/no-pass-through-parameters",
+    message:
+      "Parameter 'first' is only forwarded unchanged to 'combineLabels'. Resolve it at the leaf or pass a narrower domain object.",
+  },
+  {
+    ruleId: "antidrift/no-unresolved-dependency-types",
+    message:
+      "Do not redeclare ambient 'process' types inline; import the typed environment owner or install the runtime types.",
+  },
 ];
 
 const workDir = mkdtempSync(join(tmpdir(), "antidrift-smoke-"));
@@ -371,6 +453,18 @@ try {
       `Expected Oxlint to report ${expected}, got codes: ${[...oxlintCodes].join(", ")}`
     );
   }
+  for (const { ruleId, message } of expectedDiagnostics) {
+    const ruleSlug = ruleId.split("/")[1];
+    assert.ok(
+      oxlintDiagnostics.some(
+        (diagnostic) =>
+          (diagnostic.code === ruleId ||
+            diagnostic.code === `antidrift(${ruleSlug})`) &&
+          diagnostic.message === message
+      ),
+      `Expected Oxlint ${ruleId}: ${message}`
+    );
+  }
 
   const eslint = new ESLint({
     cwd: workDir,
@@ -404,6 +498,15 @@ try {
     assert.ok(
       eslintRuleIds.has(expected),
       `Expected ESLint to report ${expected}, got: ${[...eslintRuleIds].join(", ")}`
+    );
+  }
+  for (const { ruleId, message } of expectedDiagnostics) {
+    assert.ok(
+      eslintBad.messages.some(
+        (diagnostic) =>
+          diagnostic.ruleId === ruleId && diagnostic.message === message
+      ),
+      `Expected ESLint ${ruleId}: ${message}`
     );
   }
 

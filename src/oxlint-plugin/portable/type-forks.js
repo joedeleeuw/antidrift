@@ -433,6 +433,11 @@ export const noUnresolvedDependencyTypesRule = {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
+    const filename = (
+      context.filename ??
+      context.getFilename?.() ??
+      ""
+    ).replaceAll("\\", "/");
     const importLines = new Set();
 
     function markImportNode(node) {
@@ -443,6 +448,28 @@ export const noUnresolvedDependencyTypesRule = {
     }
 
     return {
+      VariableDeclaration(node) {
+        if (
+          filename.endsWith(".d.ts") ||
+          filename.endsWith(".d.mts") ||
+          filename.endsWith(".d.cts") ||
+          node.declare !== true
+        ) {
+          return;
+        }
+        for (const declarator of node.declarations) {
+          if (
+            declarator.id?.type === "Identifier" &&
+            declarator.id.name === "process"
+          ) {
+            context.report({
+              node: declarator,
+              message:
+                "Do not redeclare ambient 'process' types inline; import the typed environment owner or install the runtime types.",
+            });
+          }
+        }
+      },
       ImportDeclaration: markImportNode,
       ExportAllDeclaration: markImportNode,
       ExportNamedDeclaration(node) {

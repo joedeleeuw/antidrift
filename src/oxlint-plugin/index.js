@@ -16,10 +16,6 @@ import {
   noSqlStringConcatRule,
   requireConvexReturnValidatorRule,
 } from "./portable/convex-and-sql.js";
-import {
-  noForeignStateCallbacksRule,
-  noWideParameterBagsRule,
-} from "./portable/deep-module-seams.js";
 import docsSourcePolicyRule from "./portable/docs-source-policy.js";
 import {
   noArgumentMutationSideEffectRule,
@@ -107,12 +103,6 @@ import {
   noRedundantTypePredicateRule,
   noUndercheckedTypePredicateRule,
 } from "./portable/type-contracts.js";
-import {
-  noModuleMutableUiStateRule,
-  noOptionalChainZeroLengthInequalityRule,
-  noRepeatedNullableTernariesRule,
-  noShreddedDiscriminatedUnionRule,
-} from "./portable/ternary-and-state-hygiene.js";
 import {
   noContractAppeasementProjectionRule,
   noHypotheticalSeamRule,
@@ -203,7 +193,6 @@ const rawRules = {
   "no-explicit-type-arguments-on-owned-api":
     noExplicitTypeArgumentsOnOwnedApiRule,
   "no-external-decode-in-tsx": noExternalDecodeInTsxRule,
-  "no-foreign-state-callbacks": noForeignStateCallbacksRule,
   "no-handrolled-resource-lifecycle-cells":
     noHandrolledResourceLifecycleCellsRule,
   "no-hookless-use-function": noHooklessUseFunctionRule,
@@ -213,13 +202,10 @@ const rawRules = {
   "no-impure-render-call": noImpureRenderCallRule,
   "no-inline-style-colors": noInlineStyleColorsRule,
   "no-known-value-widening": noKnownValueWideningRule,
-  "no-module-mutable-ui-state": noModuleMutableUiStateRule,
   "no-mutable-let-alias": noMutableLetAliasRule,
   "no-nonindependent-test-oracle": ruleNoNonindependentTestOracle(),
   "no-nullable-positional-tuple": noNullablePositionalTupleRule,
   "no-omitted-prop-respread": noOmittedPropRespreadRule,
-  "no-optional-chain-zero-length-inequality":
-    noOptionalChainZeroLengthInequalityRule,
   "no-partial-record-satisfies": noPartialRecordSatisfiesRule,
   "no-pass-through-parameters": noPassThroughParametersRule,
   "no-path-prefix-containment": noPathPrefixContainmentRule,
@@ -237,12 +223,10 @@ const rawRules = {
   "no-redundant-zod-parse": noRedundantZodParseRule,
   "no-reexport-only-module": noReexportOnlyModuleRule,
   "no-relative-cross-package-imports": noRelativeCrossPackageImportsRule,
-  "no-repeated-nullable-ternaries": noRepeatedNullableTernariesRule,
   "no-repo-state-mirror-assertion": ruleNoRepoStateMirrorAssertion(),
   "no-schema-validator-transcoding": noSchemaValidatorTranscodingRule,
   "no-sentinel-absence-fallback": ruleNoSentinelAbsenceFallback(),
   "no-service-constructor-imports": noServiceConstructorImportsRule,
-  "no-shredded-discriminated-union": noShreddedDiscriminatedUnionRule,
   "no-spread-input-in-query-key": noSpreadInputInQueryKeyRule,
   "no-sql-string-concat": noSqlStringConcatRule,
   "no-static-devtools-import": noStaticDevtoolsImportRule,
@@ -262,7 +246,6 @@ const rawRules = {
   "no-unstable-render-default-collection":
     noUnstableRenderDefaultCollectionRule,
   "no-vague-names": noVagueNamesRule,
-  "no-wide-parameter-bags": noWideParameterBagsRule,
   "no-widen-then-assert": noWidenThenAssertRule,
   "no-wrapping-functions": noWrappingFunctionsRule,
   "react-max-component-props": reactMaxComponentPropsRule,

@@ -1,6 +1,7 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import {
   findVariable,
+  functionReturnsJsx,
   isFunctionLike,
   unwrapExpression,
 } from "../shared/scope.js";
@@ -92,6 +93,110 @@ export const noServiceConstructorImportsRule = {
   },
 };
 
+function collectTypePropertyNames(
+  typeNode,
+  typeDeclarations,
+  names = new Set(),
+  seen = new Set()
+) {
+  if (!typeNode) return names;
+  if (typeNode.type === "TSTypeLiteral") {
+    for (const member of typeNode.members) {
+      if (
+        (member.type === "TSPropertySignature" ||
+          member.type === "TSMethodSignature") &&
+        member.key?.type === "Identifier"
+      ) {
+        names.add(member.key.name);
+      }
+    }
+    return names;
+  }
+  if (typeNode.type === "TSInterfaceBody") {
+    for (const member of typeNode.body) {
+      if (
+        (member.type === "TSPropertySignature" ||
+          member.type === "TSMethodSignature") &&
+        member.key?.type === "Identifier"
+      ) {
+        names.add(member.key.name);
+      }
+    }
+    return names;
+  }
+  if (typeNode.type === "TSIntersectionType") {
+    for (const part of typeNode.types) {
+      collectTypePropertyNames(part, typeDeclarations, names, seen);
+    }
+    return names;
+  }
+  if (
+    typeNode.type === "TSTypeReference" &&
+    typeNode.typeName?.type === "Identifier" &&
+    !seen.has(typeNode.typeName.name)
+  ) {
+    seen.add(typeNode.typeName.name);
+    collectTypePropertyNames(
+      typeDeclarations.get(typeNode.typeName.name),
+      typeDeclarations,
+      names,
+      seen
+    );
+  }
+  return names;
+}
+
+function recordProgramTypeDeclarations(programNode, typeDeclarations) {
+  for (const stmt of programNode.body) {
+    const decl =
+      stmt.type === "ExportNamedDeclaration" ? stmt.declaration : stmt;
+    if (decl?.type === "TSInterfaceDeclaration" && decl.id?.name) {
+      typeDeclarations.set(decl.id.name, decl.body);
+    } else if (decl?.type === "TSTypeAliasDeclaration" && decl.id?.name) {
+      typeDeclarations.set(decl.id.name, decl.typeAnnotation);
+    }
+  }
+}
+
+function parameterPropertyNames(param, typeDeclarations) {
+  const names = new Set();
+  if (param.type === "ObjectPattern") {
+    for (const prop of param.properties) {
+      if (prop.type === "Property" && prop.key?.type === "Identifier") {
+        names.add(prop.key.name);
+      }
+    }
+  }
+  collectTypePropertyNames(
+    param.typeAnnotation?.typeAnnotation,
+    typeDeclarations,
+    names
+  );
+  return names;
+}
+
+function forwardedLocalCallee(sourceCode, parameter) {
+  if (parameter.type !== "Identifier") return null;
+  const variable = findVariable(sourceCode, parameter);
+  if (!variable || variable.references.length !== 1) return null;
+  const identifier = variable.references[0].identifier;
+  const call = identifier?.parent;
+  if (
+    call?.type !== "CallExpression" ||
+    !call.arguments.includes(identifier) ||
+    call.callee?.type !== "Identifier"
+  ) {
+    return null;
+  }
+  const calleeVariable = findVariable(sourceCode, call.callee);
+  const calleeDeclaration = calleeVariable?.defs?.[0]?.node;
+  return calleeDeclaration &&
+    (isFunctionLike(calleeDeclaration) ||
+      isFunctionLike(calleeDeclaration.init))
+    ? call.callee.name
+    : null;
+}
+
 export const noPassThroughParametersRule = {
   meta: {
     type: "problem",
@@ -102,7 +207,10 @@ export const noPassThroughParametersRule = {
     schema: [
       {
         type: "object",
-        properties: scopeProperties,
+        properties: {
+          ...scopeProperties,
+          max: { type: "number" },
+        },
         additionalProperties: false,
       },
     ],
@@ -114,38 +222,56 @@ export const noPassThroughParametersRule = {
   create(context) {
     if (!isRuleFile(context)) return {};
     const sourceCode = context.sourceCode;
+    const max = context.options[0]?.max ?? 10;
+    const typeDeclarations = new Map();
 
     function checkFunction(node) {
-      if (node.params.length < 4) return;
-      for (const param of node.params) {
-        if (param.type !== "Identifier") continue;
-        const variable = findVariable(sourceCode, param);
-        if (!variable || variable.references.length !== 1) continue;
-        const ref = variable.references[0];
-        const ident = ref.identifier;
-        const call = ident?.parent;
-        if (
-          call?.type === "CallExpression" &&
-          call.arguments.includes(ident) &&
-          call.callee?.type === "Identifier"
-        ) {
-          const calleeVar = findVariable(sourceCode, call.callee);
-          const calleeDef = calleeVar?.defs?.[0]?.node;
-          if (
-            calleeDef &&
-            (isFunctionLike(calleeDef) || isFunctionLike(calleeDef.init))
-          ) {
+      if (node.params.length >= 4) {
+        for (const param of node.params) {
+          const callee = forwardedLocalCallee(sourceCode, param);
+          if (callee) {
             context.report({
               node: param,
               messageId: "passThrough",
-              data: { name: param.name, callee: call.callee.name },
+              data: { name: param.name, callee },
             });
           }
+        }
+      }
+
+      if (functionReturnsJsx(node) || node.params.length === 0) return;
+      for (const param of node.params) {
+        const names = parameterPropertyNames(param, typeDeclarations);
+        if (
+          names.size > max &&
+          (param.type === "ObjectPattern" ||
+            param.typeAnnotation?.typeAnnotation?.type === "TSTypeLiteral")
+        ) {
+          context.report({
+            node: param,
+            message: `Function parameter bag accepts ${names.size} properties (max ${max}); group cohesive domain concepts or move behavior onto the owning object.`,
+          });
+        }
+        if (names.size < 3) continue;
+        const setters = [...names].filter((name) => /^set[A-Z]/u.test(name));
+        const getters = [...names].filter((name) => /^get[A-Z]/u.test(name));
+        if (
+          setters.length >= 3 ||
+          (setters.length >= 2 && getters.length >= 1)
+        ) {
+          const sample = [...setters, ...getters].slice(0, 4).join(", ");
+          context.report({
+            node: param,
+            message: `Parameter bag accepts multiple foreign state callbacks (${sample}); return a state transition value or move the logic into the state owner.`,
+          });
         }
       }
     }
 
     return {
+      Program(node) {
+        recordProgramTypeDeclarations(node, typeDeclarations);
+      },
       FunctionDeclaration: checkFunction,
       FunctionExpression: checkFunction,
       ArrowFunctionExpression: checkFunction,
