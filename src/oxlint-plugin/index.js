@@ -67,6 +67,7 @@ import noUnlistedExternalImportsRule from "./portable/no-unlisted-external-impor
 import noUnsafeInnerHtmlRule from "./portable/no-unsafe-inner-html.js";
 import noUnsanitizedHrefRule from "./portable/no-unsanitized-href.js";
 import noVagueNamesRule from "./portable/no-vague-names.js";
+import optionalInputEarnsOptionalityRule from "./portable/optional-input-earns-optionality.js";
 import {
   noExternalDecodeInTsxRule,
   noHooklessUseFunctionRule,
@@ -248,6 +249,7 @@ const rawRules = {
   "no-vague-names": noVagueNamesRule,
   "no-widen-then-assert": noWidenThenAssertRule,
   "no-wrapping-functions": noWrappingFunctionsRule,
+  "optional-input-earns-optionality": optionalInputEarnsOptionalityRule,
   "react-max-component-props": reactMaxComponentPropsRule,
   "require-authz-check": requireAuthzCheckRule,
   "require-convex-return-validator": requireConvexReturnValidatorRule,

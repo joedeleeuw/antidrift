@@ -19,7 +19,7 @@ import {
 import { runTypedEslintSmoke } from "./typed-eslint-smoke.mjs";
 
 const repoRoot = resolve(import.meta.dirname, "..");
-const expectedRuleCount = 103;
+const expectedRuleCount = 104;
 
 assert.equal(antidriftPlugin.meta.name, "antidrift");
 const ruleNames = Object.keys(rules);

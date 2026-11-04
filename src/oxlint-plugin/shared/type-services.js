@@ -1,6 +1,6 @@
 const typeCheckerBySourceCode = new WeakMap();
 
-function typeServices(sourceCode) {
+export function getTypeServices(sourceCode) {
   const services = sourceCode?.parserServices;
   if (!services?.program || !services.esTreeNodeToTSNodeMap) return null;
   let checker = typeCheckerBySourceCode.get(sourceCode);
@@ -8,15 +8,19 @@ function typeServices(sourceCode) {
     checker = services.program.getTypeChecker();
     typeCheckerBySourceCode.set(sourceCode, checker);
   }
-  return { checker, nodeMap: services.esTreeNodeToTSNodeMap };
+  return {
+    checker,
+    nodeMap: services.esTreeNodeToTSNodeMap,
+    program: services.program,
+  };
 }
 
 export function hasTypeChecker(sourceCode) {
-  return typeServices(sourceCode) !== null;
+  return getTypeServices(sourceCode) !== null;
 }
 
 function getResolvedType(node, sourceCode) {
-  const services = typeServices(sourceCode);
+  const services = getTypeServices(sourceCode);
   const tsNode = node ? services?.nodeMap.get(node) : null;
   return tsNode ? services.checker.getTypeAtLocation(tsNode) : null;
 }
@@ -26,7 +30,7 @@ function typeConstituents(type) {
 }
 
 export function resolvedTypeTexts(node, sourceCode) {
-  const services = typeServices(sourceCode);
+  const services = getTypeServices(sourceCode);
   const type = getResolvedType(node, sourceCode);
   if (!type) return null;
   return typeConstituents(type).map((constituent) =>
@@ -39,7 +43,7 @@ function namedSymbol(symbol) {
 }
 
 export function resolvedDeclarationFiles(node, sourceCode) {
-  const services = typeServices(sourceCode);
+  const services = getTypeServices(sourceCode);
   const tsNode = node ? services?.nodeMap.get(node) : null;
   if (!tsNode) return [];
   const { checker } = services;
