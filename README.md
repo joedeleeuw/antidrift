@@ -6,10 +6,10 @@ Every rule is authored against standard `ESTree` + `sourceCode` + `ScopeManager`
 
 ## Exports
 
-- `@joedeleeuw/antidrift`: `{ antidriftPlugin, rules, recommendedRules, oxlintPreset, createOxlintConfig, eslintPreset, createEslintConfig }` (default export: `antidriftPlugin`)
+- `@joedeleeuw/antidrift`: `{ antidriftPlugin, rules, recommendedRules, typedRules, astOnlyRules, typedRuleNames, oxlintPreset, astOnlyPreset, createOxlintConfig, eslintPreset, eslintTypedPreset, createEslintConfig }` (default export: `antidriftPlugin`)
 - `@joedeleeuw/antidrift/oxlint-plugin` / `@joedeleeuw/antidrift/eslint-plugin`: `antidriftPlugin` (`meta.name: "antidrift"`, `rules`)
-- `@joedeleeuw/antidrift/oxlint-config` / `@joedeleeuw/antidrift/preset`: `{ oxlintPreset, createOxlintConfig, recommendedRules }`
-- `@joedeleeuw/antidrift/eslint-config`: `{ eslintPreset, createEslintConfig, recommendedRules }`
+- `@joedeleeuw/antidrift/oxlint-config` / `@joedeleeuw/antidrift/preset`: `{ oxlintPreset, astOnlyPreset, createOxlintConfig, recommendedRules, typedRules, astOnlyRules, typedRuleNames }`
+- `@joedeleeuw/antidrift/eslint-config`: `{ eslintPreset, eslintTypedPreset, createEslintConfig, recommendedRules, typedRules, astOnlyRules, typedRuleNames }`
 
 ## Usage with Oxlint
 
@@ -25,6 +25,35 @@ export default defineConfig({
     ...antidrift.rules,
   },
 });
+```
+
+## Two-Host Setup (Oxlint + Typed ESLint)
+
+To run the 62 AST-only rules in Oxlint and the 20 TypeChecker-enhanced rules in Typed ESLint without duplicate diagnostics:
+
+```ts
+// oxlint.config.mts
+import { createOxlintConfig } from "@joedeleeuw/antidrift/oxlint-config";
+import { defineConfig } from "oxlint";
+
+const antidrift = createOxlintConfig({ typedRules: false });
+
+export default defineConfig({
+  jsPlugins: [...antidrift.jsPlugins],
+  rules: { ...antidrift.rules },
+});
+```
+
+```js
+// eslint.config.mjs
+import { createEslintConfig } from "@joedeleeuw/antidrift/eslint-config";
+
+export default [
+  createEslintConfig({
+    files: ["**/*.{ts,tsx,mts,cts}"],
+    typedOnly: true,
+  }),
+];
 ```
 
 ## Usage with ESLint (Flat Config)
@@ -61,6 +90,24 @@ Every rule is a plain `{ meta, create(context) }` module under `src/oxlint-plugi
 
 ### What belongs here
 
-- **Antidrift**: boundary, lexical, and AST invariants such as undecoded boundary input, appeasement casts, structural type forks, React render and state hygiene, test-oracle independence, and agent-drift smells.
+- **Antidrift**: boundary, lexical, and AST invariants such as undecoded boundary input, appeasement casts, structural type forks, React render and state hygiene, and agent-drift smells.
 - **`tsc` and `oxlint --type-aware`**: type-system invariants such as assignability, exhaustiveness, unsafe `any` flow, and floating promises.
 - **`fallow`**: cross-file graph invariants such as unused exports, circular dependencies, and whole-repository duplication.
+
+### Consolidated Rule IDs (`0.26.0`)
+
+The following rule IDs were consolidated into their canonical owners or delegated to `oxlint --type-aware` / `tsc`:
+
+| Retired Rule ID                                                                                                                                                                                         | Canonical Owner                                                                             |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `antidrift/no-as-never`, `antidrift/no-double-type-assertion`                                                                                                                                           | `antidrift/no-appeasement-cast`                                                             |
+| `antidrift/no-known-value-widening`, `antidrift/no-widen-then-assert`, `antidrift/no-unknown-type-alias`, `antidrift/no-erased-unknown-reparse`, `antidrift/no-redundant-unknown-helper`                | `antidrift/no-appeasement-erasure`                                                          |
+| `antidrift/no-nullable-tuple`, `antidrift/no-nullable-failure-bag`, `antidrift/no-result-product-type`                                                                                                  | `antidrift/no-contract-appeasement-projection`                                              |
+| `antidrift/no-redeclared-owned-union`, `antidrift/no-parallel-sidecar-maps`, `antidrift/no-positional-options-read`, `antidrift/no-decoded-blob-column-restatement`, `antidrift/no-schema-field-rename` | `antidrift/no-structural-type-fork`                                                         |
+| `antidrift/no-dual-key-alias-read`                                                                                                                                                                      | `antidrift/no-compat-names`                                                                 |
+| `antidrift/no-single-adapter-seam`, `antidrift/no-test-only-seam`                                                                                                                                       | `antidrift/no-hypothetical-seam`                                                            |
+| `antidrift/no-spread-input-in-query-key`                                                                                                                                                                | `antidrift/require-query-key-factory`                                                       |
+| `antidrift/no-dated-comments`                                                                                                                                                                           | `antidrift/no-tutorial-comments`                                                            |
+| `antidrift/no-fire-and-forget-async`                                                                                                                                                                    | `typescript/no-floating-promises`, `typescript/no-misused-promises` (`oxlint --type-aware`) |
+| `antidrift/no-string-Matched-union-switch`                                                                                                                                                              | `typescript/switch-exhaustiveness-check` (`oxlint --type-aware`)                            |
+| `antidrift/no-reflect-get`, `antidrift/no-lossy-bigint-to-number`                                                                                                                                       | Retired (standard runtime operations)                                                       |

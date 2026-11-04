@@ -1,14 +1,5 @@
 import {
-  HOOK_NAME,
-  calleeName,
-  functionNameOf,
-  isRenderOwner,
-  queryEnvelopeVisitors,
-  queryJoinVisitors,
-} from "./query-join-checks.js";
-import { existsSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
-import {
+  hasPlatformSibling,
   isRuleFile,
   ruleFilename,
   scopeProperties,
@@ -16,9 +7,14 @@ import {
 import { findDescendant } from "./ast.js";
 import { rootIdentifier } from "./static-resolution.js";
 import {
+  HOOK_NAME,
+  calleeName,
   findVariable,
+  functionNameOf,
   functionReturnsJsx,
   isFunctionLike,
+  isRenderOwner,
+  nearestFunction,
   staticPropertyName,
   unwrapExpression,
 } from "../shared/scope.js";
@@ -28,8 +24,6 @@ const SCOPE_SCHEMA = [
 ];
 
 const HOOK_CALL_NAME = /^(?:use|use[A-Z0-9])/u;
-const PLATFORMS = ["native", "web", "ios", "android"];
-const SOURCE_EXTENSIONS = ["ts", "tsx", "js", "jsx"];
 const RENDER_CALLBACK_HOOKS = new Set([
   "useMemo",
   "useEffect",
@@ -53,26 +47,6 @@ const RAW_PAYLOAD_NAME = /^(?:raw|payload|response|res|body|json|data)$/iu;
 
 function isHookCall(node) {
   return HOOK_CALL_NAME.test(calleeName(node));
-}
-
-function hasPlatformSibling(filename) {
-  const name = basename(filename);
-  const stem = name.replace(
-    /(?:\.(?:native|web|ios|android))?\.[cm]?[jt]sx?$/u,
-    ""
-  );
-  const candidates = PLATFORMS.flatMap((platform) =>
-    SOURCE_EXTENSIONS.map((extension) => `${stem}.${platform}.${extension}`)
-  );
-  if (name !== stem && /\.(?:native|web|ios|android)\./u.test(name)) {
-    candidates.push(
-      ...SOURCE_EXTENSIONS.map((extension) => `${stem}.${extension}`)
-    );
-  }
-  return candidates.some(
-    (candidate) =>
-      candidate !== name && existsSync(join(dirname(filename), candidate))
-  );
 }
 
 function isPlatformHookStub(node) {
@@ -224,21 +198,6 @@ export const noUnstableRenderDefaultCollectionRule = {
   },
 };
 
-export const noQueryEnvelopeLeakRule = {
-  meta: {
-    type: "problem",
-    docs: {
-      description:
-        "Disallow custom `use*` hooks that leak raw query lifecycle envelopes (`{ data, isLoading, error }`) instead of returning domain state.",
-    },
-    schema: SCOPE_SCHEMA,
-  },
-  create(context) {
-    if (!isRuleFile(context)) return {};
-    return queryEnvelopeVisitors(context);
-  },
-};
-
 function isUnshadowedGlobal(ident, sourceCode) {
   const binding = findVariable(sourceCode, ident);
   return !binding || binding.defs.length === 0;
@@ -263,13 +222,6 @@ function isImpureCall(node, sourceCode) {
     ) &&
     isUnshadowedGlobal(callee.object, sourceCode)
   );
-}
-
-function nearestFunction(node) {
-  for (let cur = node?.parent; cur; cur = cur.parent) {
-    if (isFunctionLike(cur)) return cur;
-  }
-  return null;
 }
 
 function isInParams(node, owner) {
@@ -419,20 +371,5 @@ export const noExternalDecodeInTsxRule = {
         });
       },
     };
-  },
-};
-
-export const noQueryJoinOrTreeReshapeRule = {
-  meta: {
-    type: "problem",
-    docs: {
-      description:
-        "Disallow O(N*M) `.find()` / `.filter()` equijoins inside iterations, multi-query joins during render, and sequential independent awaits.",
-    },
-    schema: SCOPE_SCHEMA,
-  },
-  create(context) {
-    if (!isRuleFile(context)) return {};
-    return queryJoinVisitors(context);
   },
 };

@@ -1,4 +1,4 @@
-import { findVariable } from "../shared/scope.js";
+import { findVariable, unwrapExpression } from "../shared/scope.js";
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import { getPropertyName, isIdentifier } from "./ast.js";
 
@@ -18,25 +18,6 @@ const getNodeArguments = (node) => {
     return null;
   }
   return node.arguments.map((element) => element);
-};
-const unwrapExpression = (node) => {
-  let current = node;
-  while (
-    getNodeType(current) === "TSAsExpression" ||
-    getNodeType(current) === "TSSatisfiesExpression" ||
-    getNodeType(current) === "TSNonNullExpression" ||
-    getNodeType(current) === "TypeCastExpression"
-  ) {
-    if (
-      typeof current !== "object" ||
-      current === null ||
-      !("expression" in current)
-    ) {
-      return current;
-    }
-    current = current.expression;
-  }
-  return current;
 };
 const getObjectExpressionProperties = (node) => {
   const unwrapped = unwrapExpression(node);
@@ -226,8 +207,8 @@ class FetchSignalAnalysis {
     this.context = context;
     this.requestSignalScopes = [];
   }
-  fetchOrigin = (node, seen = new Set()) => {
-    node = unwrapExpression(node);
+  fetchOrigin = (rawNode, seen = new Set()) => {
+    const node = unwrapExpression(rawNode);
     if (node?.type !== "Identifier") return isFetchCallee(node);
     const bindingSymbol = findVariable(this.context.sourceCode, node);
     if (!bindingSymbol?.defs.length) return node.name === "fetch";

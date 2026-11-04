@@ -1,3 +1,4 @@
+import { noUnstableRenderDefaultCollectionRule } from "./react-render-hygiene.js";
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import {
   findVariable,
@@ -106,9 +107,9 @@ const collectReturnArguments = (node, returnArguments) => {
       if (node.argument) {
         returnArguments.push(node.argument);
       }
-      return;
+      break;
     default:
-      return;
+      break;
   }
 };
 const isFreshReturnExpression = (expr, fnScope, sourceCode) => {
@@ -336,6 +337,12 @@ export default {
   },
   create(context) {
     if (!isRuleFile(context)) return {};
-    return new SnapshotAnalysis(context).listeners();
+    const snapshotListeners = new SnapshotAnalysis(context).listeners();
+    const defaultCollectionListeners =
+      noUnstableRenderDefaultCollectionRule.create(context);
+    return {
+      ...snapshotListeners,
+      ...defaultCollectionListeners,
+    };
   },
 };

@@ -9,12 +9,17 @@ import { ESLint } from "eslint";
 
 import {
   antidriftPlugin,
+  astOnlyPreset,
+  astOnlyRules,
   createEslintConfig,
   createOxlintConfig,
   eslintPreset,
+  eslintTypedPreset,
   oxlintPreset,
   recommendedRules,
   rules,
+  typedRuleNames,
+  typedRules,
 } from "../src/index.js";
 import { runPackedConsumerSmoke } from "./packed-consumer-smoke.mjs";
 import {
@@ -26,7 +31,7 @@ import {
 import { runTypedEslintSmoke } from "./typed-eslint-smoke.mjs";
 
 const repoRoot = resolve(import.meta.dirname, "..");
-const expectedRuleCount = 104;
+const expectedRuleCount = 82;
 
 assert.equal(antidriftPlugin.meta.name, "antidrift");
 const ruleNames = Object.keys(rules);
@@ -36,6 +41,16 @@ assert.equal(
   `Expected ${expectedRuleCount} rules, got ${ruleNames.length}`
 );
 assert.equal(Object.keys(recommendedRules).length, expectedRuleCount);
+assert.equal(typedRuleNames.length, 20);
+assert.equal(Object.keys(typedRules).length, 20);
+assert.equal(Object.keys(astOnlyRules).length, 62);
+assert.equal(
+  Object.keys(typedRules).length + Object.keys(astOnlyRules).length,
+  expectedRuleCount
+);
+assert.equal(eslintTypedPreset.name, "antidrift/typed");
+assert.deepEqual(eslintTypedPreset.rules, typedRules);
+assert.deepEqual(astOnlyPreset.rules, astOnlyRules);
 
 for (const [name, rule] of Object.entries(rules)) {
   assert.equal(
@@ -75,6 +90,7 @@ try {
       private: true,
       dependencies: {
         "@expo/ui": "1.0.0",
+        "@tauri-apps/api": "2.0.0",
         react: "19.0.0",
         "react-native": "0.78.0",
         zod: "4.0.0",

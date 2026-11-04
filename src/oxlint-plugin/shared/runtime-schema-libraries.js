@@ -31,7 +31,7 @@ export const schemaDiscriminantKeys = new Set([
   "variant",
 ]);
 
-export function isRuntimeSchemaLibrarySource(specifier, importedName = null) {
+function isRuntimeSchemaLibrarySource(specifier, importedName = null) {
   if (typeof specifier !== "string") return false;
   if (specifier === "effect") return effectSchemaModules.has(importedName);
   if (specifier.startsWith("effect/")) {
@@ -68,9 +68,9 @@ function importedSchemaLibrary(identifier, sourceCode) {
   const imported = definition.node?.imported;
   const importedName =
     imported?.type === "Identifier" ? imported.name : (imported?.value ?? null);
-  return isRuntimeSchemaLibrarySource(
-    definition.parent.source?.value,
-    importedName
+  return (
+    (typeof importedName === "string" && importedName.endsWith("Schema")) ||
+    isRuntimeSchemaLibrarySource(definition.parent.source?.value, importedName)
   );
 }
 
@@ -226,28 +226,38 @@ export function isSchemaUnionCall(expression, sourceCode) {
   };
 }
 
+function resolveShapeObjectExpression(argNode, sourceCode) {
+  const unwrapped = unwrapAwaitedExpression(argNode);
+  if (unwrapped?.type === "ObjectExpression") return unwrapped;
+  if (unwrapped?.type === "Identifier") {
+    const init = unwrapAwaitedExpression(
+      constInitializer(sourceCode, unwrapped)
+    );
+    if (init?.type === "ObjectExpression") return init;
+  }
+  return null;
+}
+
 export function isSchemaObjectOrExtendCall(expression, sourceCode) {
   const node = unwrapAwaitedExpression(expression);
   const builder = resolveSchemaBuilderCall(node, sourceCode);
   if (!builder) return null;
-  if (
-    isObjectSchemaMethod(builder.method) &&
-    builder.args[0]?.type === "ObjectExpression"
-  ) {
+  const shapeNode = resolveShapeObjectExpression(builder.args[0], sourceCode);
+  if (isObjectSchemaMethod(builder.method) && shapeNode) {
     return {
       method: builder.method,
-      shapeNode: builder.args[0],
+      shapeNode,
       baseSchemaNode: null,
     };
   }
   if (
     (builder.method === "extend" || builder.method === "merge") &&
-    builder.args[0]?.type === "ObjectExpression" &&
+    shapeNode &&
     node?.callee?.type === "MemberExpression"
   ) {
     return {
       method: builder.method,
-      shapeNode: builder.args[0],
+      shapeNode,
       baseSchemaNode: node.callee.object,
     };
   }
@@ -445,4 +455,123 @@ export function isSchemaFieldRename(node, sourceCode) {
     omittedNames,
     sourceCode
   );
+}
+
+const WIDENING_SCHEMA_METHODS = new Set([
+  "optional",
+  "nullish",
+  "nullable",
+  "default",
+]);
+
+function unwrapPreprocessSchema(expression, sourceCode) {
+  const builder = resolveSchemaBuilderCall(expression, sourceCode);
+  return builder?.method === "preprocess" && builder.args[1]
+    ? builder.args[1]
+    : expression;
+}
+
+function propertyWideningStep(validatorNode, sourceCode) {
+  const inner = unwrapPreprocessSchema(validatorNode, sourceCode);
+  const chain = resolveSchemaMemberChain(inner, sourceCode);
+  const step = chain?.steps.findLast((entry) =>
+    WIDENING_SCHEMA_METHODS.has(entry.method)
+  );
+  return step ? { chain, step } : null;
+}
+
+function referencesShapeField(node, fieldName) {
+  let cur = node;
+  while (cur?.type === "CallExpression" || cur?.type === "MemberExpression") {
+    if (
+      cur.type === "MemberExpression" &&
+      !cur.computed &&
+      cur.property?.name === fieldName &&
+      cur.object?.type === "MemberExpression" &&
+      !cur.object.computed &&
+      cur.object.property?.name === "shape"
+    ) {
+      return true;
+    }
+    cur = cur.type === "CallExpression" ? cur.callee : cur.object;
+  }
+  return false;
+}
+
+function localBaseFieldStatus(
+  baseNode,
+  fieldName,
+  sourceCode,
+  seen = new Set()
+) {
+  const unwrapped = unwrapAwaitedExpression(baseNode);
+  if (!unwrapped || seen.has(unwrapped)) return "unknown";
+  seen.add(unwrapped);
+  if (unwrapped.type === "Identifier") {
+    const init = constInitializer(sourceCode, unwrapped);
+    return init
+      ? localBaseFieldStatus(init, fieldName, sourceCode, seen)
+      : "unknown";
+  }
+  const builder = resolveSchemaBuilderCall(unwrapped, sourceCode);
+  if (
+    builder?.method === "pick" &&
+    objectFieldNames(builder.args[0]).includes(fieldName)
+  ) {
+    return "required";
+  }
+  const objCall = isSchemaObjectOrExtendCall(unwrapped, sourceCode);
+  if (objCall) {
+    const match = objCall.shapeNode.properties.find(
+      (prop) => staticPropertyKey(prop) === fieldName
+    );
+    if (match) {
+      return propertyWideningStep(match.value, sourceCode)
+        ? "already_widened"
+        : "required";
+    }
+    return objCall.baseSchemaNode
+      ? localBaseFieldStatus(
+          objCall.baseSchemaNode,
+          fieldName,
+          sourceCode,
+          seen
+        )
+      : "absent";
+  }
+  return unwrapped.callee?.type === "MemberExpression"
+    ? localBaseFieldStatus(unwrapped.callee.object, fieldName, sourceCode, seen)
+    : "unknown";
+}
+
+export function findWidenedSchemaField(node, sourceCode) {
+  const extendCall = isSchemaObjectOrExtendCall(node, sourceCode);
+  if (extendCall?.method !== "extend" || !extendCall.baseSchemaNode) {
+    return null;
+  }
+  const properties = extendCall.shapeNode.properties;
+  for (const prop of properties) {
+    const name = staticPropertyKey(prop);
+    const widening = name && propertyWideningStep(prop.value, sourceCode);
+    if (!widening) continue;
+    const status = localBaseFieldStatus(
+      extendCall.baseSchemaNode,
+      name,
+      sourceCode
+    );
+    const isImportedFieldSchemaOverride =
+      status === "unknown" &&
+      properties.length === 1 &&
+      widening.chain.root?.type === "Identifier" &&
+      widening.chain.root.name === `${name}Schema`;
+    if (
+      status === "required" ||
+      (status !== "already_widened" &&
+        referencesShapeField(widening.step.node, name)) ||
+      isImportedFieldSchemaOverride
+    ) {
+      return { node: prop, fieldName: name, method: widening.step.method };
+    }
+  }
+  return null;
 }

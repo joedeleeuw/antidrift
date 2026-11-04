@@ -1,9 +1,10 @@
+import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import {
   findVariable,
   isFunctionLike,
+  isNullishNode,
   unwrapExpression,
 } from "../shared/scope.js";
-import { resolvedDeclarationFiles } from "../shared/type-services.js";
 
 const DISCRIMINANT_KEYS = new Set([
   "kind",
@@ -16,14 +17,6 @@ const DISCRIMINANT_KEYS = new Set([
   "phase",
   "variant",
 ]);
-
-function isNullishNode(node) {
-  const expr = unwrapExpression(node);
-  return (
-    (expr?.type === "Literal" && expr.value === null) ||
-    (expr?.type === "Identifier" && expr.name === "undefined")
-  );
-}
 
 function memberAndLiteralSides(test) {
   if (test.left?.type === "MemberExpression") {
@@ -138,12 +131,12 @@ function enclosingTernaryScope(node) {
   return null;
 }
 
-function hasLiteralEqualityTest(test) {
-  if (!test) return false;
-  if (test.type === "LogicalExpression") {
-    return (
-      hasLiteralEqualityTest(test.left) || hasLiteralEqualityTest(test.right)
-    );
+function literalEqualitySubject(test, sourceCode) {
+  if (!test) return null;
+  if (test.type === "LogicalExpression" && test.operator === "||") {
+    const left = literalEqualitySubject(test.left, sourceCode);
+    const right = literalEqualitySubject(test.right, sourceCode);
+    return left && left === right ? left : null;
   }
   if (
     test.type === "BinaryExpression" &&
@@ -152,14 +145,14 @@ function hasLiteralEqualityTest(test) {
       test.operator === "==" ||
       test.operator === "!=")
   ) {
-    return (
-      test.left?.type === "Literal" ||
-      test.right?.type === "Literal" ||
-      test.left?.type === "TemplateLiteral" ||
-      test.right?.type === "TemplateLiteral"
-    );
+    const leftIsLit =
+      test.left?.type === "Literal" || test.left?.type === "TemplateLiteral";
+    const rightIsLit =
+      test.right?.type === "Literal" || test.right?.type === "TemplateLiteral";
+    if (leftIsLit && !rightIsLit) return sourceCode.getText(test.right).trim();
+    if (rightIsLit && !leftIsLit) return sourceCode.getText(test.left).trim();
   }
-  return false;
+  return null;
 }
 
 function isHookCallee(callee) {
@@ -283,90 +276,6 @@ function checkNegatedDiscriminantScatter(blockNode, context) {
   }
 }
 
-function isRepoOwnedSpecifier(specifier) {
-  return (
-    typeof specifier === "string" &&
-    (specifier.startsWith("./") ||
-      specifier.startsWith("../") ||
-      specifier.startsWith("@/") ||
-      specifier.startsWith("~/") ||
-      specifier.startsWith("#/"))
-  );
-}
-
-function isImportDefRepoOwned(def) {
-  return (
-    def?.type === "ImportBinding" &&
-    def.parent?.type === "ImportDeclaration" &&
-    isRepoOwnedSpecifier(def.parent.source?.value)
-  );
-}
-
-function isAnnotationRepoOwned(annotation, localTypes, sourceCode) {
-  if (annotation?.type === "TSTypeLiteral") return true;
-  if (
-    annotation?.type !== "TSTypeReference" ||
-    annotation.typeName?.type !== "Identifier"
-  ) {
-    return false;
-  }
-  if (localTypes.has(annotation.typeName.name)) return true;
-  const typeDef = findVariable(sourceCode, annotation.typeName)?.defs?.[0];
-  return isImportDefRepoOwned(typeDef);
-}
-
-function isProvenRepoOwnedReceiver(identNode, localTypes, context) {
-  const sourceCode = context.sourceCode;
-  const declFiles = resolvedDeclarationFiles(identNode, sourceCode);
-  if (declFiles.length > 0) {
-    return declFiles.every((file) => !file.includes("/node_modules/"));
-  }
-  const def = findVariable(sourceCode, identNode)?.defs?.[0];
-  if (!def) return false;
-  if (isImportDefRepoOwned(def)) return true;
-  const annotation = def.name?.typeAnnotation?.typeAnnotation;
-  if (isAnnotationRepoOwned(annotation, localTypes, sourceCode)) return true;
-  const init = unwrapExpression(def.node?.init);
-  if (init?.type === "ObjectExpression") return true;
-  if (init?.type === "CallExpression" && init.callee?.type === "Identifier") {
-    const calleeDef = findVariable(sourceCode, init.callee)?.defs?.[0];
-    return (
-      calleeDef?.type === "FunctionName" || isImportDefRepoOwned(calleeDef)
-    );
-  }
-  return false;
-}
-
-function checkNestedExistenceTernary(node, localTypes, context) {
-  if (
-    node.parent?.type === "ConditionalExpression" ||
-    node.alternate?.type !== "ConditionalExpression"
-  ) {
-    return;
-  }
-  const firstTest = unwrapExpression(node.test);
-  const secondTest = unwrapExpression(node.alternate.test);
-  if (
-    firstTest?.type !== "MemberExpression" ||
-    secondTest?.type !== "MemberExpression" ||
-    firstTest.computed ||
-    secondTest.computed ||
-    firstTest.object?.type !== "Identifier" ||
-    secondTest.object?.type !== "Identifier" ||
-    firstTest.object.name !== secondTest.object.name ||
-    firstTest.property?.name === secondTest.property?.name
-  ) {
-    return;
-  }
-  if (!isProvenRepoOwnedReceiver(firstTest.object, localTypes, context)) {
-    return;
-  }
-  context.report({
-    node,
-    message: `Nested existence ternaries probe multiple properties on '${firstTest.object.name}'; model '${firstTest.object.name}' as a discriminated union instead.`,
-  });
-}
-
 function checkRepeatedNullableTernary(node, scopeCounts, context) {
   if (
     node.parent?.type === "ConditionalExpression" ||
@@ -406,25 +315,27 @@ function checkRepeatedNullableTernary(node, scopeCounts, context) {
   }
 }
 
-function checkLiteralBranches(node, context) {
+function checkIfChain(node, context) {
   if (node.parent?.type === "IfStatement" && node.parent.alternate === node) {
     return;
   }
+  const subject = literalEqualitySubject(node.test, context.sourceCode);
+  if (!subject) return;
   let branches = 1;
-  let allLiteralTests = hasLiteralEqualityTest(node.test);
+  let sameSubject = true;
   let cur = node;
   while (cur.alternate) {
     branches += 1;
     if (cur.alternate.type === "IfStatement") {
       cur = cur.alternate;
-      if (!hasLiteralEqualityTest(cur.test)) {
-        allLiteralTests = false;
+      if (literalEqualitySubject(cur.test, context.sourceCode) !== subject) {
+        sameSubject = false;
       }
     } else {
       break;
     }
   }
-  if (branches >= 5 && allLiteralTests) {
+  if (branches >= 5 && sameSubject) {
     context.report({
       node,
       message: `Branch tree has ${branches} arms; declare a typed case table instead of chaining if/else branches.`,
@@ -445,8 +356,8 @@ function normalizeSwitchCaseSkeleton(switchCase, sourceCode) {
     .map((stmt) =>
       sourceCode
         .getText(stmt)
-        .replace(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\b\d+\b/gu, "$LIT")
-        .replace(/\s+/gu, " ")
+        .replaceAll(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\b\d+\b/gu, "$LIT")
+        .replaceAll(/\s+/gu, " ")
         .trim()
     )
     .join(";");
@@ -472,16 +383,9 @@ function checkSwitchStatement(node, context) {
   }
 }
 
-export function createBranchChecks(context) {
+function createBranchChecks(context) {
   const scopeCounts = new Map();
-  const localTypes = new Set();
   return {
-    TSInterfaceDeclaration(node) {
-      if (node.id?.name) localTypes.add(node.id.name);
-    },
-    TSTypeAliasDeclaration(node) {
-      if (node.id?.name) localTypes.add(node.id.name);
-    },
     Program(node) {
       checkShreddedBindings(node, context);
       checkNegatedDiscriminantScatter(node, context);
@@ -491,14 +395,34 @@ export function createBranchChecks(context) {
       checkNegatedDiscriminantScatter(node, context);
     },
     ConditionalExpression(node) {
-      checkNestedExistenceTernary(node, localTypes, context);
       checkRepeatedNullableTernary(node, scopeCounts, context);
     },
     IfStatement(node) {
-      checkLiteralBranches(node, context);
+      checkIfChain(node, context);
     },
     SwitchStatement(node) {
       checkSwitchStatement(node, context);
     },
   };
 }
+
+export const noBranchTreeRule = {
+  meta: {
+    type: "suggestion",
+    docs: {
+      description:
+        "Disallow deep if/else branch trees over a closed discriminant, discriminated-union ternary shredding, and repeated nullable ternary fan-out.",
+    },
+    schema: [
+      {
+        type: "object",
+        properties: scopeProperties,
+        additionalProperties: false,
+      },
+    ],
+  },
+  create(context) {
+    if (!isRuleFile(context)) return {};
+    return createBranchChecks(context);
+  },
+};

@@ -1,5 +1,5 @@
 export const badSource = `
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { TouchableOpacity } from "react-native";
 import { Text as WidgetText } from "@expo/ui/swift-ui";
 import { z } from "zod";
@@ -150,6 +150,25 @@ export function loadItemsSwallowingError(run: () => string[]): string[] {
     return [];
   }
 }
+
+export function upsertEntryTwoPass(
+  entries: { id: string; label: string }[],
+  next: { id: string; label: string }
+) {
+  return entries.some((entry) => entry.id === next.id)
+    ? entries.map((entry) => (entry.id === next.id ? next : entry))
+    : [...entries, next];
+}
+
+function LeafHeader({ title }: { title: string }) {
+  return <span>{title}</span>;
+}
+
+export function DrillBanner({ title, active }: { title: string; active: boolean }) {
+  const [shown, setShown] = useState(false);
+  if (active && !shown) setShown(true);
+  return <LeafHeader title={title} />;
+}
 `;
 
 export const goodSource = `
@@ -247,21 +266,16 @@ export async function consumeStreamSafely(stream: ReadableStream<Uint8Array>) {
 `;
 
 export const expectedRules = [
-  "antidrift/no-unknown-type-aliases",
-  "antidrift/no-redeclared-owned-union",
   "antidrift/no-structural-type-fork",
   "antidrift/no-compat-names",
   "antidrift/no-closed-string-parameter",
   "antidrift/no-mutable-let-alias",
-  "antidrift/no-else-if-chain",
-  "antidrift/no-unsafe-deserialize",
-  "antidrift/no-unsafe-cast-chain",
-  "antidrift/no-redundant-zod-parse",
+  "antidrift/no-appeasement-cast",
+  "antidrift/no-redundant-schema-parse",
   "antidrift/no-async-array-method",
-  "antidrift/no-unstable-render-default-collection",
   "antidrift/no-impure-render-call",
   "antidrift/no-unbound-widget-capture",
-  "antidrift/no-raw-react-native-touchables",
+  "antidrift/no-raw-touchables",
   "antidrift/require-stable-snapshot",
   "antidrift/require-authz-check",
   "antidrift/no-handrolled-resource-lifecycle-cells",
@@ -272,7 +286,7 @@ export const expectedRules = [
   "antidrift/no-branch-tree",
   "antidrift/no-pass-through-parameters",
   "antidrift/no-unresolved-dependency-types",
-  "antidrift/no-nullable-positional-tuple",
+  "antidrift/no-contract-appeasement-projection",
   "antidrift/unknown-input-must-be-decoded",
   "antidrift/no-query-join-or-tree-reshape",
 ];
@@ -359,8 +373,23 @@ export const expectedDiagnostics = [
       "Failure path drops the error and returns an empty collection, which makes bad data look valid. Let the error propagate or return a typed failure.",
   },
   {
-    ruleId: "antidrift/no-redundant-zod-parse",
+    ruleId: "antidrift/no-redundant-schema-parse",
     message:
       "Parameter 'entry' is already typed as a decoded schema output; do not re-parse internal typed values.",
+  },
+  {
+    ruleId: "antidrift/no-query-join-or-tree-reshape",
+    message:
+      "Two-pass array upsert scans the collection with `.some()` / `.find()` and then re-scans with `.map()`; key the collection in a Map or update in a single pass.",
+  },
+  {
+    ruleId: "antidrift/no-handrolled-resource-lifecycle-cells",
+    message:
+      "React state setter 'setShown' is called synchronously during render; derive the value during render instead of latching state.",
+  },
+  {
+    ruleId: "antidrift/no-pass-through-parameters",
+    message:
+      "Parameter 'title' is only forwarded unchanged to 'LeafHeader'. Resolve it at the leaf or pass a narrower domain object.",
   },
 ];

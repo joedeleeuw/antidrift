@@ -7,9 +7,10 @@ import {
   wrapperCandidate,
 } from "./function-boundary-helpers.js";
 import { passThroughVisitors } from "./parameter-bag-checks.js";
-import { getProgramIndex } from "../shared/program-index.js";
+import { getProgramIndex, resolveSymbolKey } from "../shared/program-index.js";
+import { getTypeServices } from "../shared/type-services.js";
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
-import { findVariable, staticPropertyName } from "../shared/scope.js";
+import { findVariable } from "../shared/scope.js";
 
 const SCOPE_SCHEMA = [
   { type: "object", properties: scopeProperties, additionalProperties: false },
@@ -36,6 +37,25 @@ function isLayerReference(reference) {
 const SERVICE_CONSTRUCTOR_NAME = /^make[A-Z]/u;
 const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/u;
 
+function isEffectServiceSource(sourceNode, sourceText, sourceCode) {
+  const services = getTypeServices(sourceCode);
+  if (services) {
+    const tsSource = services.nodeMap.get(sourceNode);
+    const modSymbol = tsSource
+      ? services.checker.getSymbolAtLocation(tsSource)
+      : null;
+    const targetFile = modSymbol?.declarations?.[0]
+      ?.getSourceFile?.()
+      ?.fileName?.replaceAll("\\", "/");
+    const index = getProgramIndex(sourceCode);
+    return Boolean(targetFile && index?.effectModules?.has(targetFile));
+  }
+  return (
+    /service|layer/iu.test(sourceText) ||
+    /\b(?:Effect|Layer|Context)\b/u.test(sourceCode.text ?? "")
+  );
+}
+
 export const noServiceConstructorImportsRule = {
   meta: {
     type: "problem",
@@ -60,7 +80,8 @@ export const noServiceConstructorImportsRule = {
         const source = node.source?.value;
         if (
           typeof source !== "string" ||
-          (!source.startsWith("./") && !source.startsWith("../"))
+          (!source.startsWith("./") && !source.startsWith("../")) ||
+          !isEffectServiceSource(node.source, source, context.sourceCode)
         ) {
           return;
         }
@@ -128,18 +149,23 @@ export const noPassThroughParametersRule = {
   },
 };
 
-function reportWrapperCandidate(context, cand, fileFacts) {
-  const exported = cand.exported || fileFacts.exportedNames.has(cand.name);
+function reportWrapperCandidate(context, cand, exportedNames) {
+  const exported = cand.exported || exportedNames.has(cand.name);
   const hop = { name: cand.name, callee: cand.callee };
   if (!exported) {
     context.report({ node: cand.node, messageId: "wrapper", data: hop });
     return;
   }
   const programIndex = getProgramIndex(context.sourceCode);
-  const calls =
-    (programIndex?.callStats.get(cand.name)?.totalCalls ?? 0) -
-    (fileFacts.memberCalls.get(cand.name) ?? 0);
-  if (programIndex && calls <= 1) {
+  if (!programIndex) return;
+  const services = getTypeServices(context.sourceCode);
+  const symKey = services
+    ? resolveSymbolKey(services.checker, services.nodeMap.get(cand.node))
+    : null;
+  const symStats = symKey ? programIndex.callStats.get(symKey) : null;
+  const stats = symStats ?? programIndex.callStats.get(cand.name);
+  const calls = stats ? stats.totalCalls : 0;
+  if (calls <= 1) {
     context.report({ node: cand.node, messageId: "unusedHop", data: hop });
   }
 }
@@ -147,7 +173,6 @@ function reportWrapperCandidate(context, cand, fileFacts) {
 function wrappingVisitors(context) {
   const sourceCode = context.sourceCode;
   const exportedNames = new Set();
-  const memberCalls = new Map();
   const candidates = [];
   function checkFunction(node) {
     const candidate = wrapperCandidate(node, sourceCode);
@@ -177,13 +202,9 @@ function wrappingVisitors(context) {
     FunctionDeclaration: checkFunction,
     FunctionExpression: checkFunction,
     ArrowFunctionExpression: checkFunction,
-    CallExpression(node) {
-      const name = staticPropertyName(node.callee);
-      if (name) memberCalls.set(name, (memberCalls.get(name) ?? 0) + 1);
-    },
     "Program:exit"() {
       for (const cand of candidates) {
-        reportWrapperCandidate(context, cand, { exportedNames, memberCalls });
+        reportWrapperCandidate(context, cand, exportedNames);
       }
     },
   };

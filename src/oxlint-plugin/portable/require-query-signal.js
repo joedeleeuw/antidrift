@@ -91,10 +91,10 @@ const signalBindingName = (queryFunction) => {
   }
   return null;
 };
-const isFetchCallee = (callee, isGlobalReference) => {
+const isFetchCallee = (callee, checkGlobalReference) => {
   const unwrapped = unwrapTS(callee);
   if (isIdentifier(unwrapped, "fetch")) {
-    return isGlobalReference(unwrapped, "fetch");
+    return checkGlobalReference(unwrapped, "fetch");
   }
   if (unwrapped?.type !== "MemberExpression" || unwrapped.computed !== false) {
     return false;
@@ -106,7 +106,7 @@ const isFetchCallee = (callee, isGlobalReference) => {
   return (
     isIdentifier(object) &&
     GLOBAL_FETCH_HOSTS.has(object.name) &&
-    isGlobalReference(object, object.name)
+    checkGlobalReference(object, object.name)
   );
 };
 const HTTP_VERBS = new Set(["get", "post", "put", "patch", "delete", "head"]);

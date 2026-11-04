@@ -1,4 +1,4 @@
-import { resolveOwnerStatusValues } from "../owned-union-source.js";
+import { resolveOwnerStatusValues } from "./owned-union-source.js";
 
 const FUNCTION_TYPES = new Set([
   "FunctionDeclaration",
@@ -22,8 +22,44 @@ const EXPRESSION_WRAPPERS = new Set([
   "TSSatisfiesExpression",
 ]);
 
+export const HOOK_NAME = /^use[A-Z0-9]/u;
+
 export function isFunctionLike(node) {
   return Boolean(node && FUNCTION_TYPES.has(node.type));
+}
+
+export function nearestFunction(node) {
+  for (let current = node?.parent; current; current = current.parent) {
+    if (isFunctionLike(current)) return current;
+  }
+  return null;
+}
+
+export function functionNameOf(node) {
+  if (node?.id?.type === "Identifier") return node.id.name;
+  if (
+    node?.parent?.type === "VariableDeclarator" &&
+    node.parent.id?.type === "Identifier"
+  ) {
+    return node.parent.id.name;
+  }
+  return null;
+}
+
+export function hasWidgetDirective(fnNode) {
+  if (fnNode?.body?.type !== "BlockStatement") return false;
+  for (const stmt of fnNode.body.body) {
+    if (stmt.type !== "ExpressionStatement") break;
+    const dir =
+      stmt.directive ??
+      (stmt.expression?.type === "Literal" &&
+      typeof stmt.expression.value === "string"
+        ? stmt.expression.value
+        : null);
+    if (!dir) break;
+    if (dir === "widget") return true;
+  }
+  return false;
 }
 
 export function unwrapExpression(node) {
@@ -32,6 +68,21 @@ export function unwrapExpression(node) {
     current = current.expression;
   }
   return current ?? null;
+}
+
+export function isNullishNode(node) {
+  const expr = unwrapExpression(node);
+  return (
+    (expr?.type === "Literal" && expr.value === null) ||
+    (expr?.type === "Identifier" && expr.name === "undefined")
+  );
+}
+
+export function bindingTypeAnnotation(def) {
+  if (!def) return null;
+  return def.type === "Parameter"
+    ? def.name?.typeAnnotation?.typeAnnotation
+    : def.node?.id?.typeAnnotation?.typeAnnotation;
 }
 
 export function unwrapAwaitedExpression(node) {
@@ -50,6 +101,13 @@ export function staticPropertyName(member) {
     return property.value;
   }
   return "";
+}
+
+export function calleeName(call) {
+  const callee = unwrapExpression(call?.callee);
+  return callee?.type === "Identifier"
+    ? callee.name
+    : staticPropertyName(callee);
 }
 
 export function staticPropertyKey(property) {
@@ -94,7 +152,12 @@ export function isTypeOnlyModule(node) {
 }
 
 export function findVariable(sourceCode, identifier) {
-  if (!identifier || identifier.type !== "Identifier") return null;
+  if (
+    !identifier ||
+    (identifier.type !== "Identifier" && identifier.type !== "JSXIdentifier")
+  ) {
+    return null;
+  }
   let scope = sourceCode?.getScope?.(identifier);
   while (scope) {
     const binding = scope.set?.get?.(identifier.name);
@@ -119,8 +182,8 @@ export function constInitializer(sourceCode, identifier) {
 export function splitIdentifierWords(name) {
   if (typeof name !== "string" || name.length === 0) return [];
   return name
-    .replace(/([a-z0-9])([A-Z])/gu, "$1 $2")
-    .replace(/([A-Z]+)([A-Z][a-z])/gu, "$1 $2")
+    .replaceAll(/([a-z0-9])([A-Z])/gu, "$1 $2")
+    .replaceAll(/([A-Z]+)([A-Z][a-z])/gu, "$1 $2")
     .split(/[^A-Za-z0-9]+/u)
     .filter(Boolean)
     .map((word) => word.toLowerCase());
@@ -190,13 +253,19 @@ export function functionReturnsJsx(fnNode) {
   return expressionContainsJsx(fnNode.body);
 }
 
+export function isRenderOwner(owner) {
+  return (
+    functionReturnsJsx(owner) || HOOK_NAME.test(functionNameOf(owner) ?? "")
+  );
+}
+
 const TYPE_DECLARATION_TYPES = new Set([
   "TSTypeAliasDeclaration",
   "TSInterfaceDeclaration",
 ]);
 
 function normalizedContextName(contextName) {
-  return (contextName ?? "").replace(/[^a-z0-9]/giu, "").toLowerCase();
+  return (contextName ?? "").replaceAll(/[^a-z0-9]/giu, "").toLowerCase();
 }
 
 function nodeKeyName(node) {

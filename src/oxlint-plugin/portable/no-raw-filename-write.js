@@ -85,8 +85,7 @@ class RawFilenameWrites {
     if (binding === null || seenVariables.has(binding)) {
       return false;
     }
-    const nextSeenVariables = new Set(seenVariables);
-    nextSeenVariables.add(binding);
+    const nextSeenVariables = new Set([...seenVariables, binding]);
     return binding.defs.some((definition) => {
       const declaration = definition.node;
       if (declaration.type !== "VariableDeclarator") {

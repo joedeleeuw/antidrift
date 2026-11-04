@@ -1,4 +1,5 @@
 import { checkUndecodedCast } from "./boundary-decode-checks.js";
+import { isConstAssertion } from "../shared/owned-union-source.js";
 import {
   hasTypeChecker,
   resolvedDeclarationFiles,
@@ -6,6 +7,7 @@ import {
   resolvedTypeTexts,
 } from "../shared/type-services.js";
 import {
+  bindingTypeAnnotation,
   findVariable,
   isFunctionLike,
   staticPropertyName,
@@ -99,13 +101,6 @@ function nullishRemoval(test, paramName) {
 function constituentTexts(typeNode, sourceCode) {
   const members = typeNode.type === "TSUnionType" ? typeNode.types : [typeNode];
   return members.map((member) => sourceCode.getText(member));
-}
-
-function bindingTypeAnnotation(def) {
-  if (!def) return null;
-  return def.type === "Parameter"
-    ? def.name.typeAnnotation?.typeAnnotation
-    : def.node?.id?.typeAnnotation?.typeAnnotation;
 }
 
 function receiverElementAnnotation(call, sourceCode) {
@@ -374,21 +369,106 @@ function checkUndercheckedPredicate(node, typeFields, context) {
   }
 }
 
-export function checkTypeAssertion(node, context) {
-  const target = node.typeAnnotation;
-  if (target?.type === "TSAnyKeyword") {
+function isTypeAssertionExpression(node) {
+  return node?.type === "TSAsExpression" || node?.type === "TSTypeAssertion";
+}
+
+function unwrapParenthesizedExpression(expression) {
+  let current = expression;
+  while (current?.type === "ParenthesizedExpression") {
+    current = current.expression;
+  }
+  return current;
+}
+
+function isOutermostAssertionInChain(node) {
+  let current = node;
+  let parent = node.parent;
+  while (
+    parent?.type === "ParenthesizedExpression" &&
+    parent.expression === current
+  ) {
+    current = parent;
+    parent = parent.parent;
+  }
+  return !isTypeAssertionExpression(parent) || parent.expression !== current;
+}
+
+function isForbiddenAssertionChain(node) {
+  let assertionCount = 0;
+  let hasNonConstAssertion = false;
+  let current = node;
+  while (isTypeAssertionExpression(current)) {
+    assertionCount += 1;
+    hasNonConstAssertion ||= !isConstAssertion(current);
+    current = unwrapParenthesizedExpression(current.expression);
+  }
+  return assertionCount > 1 && hasNonConstAssertion;
+}
+
+function isNeverTarget(target) {
+  return (
+    target?.type === "TSNeverKeyword" ||
+    (target?.type === "TSTypeReference" &&
+      target.typeName?.type === "Identifier" &&
+      target.typeName.name === "never")
+  );
+}
+
+const OBJECT_COLLECTION_METHODS = new Set([
+  "keys",
+  "values",
+  "entries",
+  "fromEntries",
+]);
+
+function isObjectCollectionCall(node) {
+  const callee = node?.callee;
+  return (
+    node?.type === "CallExpression" &&
+    callee?.type === "MemberExpression" &&
+    !callee.computed &&
+    callee.object?.type === "Identifier" &&
+    callee.object.name === "Object" &&
+    OBJECT_COLLECTION_METHODS.has(callee.property?.name)
+  );
+}
+
+function reportLiteralOrCollectionCast(node, inner, context) {
+  if (inner?.type === "ArrayExpression") {
     context.report({
       node,
       message:
-        "Do not cast to `any`; decode untrusted values at the boundary or use a narrow type.",
+        "Do not cast an array literal with `as T`; use a variable type annotation, generic type argument, or `satisfies T`.",
     });
-    return;
+    return true;
   }
-  const inner = node.expression;
+  if (isObjectCollectionCall(inner)) {
+    context.report({
+      node,
+      message:
+        "Do not cast `Object.keys`/`entries`/`fromEntries` output with `as T`; use an owned `typedKeys`/`typedEntries` helper or validate keys explicitly.",
+    });
+    return true;
+  }
   if (
-    (inner?.type === "TSAsExpression" || inner?.type === "TSTypeAssertion") &&
-    inner.typeAnnotation?.type !== "TSTypeReference"
+    inner?.type === "NewExpression" &&
+    inner.callee?.type === "Identifier" &&
+    inner.callee.name.endsWith("Error")
   ) {
+    context.report({
+      node,
+      message:
+        "Do not cast a constructed `Error` with `as T`; construct a typed error subclass or return a discriminated failure value.",
+    });
+    return true;
+  }
+  return false;
+}
+
+export function checkTypeAssertion(node, context) {
+  if (!isOutermostAssertionInChain(node) || isConstAssertion(node)) return;
+  if (isForbiddenAssertionChain(node)) {
     context.report({
       node,
       message:
@@ -396,20 +476,16 @@ export function checkTypeAssertion(node, context) {
     });
     return;
   }
-  if (
-    inner?.type === "ObjectExpression" &&
-    target?.type === "TSTypeReference" &&
-    !(
-      target.typeName?.type === "Identifier" && target.typeName.name === "const"
-    )
-  ) {
+  const target = node.typeAnnotation;
+  if (isNeverTarget(target)) {
     context.report({
       node,
-      message:
-        "Do not cast an object literal with `as T`; use `satisfies T` or a variable type annotation so missing fields fail typechecking.",
+      message: "Do not cast to 'never'. Fix the type boundary instead.",
     });
     return;
   }
+  const inner = unwrapParenthesizedExpression(node.expression);
+  if (reportLiteralOrCollectionCast(node, inner, context)) return;
   checkUndecodedCast(node, context);
 }
 

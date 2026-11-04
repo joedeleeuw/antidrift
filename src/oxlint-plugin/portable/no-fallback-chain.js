@@ -2,6 +2,7 @@ import {
   constInitializer,
   findVariable,
   isFunctionLike,
+  isNullishNode,
   unwrapExpression,
 } from "../shared/scope.js";
 
@@ -223,14 +224,6 @@ function isPureBooleanDisjunction(node, sourceCode) {
   return leaves.some((leaf) => isSyntacticBooleanOperand(leaf, sourceCode));
 }
 
-function isNullishNode(node) {
-  const expr = unwrapExpression(node);
-  return (
-    (expr?.type === "Literal" && expr.value === null) ||
-    (expr?.type === "Identifier" && expr.name === "undefined")
-  );
-}
-
 function isAbsenceLiteralOrNullish(node) {
   return isNullishNode(node) || (node?.type === "Literal" && node.value === "");
 }
@@ -240,7 +233,7 @@ function extractTestedPresenceCandidate(testNode, sourceCode) {
   if (!test) return null;
   if (test.type === "Identifier" || test.type === "MemberExpression") {
     return {
-      candidateText: sourceCode.getText(test).replace(/\s+/gu, ""),
+      candidateText: sourceCode.getText(test).replaceAll(/\s+/gu, ""),
       inverted: false,
     };
   }
@@ -266,7 +259,7 @@ function extractTestedPresenceCandidate(testNode, sourceCode) {
     isAbsenceLiteralOrNullish(right)
   ) {
     return {
-      candidateText: sourceCode.getText(left).replace(/\s+/gu, ""),
+      candidateText: sourceCode.getText(left).replaceAll(/\s+/gu, ""),
       inverted: operator === "===" || operator === "==",
     };
   }
@@ -282,7 +275,7 @@ function extractValueFallbackTernary(node, sourceCode) {
   const fallbackBranch = tested.inverted ? expr.consequent : expr.alternate;
   const presentText = sourceCode
     .getText(unwrapExpression(presentBranch))
-    .replace(/\s+/gu, "");
+    .replaceAll(/\s+/gu, "");
   if (
     presentText !== tested.candidateText &&
     !presentText.startsWith(`${tested.candidateText}.`)
@@ -324,27 +317,27 @@ function unwrapCallbackReturn(callbackNode) {
   return unwrapExpression(callbackNode.body);
 }
 
-function isFindPresencePredicate(arg) {
-  const pred = unwrapExpression(arg);
-  if (!pred) return false;
-  if (pred.type === "Identifier" && pred.name === "Boolean") return true;
-  if (!isFunctionLike(pred) || pred.params.length === 0) return false;
-  const firstParam = pred.params[0];
-  if (firstParam?.type !== "Identifier") return false;
-  const unwrapped = unwrapCallbackReturn(pred);
-  if (!unwrapped) return false;
-  if (unwrapped.type === "Identifier" && unwrapped.name === firstParam.name) {
-    return true;
-  }
-  if (
+function isIdentityOrBooleanParamCall(unwrapped, paramName) {
+  if (unwrapped.type === "Identifier") return unwrapped.name === paramName;
+  return (
     unwrapped.type === "CallExpression" &&
     unwrapped.callee?.type === "Identifier" &&
     unwrapped.callee.name === "Boolean" &&
     unwrapped.arguments[0]?.type === "Identifier" &&
-    unwrapped.arguments[0].name === firstParam.name
-  ) {
-    return true;
-  }
+    unwrapped.arguments[0].name === paramName
+  );
+}
+
+function isFindPresencePredicate(arg) {
+  const pred = unwrapExpression(arg);
+  if (!pred) return false;
+  if (pred.type === "Identifier") return pred.name === "Boolean";
+  if (!isFunctionLike(pred)) return false;
+  const firstParam = pred.params[0];
+  const unwrapped =
+    firstParam?.type === "Identifier" ? unwrapCallbackReturn(pred) : null;
+  if (!unwrapped) return false;
+  if (isIdentityOrBooleanParamCall(unwrapped, firstParam.name)) return true;
   return (
     unwrapped.type === "BinaryExpression" &&
     (unwrapped.operator === "!==" || unwrapped.operator === "!=") &&
@@ -387,7 +380,7 @@ function isLoopCoalesceHelperFunction(fnNode, sourceCode) {
   return (
     tested !== null &&
     !tested.inverted &&
-    sourceCode.getText(retStmt.argument).replace(/\s+/gu, "") ===
+    sourceCode.getText(retStmt.argument).replaceAll(/\s+/gu, "") ===
       tested.candidateText
   );
 }

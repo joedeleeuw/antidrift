@@ -59,7 +59,7 @@ function containsHardcodedColor(cssText) {
   if (funcMatch) {
     return funcMatch[0];
   }
-  const sanitized = stripped.replace(CSS_PROP_FALSE_POSITIVES, "");
+  const sanitized = stripped.replaceAll(CSS_PROP_FALSE_POSITIVES, "");
   const namedMatch = NAMED_COLOR_PATTERN.exec(sanitized);
   if (namedMatch) {
     return namedMatch[0];

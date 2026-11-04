@@ -78,7 +78,7 @@ export function* patternIdentifiers(node, options = {}) {
       return;
     case "TSParameterProperty":
       yield* patternIdentifiers(node.parameter, options);
-      return;
+      break;
     default:
   }
 }

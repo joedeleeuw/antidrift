@@ -7,6 +7,11 @@ import {
   staticPropertyName,
   unwrapExpression,
 } from "../shared/scope.js";
+import {
+  getResolvedType,
+  getTypeServices,
+  resolvedDeclarationFiles,
+} from "../shared/type-services.js";
 
 const OUTCOME_KEYS = new Set(["kind", "outcome", "status", "type", "ok"]);
 const REMAP_EXIT_TYPES = new Set([
@@ -22,7 +27,7 @@ const TYPE_WRAPPERS = new Set([
   "TSTypeAssertion",
 ]);
 const MUTATOR_NAME =
-  /^(?:apply|mutate|populate|write|fill|register|install|set|update|append|push|record|add)(?:[A-Z_\d]|$)/u;
+  /^(?:apply|mutate|populate|write|fill|register|install|set|update|append|push|record)(?:[A-Z_\d]|$)/u;
 const MUTABLE_HOST_TYPE =
   /^(?:Headers|URLSearchParams|FormData|Set|WeakSet|Element|Node|Document|Window|(?:HTML|SVG)\w*Element|\w*Stream|\w*Writer)$/u;
 const EXEMPT_MUTATION_PARAM =
@@ -30,13 +35,18 @@ const EXEMPT_MUTATION_PARAM =
 
 function returnedCall(body) {
   if (!body) return null;
+  let expr = null;
   if (body.type === "BlockStatement") {
     if (body.body.length !== 1 || body.body[0].type !== "ReturnStatement") {
       return null;
     }
-    return unwrapExpression(body.body[0].argument);
+    expr = unwrapExpression(body.body[0].argument);
+  } else {
+    expr = unwrapExpression(body);
   }
-  return unwrapExpression(body);
+  return expr?.type === "AwaitExpression"
+    ? unwrapExpression(expr.argument)
+    : expr;
 }
 
 export function functionBinding(node) {
@@ -69,7 +79,18 @@ export function isLocalFunctionBinding(identifier, sourceCode) {
   const definition = findVariable(sourceCode, identifier)?.defs?.[0];
   if (definition?.type === "ImportBinding") {
     const source = definition.parent?.source?.value;
-    return typeof source === "string" && source.startsWith(".");
+    if (
+      typeof source === "string" &&
+      (source.startsWith(".") ||
+        source.startsWith("@/") ||
+        source.startsWith("~/"))
+    ) {
+      return true;
+    }
+    const files = resolvedDeclarationFiles(identifier, sourceCode);
+    return (
+      files.length > 0 && files.every((file) => !file.includes("node_modules"))
+    );
   }
   return (
     isFunctionLike(definition?.node) ||
@@ -82,10 +103,49 @@ function localFunctionArity(identifier, sourceCode) {
   const declaration = isFunctionLike(node)
     ? node
     : unwrapExpression(node?.init);
-  return isFunctionLike(declaration) ? declaration.params.length : 0;
+  return isFunctionLike(declaration) ? declaration.params.length : null;
 }
 
-function forwardsParameters(call, forwarded) {
+const BUILTIN_CALL_OBJECTS = new Set([
+  "JSON",
+  "Math",
+  "Object",
+  "Array",
+  "Number",
+  "String",
+  "Boolean",
+  "Date",
+  "Promise",
+  "Reflect",
+  "Intl",
+  "console",
+]);
+
+function isConstantCallArgument(arg) {
+  const expr = unwrapExpression(arg);
+  if (!expr) return false;
+  if (expr.type === "Literal") return true;
+  if (expr.type === "ObjectExpression") {
+    return expr.properties.every(
+      (prop) =>
+        prop.type === "Property" &&
+        !prop.computed &&
+        isConstantCallArgument(prop.value)
+    );
+  }
+  if (expr.type === "ArrayExpression") {
+    return expr.elements.every(
+      (element) => element && isConstantCallArgument(element)
+    );
+  }
+  return false;
+}
+
+function forwardsParameters(call, forwarded, exported) {
+  if (forwarded.length === 0) {
+    if (call.arguments.length === 0) return true;
+    return Boolean(exported) && call.arguments.every(isConstantCallArgument);
+  }
   return (
     call.arguments.length === forwarded.length &&
     forwarded.every(
@@ -103,26 +163,32 @@ function isModuleLevel(node) {
   return true;
 }
 
-function forwardableCallee(node, call, sourceCode) {
+function forwardableCallee(node, call, binding, sourceCode) {
   const callee = unwrapExpression(call.callee);
   if (callee?.type === "Identifier") {
     if (node.params.length > 0) return callee;
+    if (binding?.exported && call.arguments.length > 0) return callee;
     return isModuleLevel(node) &&
       isLocalFunctionBinding(callee, sourceCode) &&
       localFunctionArity(callee, sourceCode) === 0
       ? callee
       : null;
   }
+  const objectIdent =
+    callee?.type === "MemberExpression" && callee.object?.type === "Identifier"
+      ? callee.object.name
+      : null;
   return callee?.type === "MemberExpression" &&
     !callee.computed &&
     node.params.length > 0 &&
+    !BUILTIN_CALL_OBJECTS.has(objectIdent) &&
     !hasRuntimeSchemaProvenance(callee.object, sourceCode)
     ? callee
     : null;
 }
 
 export function wrapperCandidate(node, sourceCode) {
-  if (node.async || node.generator) return null;
+  if (node.generator) return null;
   if (node.params.some((parameter) => parameter.type !== "Identifier")) {
     return null;
   }
@@ -130,14 +196,22 @@ export function wrapperCandidate(node, sourceCode) {
   const call = binding ? returnedCall(node.body) : null;
   if (
     call?.type !== "CallExpression" ||
-    !forwardsParameters(call, node.params)
+    !forwardsParameters(call, node.params, binding?.exported)
   ) {
     return null;
   }
-  const callee = forwardableCallee(node, call, sourceCode);
-  return callee
-    ? { node: node.id ?? node, ...binding, callee: sourceCode.getText(callee) }
-    : null;
+  const callee = forwardableCallee(node, call, binding, sourceCode);
+  if (!callee) return null;
+  const isFirstPartyParamWrapper =
+    node.params.length > 0 &&
+    callee.type === "Identifier" &&
+    isLocalFunctionBinding(callee, sourceCode);
+  return {
+    node: node.id ?? node,
+    ...binding,
+    callee: sourceCode.getText(callee),
+    isFirstPartyParamWrapper,
+  };
 }
 
 function outcomeMember(expression, bindingName) {
@@ -315,8 +389,33 @@ function exitsEarly(statement) {
   );
 }
 
+function resolvedStringCollection(identifier, sourceCode) {
+  const services = getTypeServices(sourceCode);
+  const type = services && getResolvedType(identifier, sourceCode);
+  if (!type) return null;
+  const typeArgs = services.checker.getTypeArguments?.(type) ?? [];
+  const elementType =
+    typeArgs[0] ?? services.checker.getNumberIndexType?.(type);
+  let parts = typeArgs;
+  if (elementType?.isUnion?.()) {
+    parts = elementType.types;
+  } else if (elementType) {
+    parts = [elementType];
+  }
+  if (parts.length < 2) return null;
+  const literals = [];
+  for (const part of parts) {
+    if (!part?.isStringLiteral?.() || typeof part.value !== "string") {
+      return null;
+    }
+    literals.push(`"${part.value}"`);
+  }
+  return [...new Set(literals)];
+}
+
 function constStringCollection(identifier, sourceCode) {
   const init = unwrapExpression(constInitializer(sourceCode, identifier));
+  if (!init) return resolvedStringCollection(identifier, sourceCode);
   const elements =
     init?.type === "NewExpression" && init.callee?.name === "Set"
       ? unwrapExpression(init.arguments[0])?.elements
@@ -373,7 +472,8 @@ function isOnlyBranchSelector(parameter, body, sourceCode) {
   return (
     statement?.type === "IfStatement" &&
     statement.test === test &&
-    statement.alternate !== null &&
+    (statement.alternate !== null ||
+      (exitsEarly(statement.consequent) && body.body.length >= 2)) &&
     body.body.includes(statement)
   );
 }
@@ -382,7 +482,7 @@ export function booleanModeParameter(node, sourceCode) {
   const binding = functionBinding(node);
   if (
     !binding?.exported ||
-    node.params.length < 2 ||
+    node.params.length < 1 ||
     node.body?.type !== "BlockStatement"
   ) {
     return null;

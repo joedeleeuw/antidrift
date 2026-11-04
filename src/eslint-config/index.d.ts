@@ -2,16 +2,23 @@ import type { antidriftPlugin } from "../oxlint-plugin/index.js";
 
 export declare const defaultIgnorePatterns: readonly string[];
 
+export declare const typedRuleNames: readonly string[];
+
 export declare const recommendedRules: Readonly<Record<string, "error">>;
+
+export declare const typedRules: Readonly<Record<string, "error">>;
+
+export declare const astOnlyRules: Readonly<Record<string, "error">>;
 
 export interface CreateEslintConfigOptions {
   readonly files?: readonly string[];
   readonly ignores?: readonly string[];
   readonly rules?: Readonly<Record<string, unknown>>;
+  readonly typedOnly?: boolean;
 }
 
 export interface AntidriftEslintConfig {
-  readonly name: "antidrift/recommended";
+  readonly name: "antidrift/recommended" | "antidrift/typed";
   readonly files?: readonly string[];
   readonly ignores: string[];
   readonly plugins: {
@@ -25,5 +32,7 @@ export declare function createEslintConfig(
 ): AntidriftEslintConfig;
 
 export declare const eslintPreset: AntidriftEslintConfig;
+
+export declare const eslintTypedPreset: AntidriftEslintConfig;
 
 export default eslintPreset;

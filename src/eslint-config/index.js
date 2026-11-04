@@ -1,27 +1,43 @@
 import {
+  astOnlyRules,
   defaultIgnorePatterns,
   recommendedRules,
+  typedRuleNames,
+  typedRules,
 } from "../oxlint-config/index.js";
 import { antidriftPlugin } from "../oxlint-plugin/index.js";
 
-export { defaultIgnorePatterns, recommendedRules };
+export {
+  astOnlyRules,
+  defaultIgnorePatterns,
+  recommendedRules,
+  typedRuleNames,
+  typedRules,
+};
 
 export function createEslintConfig(options = {}) {
-  const { files, ignores = [], rules: ruleOverrides = {} } = options;
+  const {
+    files,
+    ignores = [],
+    rules: ruleOverrides = {},
+    typedOnly = false,
+  } = options;
+  const baseRules = typedOnly ? typedRules : recommendedRules;
   return {
-    name: "antidrift/recommended",
+    name: typedOnly ? "antidrift/typed" : "antidrift/recommended",
     ...(Array.isArray(files) && files.length > 0 ? { files } : {}),
     ignores: [...new Set([...defaultIgnorePatterns, ...ignores])],
     plugins: {
       antidrift: antidriftPlugin,
     },
     rules: {
-      ...recommendedRules,
+      ...baseRules,
       ...ruleOverrides,
     },
   };
 }
 
 export const eslintPreset = createEslintConfig();
+export const eslintTypedPreset = createEslintConfig({ typedOnly: true });
 
 export default eslintPreset;

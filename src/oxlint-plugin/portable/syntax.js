@@ -114,6 +114,3 @@ const MIGRATION_PATTERN =
   /(?:^|\/)(?:migrations?|db\/migrations)(?:\/|$)|(?:^|\/)\d+[_-][^/]+\.[cm]?[jt]sx?$/;
 export const isMigrationFile = (filename) =>
   typeof filename === "string" && MIGRATION_PATTERN.test(filename);
-const DOMAIN_PATTERN = /(?:^|\/)(?:domain|model)\//;
-export const isDomainFile = (filename) =>
-  typeof filename === "string" && DOMAIN_PATTERN.test(filename);

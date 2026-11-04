@@ -33,7 +33,7 @@ export function astLiteralText(node) {
 export function memberSet(literals) {
   if (literals.length === 0 || literals.includes(null)) return null;
   return JSON.stringify(
-    [...new Set(literals.map((literal) => JSON.stringify(literal)))].sort()
+    [...new Set(literals.map((literal) => JSON.stringify(literal)))].toSorted()
   );
 }
 
@@ -49,7 +49,7 @@ function unwrapParensAndSatisfies(node) {
   return cur;
 }
 
-function isConstAssertion(node) {
+export function isConstAssertion(node) {
   if (node?.type !== "TSAsExpression" && node?.type !== "TSTypeAssertion") {
     return false;
   }
@@ -135,7 +135,7 @@ export function exportedArraysFromProgram(programNode) {
 }
 
 function stripCommentsPreserveStrings(text) {
-  return text.replace(
+  return text.replaceAll(
     /("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`)|\/\/[^\n]*|\/\*[\s\S]*?\*\//gu,
     (_full, strLiteral) => strLiteral ?? ""
   );
@@ -143,7 +143,7 @@ function stripCommentsPreserveStrings(text) {
 
 function unescapeStringLiteral(quoted) {
   const inner = quoted.slice(1, -1);
-  return inner.replace(/\\(.)/gu, (_m, ch) => {
+  return inner.replaceAll(/\\(.)/gu, (_m, ch) => {
     if (ch === "n") return "\n";
     if (ch === "r") return "\r";
     if (ch === "t") return "\t";
@@ -182,7 +182,7 @@ function recordRegexArrayMatches(cleaned, pattern, bindings, exports) {
   for (const match of cleaned.matchAll(pattern)) {
     const isExported = Boolean(match[1]);
     const localName = match[2];
-    const members = memberSet(parseArrayElementTokens(match[3]));
+    const members = memberSet(parseArrayElementTokens(match[3] ?? match[4]));
     if (!members) continue;
     bindings.set(localName, members);
     if (isExported) {
@@ -193,8 +193,8 @@ function recordRegexArrayMatches(cleaned, pattern, bindings, exports) {
 
 const CONST_ARRAY_REGEX =
   /(?:^|[;\n])\s*(export\s+)?const\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+?)?=\s*\(*\s*\[([\s\S]*?)\]\s*\)*\s*as\s+const\b/gu;
-const ZOD_ENUM_REGEX =
-  /(?:^|[;\n])\s*(export\s+)?const\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+?)?=\s*z\.enum\(\s*\[([\s\S]*?)\]\s*\)/gu;
+const SCHEMA_ENUM_REGEX =
+  /(?:^|[;\n])\s*(export\s+)?const\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+?)?=\s*(?:(?:z\.enum|v\.picklist)\(\s*\[([\s\S]*?)\]\s*\)|Schema\.Literal\(\s*([\s\S]*?)\s*\))/gu;
 const NAMED_EXPORT_REGEX = /(?:^|[;\n])\s*export\s*\{([^}]+)\}(?!\s*from\b)/gu;
 const DEFAULT_EXPORT_REGEX =
   /(?:^|[;\n])\s*export\s+default\s+([A-Za-z_$][\w$]*)\b/gu;
@@ -205,7 +205,7 @@ function exportedArrays(text) {
   const exports = new Map();
 
   recordRegexArrayMatches(cleaned, CONST_ARRAY_REGEX, bindings, exports);
-  recordRegexArrayMatches(cleaned, ZOD_ENUM_REGEX, bindings, exports);
+  recordRegexArrayMatches(cleaned, SCHEMA_ENUM_REGEX, bindings, exports);
 
   for (const match of cleaned.matchAll(NAMED_EXPORT_REGEX)) {
     for (const part of match[1].split(",")) {

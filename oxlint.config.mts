@@ -13,6 +13,7 @@ const antidrift = createOxlintConfig({
 });
 const tooling = createToolingConfig({
   repoRoot: import.meta.dirname,
+  maxLines: 1000,
 });
 const nativePlugins = ["eslint", "import", "oxc", "react", "unicorn"] as const;
 const toolingBaseRules = Object.fromEntries(
@@ -48,6 +49,11 @@ export default defineConfig({
   rules: {
     ...toolingBaseRules,
     ...antidrift.rules,
+    "max-lines-per-function": [
+      "error",
+      { max: 60, skipBlankLines: true, skipComments: true },
+    ],
+    "max-params": ["error", { max: 5 }],
     "preserve-caught-error": "error",
     "no-console": "error",
     "no-debugger": "error",
@@ -68,12 +74,23 @@ export default defineConfig({
       { terms: ["@nocommit", "FIXME"], location: "anywhere" },
     ],
     "unicorn/no-abusive-eslint-disable": "error",
+    "unicorn/no-array-sort": "error",
     "unicorn/no-await-in-promise-methods": "error",
+    "unicorn/no-immediate-mutation": "error",
     "unicorn/no-invalid-fetch-options": "error",
     "unicorn/no-single-promise-in-promise-methods": "error",
     "unicorn/no-useless-promise-resolve-reject": "error",
+    "unicorn/consistent-function-scoping": "error",
+    "unicorn/prefer-at": "error",
     "unicorn/prefer-node-protocol": "error",
+    "unicorn/prefer-string-replace-all": "error",
     "unicorn/require-post-message-target-origin": "error",
+    eqeqeq: ["error", "always"],
+    "no-eq-null": "error",
+    "no-loop-func": "error",
+    "no-param-reassign": "error",
+    "no-shadow": "error",
+    "no-useless-return": "error",
     curly: ["error", "multi-line"],
     "import/no-cycle": ["error", { ignoreExternal: true }],
     "import/consistent-type-specifier-style": ["error", "prefer-top-level"],
@@ -102,6 +119,15 @@ export default defineConfig({
         "antidrift/no-unlisted-external-imports": [
           "error",
           { allowDevDependencies: false },
+        ],
+      },
+    },
+    {
+      files: ["**/domain/**", "**/model/**", "**/models/**"],
+      rules: {
+        "no-restricted-exports": [
+          "error",
+          { restrictDefaultExports: { direct: true } },
         ],
       },
     },

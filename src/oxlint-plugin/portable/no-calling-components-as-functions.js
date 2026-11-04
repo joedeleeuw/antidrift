@@ -6,6 +6,11 @@ import {
   isFunctionLike,
   unwrapExpression,
 } from "../shared/scope.js";
+import {
+  getResolvedType,
+  getTypeServices,
+  resolvedDeclarationFiles,
+} from "../shared/type-services.js";
 
 const IGNORED_NAMES = new Set(["OverrideOrDefault"]);
 const NOT_PASCAL_CASE_RE = /^[A-Z][A-Z\d]*_|^[A-Z][A-Z\d_]*$/u;
@@ -117,15 +122,39 @@ function isComponentWrapperCall(sourceCode, node) {
   );
 }
 
+function resolvesImportedComponent(sourceCode, identifier) {
+  const services = getTypeServices(sourceCode);
+  if (!services) return false;
+  const files = resolvedDeclarationFiles(identifier, sourceCode);
+  if (
+    files.length === 0 ||
+    !files.some(
+      (file) => !file.includes("node_modules") && /\.[jt]sx$/u.test(file)
+    )
+  ) {
+    return false;
+  }
+  const type = getResolvedType(identifier, sourceCode);
+  const sig = type?.getCallSignatures?.()?.[0];
+  if (!sig) return false;
+  const returnType = services.checker.getReturnTypeOfSignature(sig);
+  const returnText = returnType
+    ? services.checker.typeToString(returnType)
+    : "";
+  return /\b(?:Element|ReactElement|ReactNode)\b/u.test(returnText);
+}
+
 // A callee is a component only when its binding resolves in scope, through
 // local aliases, to a function that lexically returns JSX, or to a React
-// forwardRef/memo wrapper. Imported and otherwise unresolvable callees are not
-// reported.
+// forwardRef/memo wrapper, or via TypeServices to an imported .tsx/.jsx component.
 function resolvesToComponent(sourceCode, identifier, seen = new Set()) {
   const binding = findVariable(sourceCode, identifier);
   if (!binding || seen.has(binding)) return false;
   seen.add(binding);
   const definition = binding.defs?.[0];
+  if (definition?.type === "ImportBinding") {
+    return resolvesImportedComponent(sourceCode, identifier);
+  }
   if (definition?.type === "FunctionName") {
     return functionReturnsJsx(definition.node);
   }

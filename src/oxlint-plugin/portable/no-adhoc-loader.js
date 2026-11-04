@@ -1,6 +1,5 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import {
-  filenameForContext,
   isAstNode,
   isStringLiteral,
   jsxAttributeName,
@@ -14,21 +13,6 @@ const LOADER_ICON_NAMES = [
   "LoaderPinwheelIcon",
 ];
 const BANNED_UTILITY = /(?:^|\s)animate-(?:spin|pulse)(?:\s|$)/u;
-const isAllowedFile = (context, allowedFiles) => {
-  const filename = filenameForContext(context);
-  return allowedFiles.some((allowedFile) => {
-    if (typeof allowedFile === "string") {
-      return filename.endsWith(allowedFile);
-    }
-    return (
-      typeof allowedFile === "object" &&
-      allowedFile !== null &&
-      "path" in allowedFile &&
-      typeof allowedFile.path === "string" &&
-      filename.endsWith(allowedFile.path)
-    );
-  });
-};
 const staticStrings = (node, out) => {
   if (!isAstNode(node)) {
     return;
@@ -117,23 +101,6 @@ export default {
           loaderIcons: { type: "array", items: { type: "string" } },
           owner: { type: "string", minLength: 1 },
           skeleton: { type: "string", minLength: 1 },
-          allowedFiles: {
-            type: "array",
-            items: {
-              anyOf: [
-                { type: "string" },
-                {
-                  type: "object",
-                  properties: {
-                    path: { type: "string" },
-                    reason: { type: "string" },
-                  },
-                  required: ["path", "reason"],
-                  additionalProperties: false,
-                },
-              ],
-            },
-          },
         },
         additionalProperties: false,
       },
@@ -148,21 +115,6 @@ export default {
       skeleton: options.skeleton ?? "accessible placeholder text",
     };
 
-    if (
-      (() => {
-        const options = context.options.at(0);
-        const allowedFiles =
-          typeof options === "object" &&
-          options !== null &&
-          !Array.isArray(options) &&
-          Array.isArray(options.allowedFiles)
-            ? options.allowedFiles
-            : [];
-        return !isAllowedFile(context, allowedFiles);
-      })() === false
-    ) {
-      return {};
-    }
     return {
       JSXOpeningElement(node) {
         const name = jsxElementName(node.name);

@@ -1,5 +1,6 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import {
+  calleeName,
   findVariable,
   isFunctionLike,
   unwrapExpression,
@@ -37,19 +38,6 @@ const SAFE_LOOKUP_METHODS = new Set([
 const GUARD_HELPER_PREFIX =
   /^(?:isTrusted|isAllowed|assert|verify|validate|require|check|ensure)|sender|frame|origin|auth/iu;
 
-function calleeName(callee) {
-  if (!callee) return null;
-  if (callee.type === "Identifier") return callee.name;
-  if (
-    callee.type === "MemberExpression" &&
-    !callee.computed &&
-    callee.property?.type === "Identifier"
-  ) {
-    return callee.property.name;
-  }
-  return null;
-}
-
 function isIpcMainRegistration(node) {
   const callee = node.callee;
   return (
@@ -78,7 +66,7 @@ function isSenderOrFrameAccess(candidate, eventParamName) {
 function isGuardCallOnEvent(candidate, eventParamName) {
   return (
     candidate.type === "CallExpression" &&
-    GUARD_HELPER_PREFIX.test(calleeName(candidate.callee) ?? "") &&
+    GUARD_HELPER_PREFIX.test(calleeName(candidate)) &&
     candidate.arguments.some(
       (arg) => arg.type === "Identifier" && arg.name === eventParamName
     )
@@ -112,7 +100,7 @@ function isGuardCallStatement(stmt, eventParamName, authzSet) {
   const rawExpr = stmt.expression;
   const expr = rawExpr?.type === "AwaitExpression" ? rawExpr.argument : rawExpr;
   if (expr?.type !== "CallExpression") return false;
-  const name = calleeName(expr.callee);
+  const name = calleeName(expr);
   const isGuardName =
     name && (GUARD_HELPER_PREFIX.test(name) || authzSet.has(name));
   const passesEventOrSender = expr.arguments.some(
@@ -266,7 +254,7 @@ class AuthorizationChecks {
 
   visitCallExpression = (node) => {
     const frame = this.stack.at(-1);
-    const name = calleeName(node.callee);
+    const name = calleeName(node);
     if (frame && name && this.authzSet.has(name)) {
       frame.sawAuthz = true;
     }

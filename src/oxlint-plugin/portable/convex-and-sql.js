@@ -125,31 +125,72 @@ export const requireConvexReturnValidatorRule = {
   },
 };
 
-const OWNED_PACKAGES = /^(?:convex\/react|@trpc\/|@tanstack\/react-query)/u;
+const OWNED_PACKAGES =
+  /^(?:convex\/react|@trpc\/|@tanstack\/react-query|swr|@apollo\/client|urql|@reduxjs\/toolkit\/query)/u;
 const INFERRED_QUERY_HOOK = /^use(?:Suspense|Infinite)?Query$/u;
-const OWNED_HOOK = /^use(?:(?:Suspense|Infinite|Paginated)?Query|Mutation)$/u;
-const TRPC_HOOK = /^use(?:(?:Suspense|Infinite)?Query|Mutation)$/u;
+const OWNED_HOOK =
+  /^use(?:[A-Z]\w*)?(?:Query|Queries|PaginatedQuery|InfiniteQuery|LazyQuery|Mutation|SWR)$/u;
+const TRPC_HOOK =
+  /^use(?:(?:Suspense|Infinite|Lazy)?Query|Queries|Mutation|Subscription)$/u;
 const TRPC_ROOT = /^(?:trpc|api)$/u;
 
-function queryFnReturnsConcreteType(options, sourceCode) {
-  const services = getTypeServices(sourceCode);
-  const queryFn = options.properties.find(
-    (property) => staticPropertyKey(property) === "queryFn"
+function hasConcreteAstReturnType(fnOrIdent, sourceCode) {
+  const expr = unwrapExpression(fnOrIdent);
+  const decl =
+    expr?.type === "Identifier"
+      ? findVariable(sourceCode, expr)?.defs?.[0]?.node
+      : expr;
+  const ann = decl?.returnType?.typeAnnotation;
+  if (!ann) return false;
+  return (
+    ann.type !== "TSAnyKeyword" &&
+    ann.type !== "TSUnknownKeyword" &&
+    ann.type !== "TSNeverKeyword"
   );
-  const signature = queryFn
-    ? getResolvedType(queryFn.value, sourceCode)?.getCallSignatures?.()[0]
-    : null;
-  if (
-    !services ||
-    !signature ||
-    isBroadResolvedType(queryFn.value, sourceCode)
-  ) {
+}
+
+function fnReturnsConcreteType(fnNode, sourceCode) {
+  if (!fnNode) return false;
+  const services = getTypeServices(sourceCode);
+  const signature = getResolvedType(
+    fnNode,
+    sourceCode
+  )?.getCallSignatures?.()[0];
+  if (!services || !signature) {
+    return hasConcreteAstReturnType(fnNode, sourceCode);
+  }
+  if (isBroadResolvedType(fnNode, sourceCode)) {
     return false;
   }
   const returned = services.checker.getReturnTypeOfSignature(signature);
   const awaited = services.checker.getAwaitedType?.(returned) ?? returned;
   const text = services.checker.typeToString(awaited);
-  return text !== "any" && text !== "unknown";
+  return (
+    text !== "any" &&
+    text !== "unknown" &&
+    text !== "never" &&
+    text !== "never[]"
+  );
+}
+
+function queryFnReturnsConcreteType(options, sourceCode) {
+  const queryFn = options?.properties?.find(
+    (property) => staticPropertyKey(property) === "queryFn"
+  );
+  return fnReturnsConcreteType(queryFn?.value, sourceCode);
+}
+
+function hasTypedDescriptorArg(arg, sourceCode) {
+  if (
+    !arg ||
+    arg.type === "Literal" ||
+    arg.type === "ArrayExpression" ||
+    arg.type === "ObjectExpression"
+  ) {
+    return false;
+  }
+  const resolved = getResolvedType(arg, sourceCode);
+  return Boolean(resolved && !isBroadResolvedType(arg, sourceCode));
 }
 
 function isTrpcRoot(identifier, sourceCode) {
@@ -169,12 +210,26 @@ function ownedApiCallee(node, importedHooks, sourceCode) {
   const callee = node.callee;
   const options = unwrapExpression(node.arguments[0]);
   if (callee?.type === "Identifier" && importedHooks.has(callee.name)) {
+    const importedName = importedHooks.get(callee.name);
+    if (importedName === "useSWR") {
+      return fnReturnsConcreteType(node.arguments[1], sourceCode)
+        ? callee.name
+        : null;
+    }
     const inlineQuery =
-      INFERRED_QUERY_HOOK.test(importedHooks.get(callee.name)) &&
+      INFERRED_QUERY_HOOK.test(importedName) &&
       options?.type === "ObjectExpression";
     return !inlineQuery || queryFnReturnsConcreteType(options, sourceCode)
       ? callee.name
       : null;
+  }
+  if (
+    callee?.type === "Identifier" &&
+    OWNED_HOOK.test(callee.name) &&
+    (queryFnReturnsConcreteType(options, sourceCode) ||
+      hasTypedDescriptorArg(options, sourceCode))
+  ) {
+    return callee.name;
   }
   const method = staticPropertyName(callee);
   if (TRPC_HOOK.test(method)) {
@@ -183,6 +238,13 @@ function ownedApiCallee(node, importedHooks, sourceCode) {
   return method === "getQueryData" && staticPropertyName(options) === "queryKey"
     ? method
     : null;
+}
+
+function importedHookName(spec) {
+  if (spec.type === "ImportSpecifier" && spec.imported?.type === "Identifier") {
+    return spec.imported.name;
+  }
+  return spec.type === "ImportDefaultSpecifier" ? spec.local.name : "";
 }
 
 export const noExplicitTypeArgumentsOnOwnedApiRule = {
@@ -202,12 +264,9 @@ export const noExplicitTypeArgumentsOnOwnedApiRule = {
         const src = node.source?.value;
         if (typeof src !== "string" || !OWNED_PACKAGES.test(src)) return;
         for (const spec of node.specifiers ?? []) {
-          if (
-            spec.type === "ImportSpecifier" &&
-            spec.imported?.type === "Identifier" &&
-            OWNED_HOOK.test(spec.imported.name)
-          ) {
-            importedHooks.set(spec.local.name, spec.imported.name);
+          const importedName = importedHookName(spec);
+          if (OWNED_HOOK.test(importedName)) {
+            importedHooks.set(spec.local.name, importedName);
           }
         }
       },

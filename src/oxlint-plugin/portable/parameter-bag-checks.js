@@ -1,4 +1,7 @@
-import { isLocalFunctionBinding } from "./function-boundary-helpers.js";
+import {
+  isLocalFunctionBinding,
+  wrapperCandidate,
+} from "./function-boundary-helpers.js";
 import { ruleFilename } from "../shared/rule-scope.js";
 import {
   findVariable,
@@ -8,6 +11,12 @@ import {
   staticPropertyName,
   unwrapExpression,
 } from "../shared/scope.js";
+import {
+  getResolvedType,
+  getTypeServices,
+  resolvedDeclarationFiles,
+  resolvedPropertyShape,
+} from "../shared/type-services.js";
 
 function collectMemberNames(members, names) {
   for (const member of members) {
@@ -113,10 +122,7 @@ function localBagDeclaration(typeNode, typeDeclarations) {
   }
   const name = typeNode.typeName.name;
   const declaration = typeDeclarations.get(name);
-  if (!declaration) return null;
-  const exported =
-    declaration.parent?.parent?.type === "ExportNamedDeclaration";
-  return !exported || BAG_TYPE_NAME.test(name) ? declaration : null;
+  return declaration && BAG_TYPE_NAME.test(name) ? declaration : null;
 }
 
 function objectPatternNames(pattern) {
@@ -145,23 +151,56 @@ function firstStatementDestructure(node, parameter) {
   return declarator ? objectPatternNames(declarator.id) : [];
 }
 
-function bagShape(node, parameter, typeDeclarations) {
+function isBagReference(typeNode, sourceCode) {
+  if (
+    typeNode?.type !== "TSTypeReference" ||
+    typeNode.typeName?.type !== "Identifier" ||
+    !BAG_TYPE_NAME.test(typeNode.typeName.name)
+  ) {
+    return false;
+  }
+  const files = sourceCode
+    ? resolvedDeclarationFiles(typeNode, sourceCode)
+    : [];
+  return files.every((file) => !file.includes("node_modules"));
+}
+
+function shouldCollectAnnotatedNames(parameter, annotation, localDeclaration) {
+  return (
+    parameter.type === "ObjectPattern" ||
+    annotation?.type === "TSTypeLiteral" ||
+    annotation?.type === "TSIntersectionType" ||
+    localDeclaration !== null
+  );
+}
+
+function bagShape(parameter, typeDeclarations, sourceCode) {
   const annotation = parameter.typeAnnotation?.typeAnnotation;
   const localDeclaration = localBagDeclaration(annotation, typeDeclarations);
-  const destructured =
-    annotation?.type === "TSTypeReference" && !localDeclaration
-      ? []
-      : firstStatementDestructure(node, parameter);
+  const resolvedBag =
+    !localDeclaration && isBagReference(annotation, sourceCode)
+      ? resolvedPropertyShape(annotation, sourceCode)
+      : null;
+  const isUnresolvedRef =
+    annotation?.type === "TSTypeReference" && !localDeclaration && !resolvedBag;
+  const destructured = isUnresolvedRef
+    ? []
+    : firstStatementDestructure(parameter.parent, parameter);
   const names = new Set(
     parameter.type === "ObjectPattern" ? objectPatternNames(parameter) : []
   );
-  collectTypePropertyNames(annotation, typeDeclarations, names);
+  const collectAnnotated = shouldCollectAnnotatedNames(
+    parameter,
+    annotation,
+    localDeclaration
+  );
+  if (collectAnnotated) {
+    collectTypePropertyNames(annotation, typeDeclarations, names);
+  }
+  for (const name of resolvedBag?.all ?? []) names.add(name);
   for (const name of destructured) names.add(name);
   const shaped =
-    parameter.type === "ObjectPattern" ||
-    annotation?.type === "TSTypeLiteral" ||
-    localDeclaration !== null ||
-    destructured.length > 0;
+    collectAnnotated || resolvedBag !== null || destructured.length > 0;
   return { shaped, size: names.size };
 }
 
@@ -179,7 +218,21 @@ function callbackArity(member) {
     : null;
 }
 
-function foreignCallbacks(parameter, typeDeclarations) {
+function addResolvedCallbacks(annotation, sourceCode, callbacks) {
+  const services = getTypeServices(sourceCode);
+  const type = services && getResolvedType(annotation, sourceCode);
+  if (!type) return;
+  for (const prop of services.checker.getPropertiesOfType(type) ?? []) {
+    if (typeof prop?.name !== "string" || prop.name.startsWith("__")) continue;
+    const propType = services.checker.getTypeOfSymbol?.(prop);
+    const sigs = propType?.getCallSignatures?.() ?? [];
+    if (sigs.length > 0) {
+      callbacks.set(prop.name, sigs[0].parameters?.length ?? 0);
+    }
+  }
+}
+
+function foreignCallbacks(parameter, typeDeclarations, sourceCode) {
   const annotation = parameter.typeAnnotation?.typeAnnotation;
   const members =
     memberList(annotation) ??
@@ -190,6 +243,8 @@ function foreignCallbacks(parameter, typeDeclarations) {
       const arity = callbackArity(member);
       if (arity !== null) callbacks.set(member.key.name, arity);
     }
+  } else if (isBagReference(annotation, sourceCode)) {
+    addResolvedCallbacks(annotation, sourceCode, callbacks);
   } else if (
     parameter.type === "ObjectPattern" &&
     annotation?.type !== "TSTypeReference"
@@ -216,7 +271,11 @@ function getterSetterPair(callbacks) {
 }
 
 function reportForeignCallbacks(parameter, typeDeclarations, context) {
-  const callbacks = foreignCallbacks(parameter, typeDeclarations);
+  const callbacks = foreignCallbacks(
+    parameter,
+    typeDeclarations,
+    context.sourceCode
+  );
   const names = [...callbacks.keys()];
   const setters = names.filter((name) => /^set[A-Z]/u.test(name));
   const getters = names.filter((name) => /^get[A-Z]/u.test(name));
@@ -247,13 +306,51 @@ function forwardedLocalCallee(sourceCode, parameter) {
   const identifier = binding.references[0].identifier;
   const call = identifier?.parent;
   return call?.type === "CallExpression" &&
+    call.arguments.length >= 2 &&
     call.arguments.includes(identifier) &&
     call.callee?.type === "Identifier" &&
-    findVariable(sourceCode, call.callee)?.defs?.[0]?.type !==
-      "ImportBinding" &&
     isLocalFunctionBinding(call.callee, sourceCode)
     ? call.callee.name
     : null;
+}
+
+function isReturnedRootJsxElement(opening) {
+  const parentType = opening?.parent?.parent?.type;
+  return (
+    opening?.type === "JSXOpeningElement" &&
+    parentType !== "JSXElement" &&
+    parentType !== "JSXFragment"
+  );
+}
+
+function forwardedJsxProp(sourceCode, prop) {
+  if (prop.type !== "Property" || prop.value?.type !== "Identifier") {
+    return null;
+  }
+  const binding = findVariable(sourceCode, prop.value);
+  if (!binding || binding.references.length !== 1) return null;
+  const ref = binding.references[0].identifier;
+  const container = ref?.parent;
+  const attr = container?.parent;
+  const opening = attr?.parent;
+  const nameNode = opening?.name;
+  return container?.type === "JSXExpressionContainer" &&
+    attr?.type === "JSXAttribute" &&
+    isReturnedRootJsxElement(opening) &&
+    nameNode?.type === "JSXIdentifier" &&
+    isLocalFunctionBinding(nameNode, sourceCode)
+    ? { node: prop.value, name: prop.value.name, callee: nameNode.name }
+    : null;
+}
+
+function forwardedJsxProps(sourceCode, parameter) {
+  if (parameter.type !== "ObjectPattern") return [];
+  const hits = [];
+  for (const prop of parameter.properties) {
+    const hit = forwardedJsxProp(sourceCode, prop);
+    if (hit) hits.push(hit);
+  }
+  return hits;
 }
 
 function memberExtraction(sourceCode, parameter) {
@@ -347,7 +444,7 @@ function checkParameterBags(node, typeDeclarations, context) {
   if (functionReturnsJsx(node)) return;
   const max = context.options[0]?.max ?? 10;
   for (const parameter of node.params) {
-    const bag = bagShape(node, parameter, typeDeclarations);
+    const bag = bagShape(parameter, typeDeclarations, context.sourceCode);
     if (bag.shaped && bag.size > max) {
       context.report({
         node: parameter,
@@ -372,7 +469,8 @@ export function passThroughVisitors(context) {
   const isTest = isTestFile(ruleFilename(context));
 
   function checkFunction(node) {
-    if (node.params.length >= 4) {
+    const candidate = wrapperCandidate(node, sourceCode);
+    if (node.params.length >= 4 && (!candidate || candidate.exported)) {
       for (const parameter of node.params) {
         const callee = forwardedLocalCallee(sourceCode, parameter);
         if (callee) {
@@ -384,7 +482,18 @@ export function passThroughVisitors(context) {
         }
       }
     }
-    if (!isTest) checkParameterBags(node, typeDeclarations, context);
+    if (!isTest) {
+      for (const parameter of node.params) {
+        for (const jsxForward of forwardedJsxProps(sourceCode, parameter)) {
+          context.report({
+            node: jsxForward.node,
+            messageId: "passThrough",
+            data: { name: jsxForward.name, callee: jsxForward.callee },
+          });
+        }
+      }
+      checkParameterBags(node, typeDeclarations, context);
+    }
   }
 
   return {

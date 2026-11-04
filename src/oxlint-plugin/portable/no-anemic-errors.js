@@ -1,4 +1,5 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
+import { isFunctionLike } from "../shared/scope.js";
 import {
   getCallChain,
   getFunctionStatements,
@@ -12,27 +13,103 @@ import {
   isTestFilename,
   unwrapChainExpression,
 } from "./syntax.js";
-import { emptyFailureFallbackVisitors } from "./empty-failure-fallback.js";
 import { mergeVisitors } from "../shared/merge-visitors.js";
+
+const FUNCTION_TYPES = new Set([
+  "ArrowFunctionExpression",
+  "FunctionDeclaration",
+  "FunctionExpression",
+]);
+
+const WRAPPER_TYPES = new Set([
+  "ChainExpression",
+  "ParenthesizedExpression",
+  "TSAsExpression",
+  "TSNonNullExpression",
+  "TSSatisfiesExpression",
+  "TSTypeAssertion",
+]);
+
+function isEmptyCollection(node) {
+  let current = node;
+  while (WRAPPER_TYPES.has(current?.type)) current = current.expression;
+  return (
+    (current?.type === "ArrayExpression" && current.elements.length === 0) ||
+    (current?.type === "ObjectExpression" && current.properties.length === 0)
+  );
+}
+
+function isPromiseCatchHandler(node) {
+  const call = node.parent;
+  return (
+    call?.type === "CallExpression" &&
+    call.arguments[0] === node &&
+    call.callee.type === "MemberExpression" &&
+    !call.callee.computed &&
+    call.callee.property.name === "catch"
+  );
+}
+
+function enclosingFailurePath(node) {
+  for (let current = node.parent; current; current = current.parent) {
+    if (FUNCTION_TYPES.has(current.type)) {
+      return isPromiseCatchHandler(current) ? current : null;
+    }
+    if (current.type === "CatchClause") return current;
+  }
+  return null;
+}
+
+function rethrows(body, sourceCode) {
+  const pending = [body];
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (current.type === "ThrowStatement") return true;
+    for (const key of sourceCode.visitorKeys[current.type] ?? []) {
+      for (const child of [current[key]].flat()) {
+        if (child?.type && !FUNCTION_TYPES.has(child.type)) pending.push(child);
+      }
+    }
+  }
+  return false;
+}
+
+function emptyFailureFallbackVisitors(context) {
+  const { sourceCode } = context;
+  return {
+    ReturnStatement(node) {
+      if (!isEmptyCollection(node.argument)) return;
+      const handler = enclosingFailurePath(node);
+      if (handler && !rethrows(handler.body, sourceCode)) {
+        context.report({ node, messageId: "fallback" });
+      }
+    },
+    ArrowFunctionExpression(node) {
+      if (
+        isEmptyCollection(node.body) &&
+        isPromiseCatchHandler(node) &&
+        !rethrows(node.body, sourceCode)
+      ) {
+        context.report({ node, messageId: "fallback" });
+      }
+    },
+  };
+}
 
 const VAGUE_ERROR_PATTERN =
   /^(failed|error|something went wrong|an error occurred|unknown error|unexpected error|oops|failure|internal error|server error)$/i;
-
-const BARE_ERROR_CONSTRUCTORS = new Set([
-  "Error",
-  "EvalError",
-  "RangeError",
-  "ReferenceError",
-  "SyntaxError",
-  "TypeError",
-  "URIError",
-]);
 
 const LOGGER_OBJECTS = new Set(["console", "logger", "log"]);
 const DECODE_METHOD = /^(?:parse|parseAsync|decodeUnknownSync|decodeSync)$/u;
 const NON_SCHEMA_RECEIVER = /^(?:Date|URL|path|Number|BigInt|Temporal)$/u;
 const PROCESS_FALLBACK_FIELDS = new Set(["stdout", "stderr", "code"]);
 const PROCESS_FALLBACK_TARGETS = new Set(["stdout", "stderr", "message"]);
+const SYNC_FS_METHODS = new Set([
+  "appendFileSync",
+  "writeFileSync",
+  "mkdirSync",
+]);
+const LOGGER_FN_RE = /(?:^|[a-z])(?:log|logger|audit)(?:[A-Z]|$)/u;
 
 const LOGGER_METHODS = new Set([
   "debug",
@@ -53,70 +130,41 @@ function isErrorMemberRead(node, errorName, allowedProperties) {
   );
 }
 
-function isBareCaughtErrorCall(target, errorName) {
-  const args = getNodeArray(target, "arguments");
-  if (args.length === 0) {
-    return isErrorMemberRead(target.callee, errorName, new Set(["toString"]));
+function enclosingFunctionName(node) {
+  for (let cur = node.parent; cur; cur = cur.parent) {
+    if (!isFunctionLike(cur)) continue;
+    if (cur.id?.name) return cur.id.name;
+    if (
+      cur.parent?.type === "VariableDeclarator" &&
+      cur.parent.id?.type === "Identifier"
+    ) {
+      return cur.parent.id.name;
+    }
+    if (
+      cur.parent?.type === "MethodDefinition" &&
+      cur.parent.key?.type === "Identifier"
+    ) {
+      return cur.parent.key.name;
+    }
   }
-  return (
-    getIdentifierName(target.callee) === "String" &&
-    args.length === 1 &&
-    (getIdentifierName(args[0]) === errorName ||
-      isErrorMemberRead(args[0], errorName, new Set(["message"])))
-  );
+  return "";
 }
 
-function isBareCaughtErrorTemplate(target, errorName) {
-  const expressions = getNodeArray(target, "expressions");
-  const quasis = getNodeArray(target, "quasis");
-  const staticText = quasis
-    .map((quasi) => getString(quasi.value?.raw) ?? "")
-    .join("")
-    .trim();
-  return (
-    staticText.length === 0 &&
-    expressions.length === 1 &&
-    isBareCaughtErrorMessage(expressions[0], errorName)
-  );
-}
-
-function isBareCaughtErrorMessage(node, errorName) {
-  const target = unwrapChainExpression(node);
-  if (!target) {
-    return false;
-  }
-  if (getIdentifierName(target) === errorName) {
-    return true;
-  }
-  if (isErrorMemberRead(target, errorName, new Set(["message", "stack"]))) {
-    return true;
-  }
-  if (
-    target.type === "CallExpression" &&
-    isBareCaughtErrorCall(target, errorName)
-  ) {
-    return true;
-  }
-  if (target.type === "TemplateLiteral") {
-    return isBareCaughtErrorTemplate(target, errorName);
-  }
-  if (target.type === "ConditionalExpression") {
-    return (
-      isBareCaughtErrorMessage(target.consequent, errorName) &&
-      isBareCaughtErrorMessage(target.alternate, errorName)
-    );
-  }
-  if (
-    target.type === "LogicalExpression" &&
-    (target.operator === "??" || target.operator === "||")
-  ) {
-    return (
-      isBareCaughtErrorMessage(target.left, errorName) &&
-      (isBareCaughtErrorMessage(target.right, errorName) ||
-        getLiteralString(target.right) !== null)
-    );
+function isInsideTryBlock(node) {
+  for (let cur = node.parent; cur && !isFunctionLike(cur); cur = cur.parent) {
+    if (cur.type === "TryStatement") return true;
   }
   return false;
+}
+
+function isSyncFsCall(callee) {
+  if (callee?.type === "Identifier") return SYNC_FS_METHODS.has(callee.name);
+  return (
+    callee?.type === "MemberExpression" &&
+    !callee.computed &&
+    callee.property?.type === "Identifier" &&
+    SYNC_FS_METHODS.has(callee.property.name)
+  );
 }
 
 function isLoggerStatementForError(statement, errorName) {
@@ -134,11 +182,9 @@ function isLoggerStatementForError(statement, errorName) {
   if (!chain || chain.members.length === 0) {
     return false;
   }
-  const methodName = chain.members[chain.members.length - 1];
+  const methodName = chain.members.at(-1);
   const receiverName =
-    chain.members.length === 1
-      ? chain.rootIdentifier
-      : chain.members[chain.members.length - 2];
+    chain.members.length === 1 ? chain.rootIdentifier : chain.members.at(-2);
   if (
     !methodName ||
     !receiverName ||
@@ -322,32 +368,27 @@ class ErrorDiagnostics {
     )
       ? getIdentifierName(argument.callee)
       : null;
-    const args = BARE_ERROR_CONSTRUCTORS.has(calleeName)
-      ? getNodeArray(argument, "arguments")
-      : [];
+    const args =
+      calleeName === "Error" ? getNodeArray(argument, "arguments") : [];
     const message = args[0] ? getLiteralString(args[0]) : null;
-    if (
-      calleeName === "Error" &&
-      message &&
-      VAGUE_ERROR_PATTERN.test(message)
-    ) {
+    if (message && VAGUE_ERROR_PATTERN.test(message)) {
       this.context.report({
         node,
         messageId: "anemicThrow",
         data: { message },
       });
-      return;
     }
-    const activeCatchParam = this.catchParamStack.at(-1);
+  };
+
+  visitCallExpression = (node) => {
     if (
-      activeCatchParam &&
-      args.length === 1 &&
-      isBareCaughtErrorMessage(args[0], activeCatchParam)
+      isSyncFsCall(node.callee) &&
+      !isInsideTryBlock(node) &&
+      LOGGER_FN_RE.test(enclosingFunctionName(node))
     ) {
       this.context.report({
         node,
-        messageId: "lossyErrorRethrow",
-        data: { name: activeCatchParam },
+        messageId: "unguardedSyncFsInLogger",
       });
     }
   };
@@ -383,6 +424,7 @@ class ErrorDiagnostics {
       FunctionExpression: this.enterPromiseCatchCallback,
       "FunctionExpression:exit": this.exitPromiseCatchCallback,
       ThrowStatement: this.visitThrowStatement,
+      CallExpression: this.visitCallExpression,
       ReturnStatement: this.visitReturnStatement,
       TryStatement: this.visitTryStatement,
       LogicalExpression: this.visitLogicalExpression,
@@ -403,15 +445,13 @@ const noAnemicErrorsRule = {
     type: "problem",
     docs: {
       description:
-        "Disallow vague errors, lossy rewrapping, catch-log-rethrow duplication, empty success-shaped failure returns, decode-to-nullable collapses, and catch-side error-code/stdout fallbacks.",
+        "Disallow vague errors, catch-log-rethrow duplication, empty success-shaped failure returns, decode-to-nullable collapses, catch-side error-code/stdout fallbacks, and unguarded sync filesystem writes in loggers.",
     },
     messages: {
       anemicThrow:
         "Error message '{{message}}' is too vague. Include context about what failed and why.",
       anemicReturn:
         "Returning a generic error object is forbidden. Include the failed operation and its input context in the returned error contract.",
-      lossyErrorRethrow:
-        "Re-throwing caught error '{{name}}' as a bare `new Error({{name}}.message)` discards its stack trace, cause chain, and error class with no added context. Rethrow `{{name}}` directly, wrap with `{ cause: {{name}} }` and domain context, or throw a typed domain error.",
       catchLogRethrow:
         "Logging caught error '{{name}}' and immediately re-throwing it unmodified duplicates error logging across every frame on the call stack. Either handle the error here, wrap it with domain context and `{ cause: {{name}} }`, or let it propagate and log once at the boundary.",
       fallback:
@@ -420,6 +460,8 @@ const noAnemicErrorsRule = {
         "Boundary decode '{{callee}}' is collapsed to {{sentinel}}, erasing schema and syntax failures into absence; propagate or report the decode error explicitly.",
       catchErrorCodeOrStdoutFallback:
         "Catch block falls back from '{{name}}.{{field}}' to another error field or a sentinel code; rethrow or return a typed failure instead of collapsing process output and error codes.",
+      unguardedSyncFsInLogger:
+        "Synchronous filesystem write inside a logger/audit function is unguarded and can crash callers on I/O errors.",
     },
   },
   create(context) {

@@ -54,7 +54,7 @@ const typeSignature = (typeNode) => {
   if (typeNode.type === "TSTypeLiteral") {
     const names = (typeNode.members ?? [])
       .map((member) => getPropertyName(member.key) ?? "?")
-      .sort();
+      .toSorted();
     return `{${names.join(",")}}`;
   }
   if (

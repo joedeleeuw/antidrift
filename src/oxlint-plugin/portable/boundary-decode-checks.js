@@ -15,6 +15,7 @@ import {
   hasTypeChecker,
   isBroadResolvedType,
   resolvedPropertyShape,
+  resolvedTypeTexts,
 } from "../shared/type-services.js";
 
 const SCHEMA_DECODE_METHODS = new Set([
@@ -49,33 +50,106 @@ export function isJsonCall(node, method) {
   );
 }
 
-export function isRawDeserializeCall(node) {
+const IPC_PACKAGE_RE =
+  /^(?:@tauri-apps\/api(?:\/(?:core|tauri|event))?|electron)$/u;
+const TAURI_IPC_METHODS = new Set(["invoke", "listen", "once", "on"]);
+const JSON_RECEIVER_NAME =
+  /^(?:res|response|req|request|reply)$|(?:Res|Response|Req|Request|Reply)$/u;
+const JSON_RECEIVER_TYPE = /^(?:Response|Request|Body|KyResponse)$/u;
+
+function tauriCalleeParts(callee) {
+  if (callee?.type === "Identifier") {
+    return { ident: callee, methodName: callee.name };
+  }
+  if (
+    callee?.type === "MemberExpression" &&
+    !callee.computed &&
+    callee.object?.type === "Identifier" &&
+    callee.property?.type === "Identifier"
+  ) {
+    return { ident: callee.object, methodName: callee.property.name };
+  }
+  return null;
+}
+
+export function resolveTauriIpcMethod(node, sourceCode) {
+  const expr = unwrapAwaitedExpression(node);
+  if (expr?.type !== "CallExpression") return null;
+  const callee = unwrapExpression(expr.callee);
+  const parts = tauriCalleeParts(callee);
+  if (!parts || !TAURI_IPC_METHODS.has(parts.methodName)) return null;
+  if (
+    callee.type === "MemberExpression" &&
+    parts.ident.name === "ipcRenderer"
+  ) {
+    return parts.methodName;
+  }
+  if (!sourceCode) return null;
+  const def = findVariable(sourceCode, parts.ident)?.defs?.[0];
+  if (
+    def?.type !== "ImportBinding" ||
+    !IPC_PACKAGE_RE.test(def.parent?.source?.value ?? "")
+  ) {
+    return null;
+  }
+  const imported = def.node?.imported;
+  const importedName =
+    callee.type === "Identifier" && imported?.type === "Identifier"
+      ? imported.name
+      : parts.methodName;
+  return TAURI_IPC_METHODS.has(importedName) ? parts.methodName : null;
+}
+
+function isJsonReceiver(receiver, sourceCode) {
+  if (unwrapAwaitedExpression(receiver)?.type === "CallExpression") {
+    return true;
+  }
+  const unwrapped = unwrapExpression(receiver);
+  const name =
+    unwrapped?.type === "Identifier"
+      ? unwrapped.name
+      : staticPropertyName(unwrapped);
+  if (JSON_RECEIVER_NAME.test(name)) return true;
+  return (
+    resolvedTypeTexts(unwrapped, sourceCode)?.some((text) =>
+      JSON_RECEIVER_TYPE.test(text)
+    ) ?? false
+  );
+}
+
+export function isRawDeserializeCall(node, sourceCode = null) {
   const expr = unwrapAwaitedExpression(node);
   if (expr?.type !== "CallExpression") return false;
+  if (resolveTauriIpcMethod(expr, sourceCode) === "invoke") {
+    const typeArgs = expr.typeArguments ?? expr.typeParameters;
+    return !typeArgs?.params?.length;
+  }
   const callee = unwrapExpression(expr.callee);
   if (
     callee?.type !== "MemberExpression" ||
     callee.computed ||
-    callee.property?.type !== "Identifier" ||
-    callee.object?.type !== "Identifier"
+    callee.property?.type !== "Identifier"
   ) {
     return false;
   }
   if (
     callee.property.name === "parse" &&
-    /^(?:JSON|YAML)$/u.test(callee.object.name)
+    callee.object?.type === "Identifier" &&
+    /^(?:JSON|YAML|TOML)$/u.test(callee.object.name)
   ) {
     return true;
   }
   return (
     callee.property.name === "json" &&
-    /^(?:res|response|req|request)$/iu.test(callee.object.name)
+    expr.arguments.length === 0 &&
+    isJsonReceiver(callee.object, sourceCode)
   );
 }
 
 export function isPassedToDecoder(node, sourceCode) {
-  const parent = node.parent;
-  if (parent?.type !== "CallExpression" || !parent.arguments.includes(node)) {
+  const step = node.parent?.type === "AwaitExpression" ? node.parent : node;
+  const parent = step.parent;
+  if (parent?.type !== "CallExpression" || !parent.arguments.includes(step)) {
     return false;
   }
   const callee = unwrapExpression(parent.callee);
@@ -99,7 +173,10 @@ export function isAliasedRawDeserialize(expression, sourceCode) {
   return Boolean(
     declarator?.type === "VariableDeclarator" &&
     !declarator.id.typeAnnotation &&
-    isRawDeserializeCall(constInitializer(sourceCode, identifier)) &&
+    isRawDeserializeCall(
+      constInitializer(sourceCode, identifier),
+      sourceCode
+    ) &&
     !binding.references.some((ref) =>
       isPassedToDecoder(ref.identifier, sourceCode)
     )
@@ -264,12 +341,15 @@ function isLiteralUnionType(typeNode) {
 }
 
 function isClosedLiteralCast(node, sourceCode) {
-  if (isLiteralUnionType(node.typeAnnotation)) return true;
+  const target = node.typeAnnotation;
+  if (
+    isLiteralUnionType(target) ||
+    (target?.type === "TSTypeOperator" && target.operator === "keyof")
+  ) {
+    return true;
+  }
   if (!hasTypeChecker(sourceCode)) return false;
-  const literalMembers = closedStringLiteralUnionValues(
-    node.typeAnnotation,
-    sourceCode
-  );
+  const literalMembers = closedStringLiteralUnionValues(target, sourceCode);
   return (
     (literalMembers?.length ?? 0) >= 2 &&
     closedStringLiteralUnionValues(node.expression, sourceCode) === null
@@ -319,15 +399,30 @@ function isSyntacticBroadExpression(expression, sourceCode) {
   return isUnknownRecordAnnotation(ann);
 }
 
+function isBroadTargetCast(expression, target, sourceCode) {
+  if (!hasTypeChecker(sourceCode)) return false;
+  const targetShape = resolvedPropertyShape(target, sourceCode);
+  return (
+    Boolean(targetShape && targetShape.all.length > 0) &&
+    isBroadResolvedType(expression, sourceCode)
+  );
+}
+
 function isBroadStructuredCast(node, sourceCode) {
   const target = node.typeAnnotation;
   if (
     (target?.type ?? "").endsWith("Keyword") ||
-    isRawDeserializeCall(node.expression) ||
+    isRawDeserializeCall(node.expression, sourceCode) ||
     isAliasedRawDeserialize(node.expression, sourceCode) ||
     isOwnedParameterReference(node.expression, sourceCode)
   ) {
     return false;
+  }
+  if (
+    target?.type === "TSTupleType" &&
+    unwrapExpression(node.expression)?.type !== "ArrayExpression"
+  ) {
+    return true;
   }
   if (
     (target?.type === "TSTypeReference" || target?.type === "TSTypeLiteral") &&
@@ -335,15 +430,18 @@ function isBroadStructuredCast(node, sourceCode) {
   ) {
     return true;
   }
-  return (
-    hasTypeChecker(sourceCode) &&
-    isBroadResolvedType(node.expression, sourceCode) &&
-    (resolvedPropertyShape(target, sourceCode)?.all.length ?? 0) > 0
-  );
+  return isBroadTargetCast(node.expression, target, sourceCode);
 }
 
 export function checkUndecodedCast(node, context) {
   const sourceCode = context.sourceCode;
+  if (
+    isRawDeserializeCall(node.expression, sourceCode) ||
+    isAliasedRawDeserialize(node.expression, sourceCode) ||
+    isOwnedParameterReference(node.expression, sourceCode)
+  ) {
+    return;
+  }
   if (
     node.expression?.type !== "Literal" &&
     isClosedLiteralCast(node, sourceCode)

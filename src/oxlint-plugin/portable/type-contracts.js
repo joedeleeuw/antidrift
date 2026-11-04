@@ -1,4 +1,3 @@
-import { checkRedundantUnknownHelper } from "./boundary-decode-checks.js";
 import {
   checkRedundantPredicate,
   checkTypeAssertion,
@@ -6,7 +5,6 @@ import {
   forEachOwnNode,
   topLevelTypeDeclarations,
 } from "./type-predicate-checks.js";
-import { checkErasedUnknownReparse } from "./schema-reparse-checks.js";
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import {
   isObjectSchemaMethod,
@@ -15,13 +13,13 @@ import {
   schemaDiscriminantKeys,
 } from "../shared/runtime-schema-libraries.js";
 import {
-  findVariable,
+  isFunctionLike,
   staticPropertyKey,
   unwrapExpression,
 } from "../shared/scope.js";
 import {
-  closedStringLiteralUnionValues,
-  hasTypeChecker,
+  resolvedPropertyShape,
+  resolvedTypeTexts,
 } from "../shared/type-services.js";
 
 const SCOPE_SCHEMA = [
@@ -33,7 +31,7 @@ export const noAppeasementCastRule = {
     type: "problem",
     docs: {
       description:
-        "Disallow appeasement type assertions (`as any`, `as unknown as T`, or casting object literals with `as T`).",
+        "Disallow appeasement type assertions (`as never`, chained assertions `as unknown as T`, collection/error casts, or casting undecoded boundary outputs).",
     },
     schema: SCOPE_SCHEMA,
   },
@@ -47,89 +45,7 @@ export const noAppeasementCastRule = {
   },
 };
 
-function isClosedKeyType(keyType, sourceCode, depth = 0) {
-  if (
-    keyType?.type === "TSLiteralType" ||
-    (keyType?.type === "TSTypeOperator" && keyType.operator === "keyof") ||
-    (keyType?.type === "TSUnionType" &&
-      keyType.types.every((member) => member.type === "TSLiteralType"))
-  ) {
-    return true;
-  }
-  if (keyType?.type !== "TSTypeReference" || depth > 4) return false;
-  const alias = topLevelTypeDeclarations(sourceCode.ast).get(
-    keyType.typeName?.name
-  )?.typeAnnotation;
-  if (alias) return isClosedKeyType(alias, sourceCode, depth + 1);
-  return (
-    hasTypeChecker(sourceCode) &&
-    (closedStringLiteralUnionValues(keyType, sourceCode)?.length ?? 0) > 0
-  );
-}
-
-function isMemberWritten(identifier, sourceCode) {
-  return (findVariable(sourceCode, identifier)?.references ?? []).some(
-    (ref) => {
-      const member = ref.identifier.parent;
-      const write = member?.parent;
-      return (
-        member?.type === "MemberExpression" &&
-        member.object === ref.identifier &&
-        ((write?.type === "AssignmentExpression" && write.left === member) ||
-          write?.type === "UpdateExpression" ||
-          (write?.type === "UnaryExpression" && write.operator === "delete"))
-      );
-    }
-  );
-}
-
-function checkCaseTableAnnotation(node, context) {
-  const sourceCode = context.sourceCode;
-  const annotation = node.id?.typeAnnotation?.typeAnnotation;
-  const init = unwrapExpression(node.init);
-  if (
-    node.parent?.kind !== "const" ||
-    node.id.type !== "Identifier" ||
-    annotation?.type !== "TSTypeReference" ||
-    annotation.typeName?.name !== "Record" ||
-    init?.type !== "ObjectExpression" ||
-    init.properties.length === 0 ||
-    !isClosedKeyType(annotation.typeArguments?.params?.[0], sourceCode) ||
-    isMemberWritten(node.id, sourceCode)
-  ) {
-    return;
-  }
-  const typeText = sourceCode.getText(annotation);
-  context.report({
-    node: node.id,
-    message: `Case table '${node.id.name}' is annotated \`${typeText}\`, which erases each entry's own type; write \`{ ... } satisfies ${typeText}\` instead.`,
-  });
-}
-
-export const noAppeasementErasureRule = {
-  meta: {
-    type: "problem",
-    docs: {
-      description:
-        "Disallow widening known values to `unknown` only to re-assert or re-parse a narrower contract, `Record<ClosedKey, V>` case-table annotations, and unknown-error helpers applied to known errors.",
-    },
-    schema: SCOPE_SCHEMA,
-  },
-  create(context) {
-    if (!isRuleFile(context)) return {};
-    return {
-      CallExpression(node) {
-        checkRedundantUnknownHelper(node, context);
-      },
-      VariableDeclarator(node) {
-        checkCaseTableAnnotation(node, context);
-        checkErasedUnknownReparse(node, context);
-      },
-    };
-  },
-};
-
-function isNullableType(typeNode, aliases, seen = new Set()) {
+function isNullableType(typeNode, aliases, sourceCode, seen = new Set()) {
   if (!typeNode) return false;
   if (
     typeNode.type === "TSNullKeyword" ||
@@ -139,7 +55,9 @@ function isNullableType(typeNode, aliases, seen = new Set()) {
   }
   if (typeNode.type === "TSOptionalType") return true;
   if (typeNode.type === "TSUnionType") {
-    return typeNode.types.some((type) => isNullableType(type, aliases, seen));
+    return typeNode.types.some((type) =>
+      isNullableType(type, aliases, sourceCode, seen)
+    );
   }
   if (
     typeNode.type === "TSTypeReference" &&
@@ -147,7 +65,13 @@ function isNullableType(typeNode, aliases, seen = new Set()) {
     !seen.has(typeNode.typeName.name)
   ) {
     seen.add(typeNode.typeName.name);
-    return isNullableType(aliases.get(typeNode.typeName.name), aliases, seen);
+    const local = aliases.get(typeNode.typeName.name);
+    if (local) return isNullableType(local, aliases, sourceCode, seen);
+    return (
+      resolvedTypeTexts(typeNode, sourceCode)?.some(
+        (text) => text === "null" || text === "undefined"
+      ) ?? false
+    );
   }
   return false;
 }
@@ -159,7 +83,7 @@ function checkNullableTuple(node, aliases, context) {
     const inner = elem.type === "TSNamedTupleMember" ? elem.elementType : elem;
     if (elem.type === "TSNamedTupleMember" && elem.optional) {
       nullableCount += 1;
-    } else if (isNullableType(inner, aliases)) {
+    } else if (isNullableType(inner, aliases, context.sourceCode)) {
       nullableCount += 1;
     }
   }
@@ -184,9 +108,15 @@ const RESULT_TAGS = new Set(["ok", "success", ...schemaDiscriminantKeys]);
 function explicitlyNullable(property, sourceCode) {
   if (property.type === "TSPropertySignature") {
     const annotation = property.typeAnnotation?.typeAnnotation;
-    return (
+    if (
       annotation?.type === "TSUnionType" &&
       annotation.types.some((type) => type.type === "TSNullKeyword")
+    ) {
+      return true;
+    }
+    return (
+      annotation?.type === "TSTypeReference" &&
+      (resolvedTypeTexts(annotation, sourceCode)?.includes("null") ?? false)
     );
   }
   const chain = resolveSchemaMemberChain(property.value, sourceCode);
@@ -297,7 +227,7 @@ function nullishKeys(objectNode) {
 }
 
 function keySignature(objectNode) {
-  return objectNode.properties.map(staticPropertyKey).sort().join(",");
+  return objectNode.properties.map(staticPropertyKey).toSorted().join(",");
 }
 
 function checkOutcomeFlagErasure(returnedLiterals, context) {
@@ -325,14 +255,14 @@ function checkOutcomeFlagErasure(returnedLiterals, context) {
   }
 }
 
-export function checkReturnContracts(fnNode, context) {
+function checkReturnContracts(fnNode, context) {
   const returnedLiterals = returnedObjects(fnNode, context.sourceCode);
   if (!returnedLiterals) return;
   checkConstantReturnField(returnedLiterals, context);
   checkOutcomeFlagErasure(returnedLiterals, context);
 }
 
-export function checkResultProductType(node, context) {
+function checkResultProductType(node, context) {
   const names = new Set(node.members.map(staticPropertyKey));
   if (
     (names.has("ok") || names.has("success")) &&
@@ -348,19 +278,109 @@ export function checkResultProductType(node, context) {
   }
 }
 
-export const noNullablePositionalTupleRule = {
+function enclosingSingleReturnFunction(objNode) {
+  const parent = objNode.parent;
+  if (isFunctionLike(parent) && parent.body === objNode) return parent;
+  if (
+    parent?.type === "ReturnStatement" &&
+    parent.parent?.type === "BlockStatement" &&
+    parent.parent.body.length === 1 &&
+    isFunctionLike(parent.parent.parent)
+  ) {
+    return parent.parent.parent;
+  }
+  return null;
+}
+
+function projectionSource(node) {
+  const roots = node.properties.map((prop) => {
+    const member = unwrapExpression(prop.value);
+    return prop.type === "Property" &&
+      !prop.computed &&
+      !prop.shorthand &&
+      prop.key?.type === "Identifier" &&
+      member?.type === "MemberExpression" &&
+      !member.computed &&
+      member.object?.type === "Identifier" &&
+      member.property?.name === prop.key.name
+      ? member.object.name
+      : null;
+  });
+  return roots.every((root) => root && root === roots[0]) ? roots[0] : null;
+}
+
+function declaredTypePropertyCount(typeName, sourceCode) {
+  const decl = topLevelTypeDeclarations(sourceCode.ast).get(typeName);
+  if (decl?.type === "TSInterfaceDeclaration") {
+    return decl.body?.body?.length ?? 0;
+  }
+  if (
+    decl?.type === "TSTypeAliasDeclaration" &&
+    decl.typeAnnotation?.type === "TSTypeLiteral"
+  ) {
+    return decl.typeAnnotation.members?.length ?? 0;
+  }
+  return 0;
+}
+
+function isContractProjection(objNode, sourceIdent, sourceCode) {
+  const fnNode = enclosingSingleReturnFunction(objNode);
+  const parameter = fnNode?.params.length === 1 ? fnNode.params[0] : null;
+  const paramType = parameter?.typeAnnotation?.typeAnnotation;
+  const returnType = fnNode?.returnType?.typeAnnotation;
+  if (
+    parameter?.type !== "Identifier" ||
+    parameter.name !== sourceIdent ||
+    paramType?.type !== "TSTypeReference"
+  ) {
+    return false;
+  }
+  if (
+    returnType?.type === "TSTypeReference" &&
+    sourceCode.getText(paramType.typeName) ===
+      sourceCode.getText(returnType.typeName)
+  ) {
+    return false;
+  }
+  const resolvedCount =
+    resolvedPropertyShape(parameter, sourceCode)?.all.length ?? 0;
+  const sourceCount =
+    resolvedCount > 0
+      ? resolvedCount
+      : declaredTypePropertyCount(
+          sourceCode.getText(paramType.typeName),
+          sourceCode
+        );
+  return sourceCount === 0 || objNode.properties.length >= sourceCount;
+}
+
+function checkContractProjection(node, context) {
+  const sourceIdent =
+    node.properties.length >= 3 ? projectionSource(node) : null;
+  if (
+    sourceIdent &&
+    isContractProjection(node, sourceIdent, context.sourceCode)
+  ) {
+    context.report({
+      node,
+      message: `Object literal restates ${node.properties.length} properties verbatim from '${sourceIdent}'; pass '${sourceIdent}' directly instead of reshaping a parallel bag.`,
+    });
+  }
+}
+
+export const noContractAppeasementProjectionRule = {
   meta: {
     type: "problem",
     docs: {
       description:
-        "Disallow tuple types with 2 or more nullable positional elements and untagged nullable failure/payload product bags.",
+        "Disallow `{ ok, data, error }` product result envelopes, untagged nullable failure/payload bags, multi-field nullable positional tuples, verbatim 3+ property bag clones, constant return fields, and complementary flag/error return products.",
     },
     schema: SCOPE_SCHEMA,
   },
   create(context) {
     if (!isRuleFile(context)) return {};
     const aliases = new Map();
-
+    const checkFunction = (node) => checkReturnContracts(node, context);
     return {
       Program(node) {
         for (const stmt of node.body) {
@@ -370,6 +390,9 @@ export const noNullablePositionalTupleRule = {
             aliases.set(decl.id.name, decl.typeAnnotation);
           }
         }
+      },
+      ObjectExpression(node) {
+        checkContractProjection(node, context);
       },
       TSTupleType(node) {
         checkNullableTuple(node, aliases, context);
@@ -384,6 +407,9 @@ export const noNullablePositionalTupleRule = {
           checkNullableFailureBag(node.typeAnnotation.members, node, context);
         }
       },
+      TSTypeLiteral(node) {
+        checkResultProductType(node, context);
+      },
       CallExpression(node) {
         const builder = resolveSchemaBuilderCall(node, context.sourceCode);
         if (
@@ -393,6 +419,9 @@ export const noNullablePositionalTupleRule = {
           checkNullableFailureBag(builder.args[0].properties, node, context);
         }
       },
+      FunctionDeclaration: checkFunction,
+      FunctionExpression: checkFunction,
+      ArrowFunctionExpression: checkFunction,
     };
   },
 };

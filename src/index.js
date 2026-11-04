@@ -1,19 +1,15 @@
-import { createEslintConfig, eslintPreset } from "./eslint-config/index.js";
-import {
-  createOxlintConfig,
-  oxlintPreset,
-  recommendedRules,
-} from "./oxlint-config/index.js";
-import { antidriftPlugin, rules } from "./oxlint-plugin/index.js";
-
 export {
-  antidriftPlugin,
   createEslintConfig,
-  createOxlintConfig,
   eslintPreset,
+  eslintTypedPreset,
+} from "./eslint-config/index.js";
+export {
+  astOnlyPreset,
+  astOnlyRules,
+  createOxlintConfig,
   oxlintPreset,
   recommendedRules,
-  rules,
-};
-
-export default antidriftPlugin;
+  typedRuleNames,
+  typedRules,
+} from "./oxlint-config/index.js";
+export { antidriftPlugin, default, rules } from "./oxlint-plugin/index.js";

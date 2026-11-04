@@ -1,14 +1,10 @@
 Antidrift
 Copyright (c) 2026 Joe de Leeuw
 
-This product links and adapts components from the following open-source projects:
+This product adapts components from the following open-source projects:
 
-1. tsrs (https://github.com/oxc-project/tsrs / https://github.com/maschwenk/tsrs)
-   Licensed under the Apache License, Version 2.0.
-   Derived from microsoft/typescript-go (https://github.com/microsoft/typescript-go),
-   Copyright (c) Microsoft Corporation, licensed under the Apache License, Version 2.0.
+1. @rikalabs/oxlint-standards (https://github.com/Rika-Labs/oxlint-standards)
+   Copyright (c) 2026 Dillon Mulroy, licensed under the MIT License.
 
-2. tsrslint (https://github.com/maschwenk/tsrslint)
-   Licensed under the MIT License.
-   Derived from oxc-project/tsgolint (https://github.com/oxc-project/tsgolint),
-   Copyright (c) 2025 Boshen and Oxc contributors, licensed under the MIT License.
+2. eslint-plugin-sentry / no-calling-components-as-functions (https://github.com/getsentry/sentry)
+   Copyright (c) Functional Software, Inc. dba Sentry, licensed under the MIT License.

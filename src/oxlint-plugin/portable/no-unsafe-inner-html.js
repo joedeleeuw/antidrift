@@ -55,8 +55,8 @@ class HtmlProvenance {
     ];
     this.trusted = this.options.trustedSources ?? [];
   }
-  proven = (node, seen = new Set()) => {
-    node = unwrapExpression(node);
+  proven = (rawNode, seen = new Set()) => {
+    const node = unwrapExpression(rawNode);
     if (isStaticHtml(node) || importedOwner(this.context, node, this.trusted)) {
       return true;
     }

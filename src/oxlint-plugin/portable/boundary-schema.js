@@ -1,34 +1,27 @@
 import {
   checkDiscardedDecode,
   checkSchemaCatch,
-  checkPositionalOptions,
   checkRepairOnReadTernary,
   checkSerializationRoundtrip,
   isAliasedRawDeserialize,
   isPassedToDecoder,
   isRawDeserializeCall,
   RAW_DESERIALIZE_CAST_MESSAGE,
+  resolveTauriIpcMethod,
 } from "./boundary-decode-checks.js";
-import {
-  checkCodecRoundtrip,
-  checkRedundantSchemaParse,
-} from "./schema-reparse-checks.js";
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
-import {
-  resolveSchemaBuilderCall,
-  schemaReceiverVerdict,
-} from "../shared/runtime-schema-libraries.js";
+import { resolveSchemaBuilderCall } from "../shared/runtime-schema-libraries.js";
 import {
   findVariable,
   isFunctionLike,
   isTestFile,
   staticPropertyKey,
-  unwrapExpression,
 } from "../shared/scope.js";
-
-const SCOPE_SCHEMA = [
-  { type: "object", properties: scopeProperties, additionalProperties: false },
-];
+import {
+  getResolvedType,
+  resolvedDeclarationFiles,
+} from "../shared/type-services.js";
+import { patternIdentifiers } from "./static-resolution.js";
 
 function checkJsonStringFields(node, context) {
   const builder = resolveSchemaBuilderCall(node, context.sourceCode);
@@ -53,50 +46,6 @@ function checkJsonStringFields(node, context) {
     }
   }
 }
-
-export const noUnsafeDeserializeRule = {
-  meta: {
-    type: "problem",
-    docs: {
-      description:
-        "Disallow casting raw or aliased JSON.parse / response.json() results to domain types, string-or-object repair-on-read ternaries, and JSON stringify/parse value round-trips.",
-    },
-    schema: SCOPE_SCHEMA,
-  },
-  create(context) {
-    if (!isRuleFile(context)) return {};
-    const sourceCode = context.sourceCode;
-    return {
-      CallExpression(node) {
-        checkJsonStringFields(node, context);
-        checkSerializationRoundtrip(node, context);
-      },
-      ConditionalExpression(node) {
-        checkRepairOnReadTernary(node, context);
-      },
-      TSAsExpression(node) {
-        if (
-          node.typeAnnotation?.type !== "TSUnknownKeyword" &&
-          (isRawDeserializeCall(node.expression) ||
-            isAliasedRawDeserialize(node.expression, sourceCode))
-        ) {
-          context.report({ node, message: RAW_DESERIALIZE_CAST_MESSAGE });
-        }
-      },
-      VariableDeclarator(node) {
-        if (!node.init || !isRawDeserializeCall(node.init)) return;
-        const ann = node.id?.typeAnnotation?.typeAnnotation;
-        if (!ann || ann.type === "TSUnknownKeyword") return;
-        if (isPassedToDecoder(node.init, sourceCode)) return;
-        context.report({
-          node,
-          message:
-            "Do not assign raw deserialized JSON directly to an explicitly typed binding; decode with a schema validator first.",
-        });
-      },
-    };
-  },
-};
 
 const UNKNOWN_RECORD_NAMES = new Set([
   "UnknownRecord",
@@ -160,6 +109,99 @@ function isUnknownPreservingAssertionType(typeNode) {
   return false;
 }
 
+function isUnknownTypedIdentifier(ident, parameter, sourceCode) {
+  if (
+    ident.typeAnnotation?.typeAnnotation?.type === "TSUnknownKeyword" ||
+    parameter.typeAnnotation?.typeAnnotation?.type === "TSUnknownKeyword"
+  ) {
+    return true;
+  }
+  const resolved = getResolvedType(ident, sourceCode);
+  return Boolean(resolved && ((resolved.flags ?? 0) & 2) !== 0);
+}
+
+function checkUnknownParameterBinding(ident, context, probeThreshold) {
+  const binding = findVariable(context.sourceCode, ident);
+  if (!binding) return;
+  let inCheckCount = 0;
+  for (const ref of binding.references) {
+    const parent = ref.identifier?.parent;
+    if (
+      (parent?.type === "TSAsExpression" ||
+        parent?.type === "TSTypeAssertion") &&
+      !isUnknownPreservingAssertionType(parent.typeAnnotation)
+    ) {
+      context.report({
+        node: parent,
+        message: `Unknown input '${ident.name}' is cast directly instead of decoded through a boundary schema.`,
+      });
+    }
+    if (
+      parent?.type === "BinaryExpression" &&
+      parent.operator === "in" &&
+      parent.right === ref.identifier
+    ) {
+      inCheckCount += 1;
+    }
+  }
+  if (inCheckCount >= probeThreshold) {
+    context.report({
+      node: ident,
+      message: `Unknown input '${ident.name}' is probed with ${inCheckCount} ad-hoc 'in' checks; decode once with a boundary schema instead.`,
+    });
+  }
+}
+
+const GENERATED_IPC_PATH_RE =
+  /(?:^|\/)(?:_generated|__generated__|generated|bindings)(?:\/|$|\.)|\.(?:gen|generated)\.[cm]?tsx?$/u;
+
+function isGeneratedIpcTypeNode(typeNode, sourceCode) {
+  let target = typeNode;
+  while (target?.type === "TSArrayType") {
+    target = target.elementType;
+  }
+  const declFiles = resolvedDeclarationFiles(target, sourceCode);
+  if (
+    declFiles.length > 0 &&
+    declFiles.every((file) => GENERATED_IPC_PATH_RE.test(file))
+  ) {
+    return true;
+  }
+  const typeIdent =
+    target?.type === "TSTypeReference" && target.typeName?.type === "Identifier"
+      ? target.typeName
+      : null;
+  if (!typeIdent) return false;
+  const def = findVariable(sourceCode, typeIdent)?.defs?.[0];
+  const importSource = def?.parent?.source?.value;
+  return (
+    def?.type === "ImportBinding" &&
+    GENERATED_IPC_PATH_RE.test(importSource ?? "")
+  );
+}
+
+function checkTauriIpcTypeArguments(node, context) {
+  const sourceCode = context.sourceCode;
+  const method = resolveTauriIpcMethod(node, sourceCode);
+  if (!method) return;
+  const typeArgs = node.typeArguments ?? node.typeParameters;
+  const firstArg = typeArgs?.params?.[0];
+  if (
+    !firstArg ||
+    firstArg.type === "TSVoidKeyword" ||
+    firstArg.type === "TSNeverKeyword" ||
+    isUnknownPreservingAssertionType(firstArg) ||
+    isPassedToDecoder(node, sourceCode) ||
+    isGeneratedIpcTypeNode(firstArg, sourceCode)
+  ) {
+    return;
+  }
+  context.report({
+    node: typeArgs,
+    message: `Do not pass an unvalidated type argument to Tauri '${method}<...>(...)'; decode the IPC payload at the boundary with a schema validator or use generated bindings.`,
+  });
+}
+
 function checkUnknownFunction(node, context, probeThreshold) {
   const filename = (context.filename ?? "").replaceAll("\\", "/");
   if (
@@ -170,41 +212,84 @@ function checkUnknownFunction(node, context, probeThreshold) {
   }
   const sourceCode = context.sourceCode;
   for (const parameter of node.params) {
-    if (
-      parameter.type !== "Identifier" ||
-      parameter.typeAnnotation?.typeAnnotation?.type !== "TSUnknownKeyword"
-    ) {
-      continue;
-    }
-    const binding = findVariable(sourceCode, parameter);
-    if (!binding) continue;
-    let inCheckCount = 0;
-    for (const ref of binding.references) {
-      const parent = ref.identifier?.parent;
-      if (
-        parent?.type === "TSAsExpression" &&
-        !isUnknownPreservingAssertionType(parent.typeAnnotation)
-      ) {
-        context.report({
-          node: parent,
-          message: `Unknown input '${parameter.name}' is cast directly instead of decoded through a boundary schema.`,
-        });
+    for (const ident of patternIdentifiers(parameter)) {
+      if (isUnknownTypedIdentifier(ident, parameter, sourceCode)) {
+        checkUnknownParameterBinding(ident, context, probeThreshold);
       }
-      if (
-        parent?.type === "BinaryExpression" &&
-        parent.operator === "in" &&
-        parent.right === ref.identifier
-      ) {
-        inCheckCount += 1;
-      }
-    }
-    if (inCheckCount >= probeThreshold) {
-      context.report({
-        node: parameter,
-        message: `Unknown input '${parameter.name}' is probed with ${inCheckCount} ad-hoc 'in' checks; decode once with a boundary schema instead.`,
-      });
     }
   }
+  const returnAnn = node.returnType?.typeAnnotation;
+  if (
+    returnAnn &&
+    returnAnn.type !== "TSAnyKeyword" &&
+    !isUnknownPreservingAssertionType(returnAnn) &&
+    node.body?.type !== "BlockStatement" &&
+    (isRawDeserializeCall(node.body, sourceCode) ||
+      isAliasedRawDeserialize(node.body, sourceCode))
+  ) {
+    context.report({
+      node: node.body,
+      message:
+        "Do not return raw deserialized JSON directly as an explicitly typed contract; decode with a schema validator first.",
+    });
+  }
+}
+
+function enclosingFunctionOrTry(node) {
+  for (let cur = node.parent; cur; cur = cur.parent) {
+    if (cur.type === "TryStatement") return null;
+    if (isFunctionLike(cur)) return cur;
+  }
+  return null;
+}
+
+function checkRawDeserializeReturn(node, context) {
+  const sourceCode = context.sourceCode;
+  if (
+    !node.argument ||
+    (!isRawDeserializeCall(node.argument, sourceCode) &&
+      !isAliasedRawDeserialize(node.argument, sourceCode))
+  ) {
+    return;
+  }
+  const fnNode = enclosingFunctionOrTry(node);
+  const returnAnn = fnNode?.returnType?.typeAnnotation;
+  if (
+    !returnAnn ||
+    returnAnn.type === "TSAnyKeyword" ||
+    isUnknownPreservingAssertionType(returnAnn)
+  ) {
+    return;
+  }
+  context.report({
+    node,
+    message:
+      "Do not return raw deserialized JSON directly as an explicitly typed contract; decode with a schema validator first.",
+  });
+}
+
+function checkRawDeserializeAssertion(node, context) {
+  const sourceCode = context.sourceCode;
+  if (
+    node.typeAnnotation?.type !== "TSUnknownKeyword" &&
+    (isRawDeserializeCall(node.expression, sourceCode) ||
+      isAliasedRawDeserialize(node.expression, sourceCode))
+  ) {
+    context.report({ node, message: RAW_DESERIALIZE_CAST_MESSAGE });
+  }
+}
+
+function checkRawDeserializeDeclarator(node, context) {
+  const sourceCode = context.sourceCode;
+  if (!node.init || !isRawDeserializeCall(node.init, sourceCode)) return;
+  const ann = node.id?.typeAnnotation?.typeAnnotation;
+  if (!ann || ann.type === "TSUnknownKeyword") return;
+  if (isPassedToDecoder(node.init, sourceCode)) return;
+  context.report({
+    node,
+    message:
+      "Do not assign raw deserialized JSON directly to an explicitly typed binding; decode with a schema validator first.",
+  });
 }
 
 export const unknownInputMustBeDecodedRule = {
@@ -212,7 +297,7 @@ export const unknownInputMustBeDecodedRule = {
     type: "problem",
     docs: {
       description:
-        "Disallow casting or probing `: unknown` boundary parameters into domain types without a schema decoder, discarded statement decodes, and `.catch(fallback)` repair-on-read.",
+        "Disallow casting or probing `: unknown` boundary parameters or raw deserialized JSON (`JSON.parse`, `response.json()`) into domain types without a schema decoder, discarded statement decodes, repair-on-read ternaries, and `.catch(fallback)` repair-on-read.",
     },
     schema: [
       {
@@ -232,177 +317,33 @@ export const unknownInputMustBeDecodedRule = {
       context.options[0]?.defensiveShapeProbeThreshold ?? 2;
     const checkFunction = (node) =>
       checkUnknownFunction(node, context, probeThreshold);
+    const checkAssertion = (node) =>
+      checkRawDeserializeAssertion(node, context);
 
     return {
       CallExpression(node) {
+        checkJsonStringFields(node, context);
+        checkSerializationRoundtrip(node, context);
         checkSchemaCatch(node, reportedObjects, context);
+        checkTauriIpcTypeArguments(node, context);
+      },
+      ConditionalExpression(node) {
+        checkRepairOnReadTernary(node, context);
       },
       ExpressionStatement(node) {
         checkDiscardedDecode(node, context);
       },
+      TSAsExpression: checkAssertion,
+      TSTypeAssertion: checkAssertion,
+      VariableDeclarator(node) {
+        checkRawDeserializeDeclarator(node, context);
+      },
+      ReturnStatement(node) {
+        checkRawDeserializeReturn(node, context);
+      },
       FunctionDeclaration: checkFunction,
       FunctionExpression: checkFunction,
       ArrowFunctionExpression: checkFunction,
-    };
-  },
-};
-
-export const noRedundantZodParseRule = {
-  meta: {
-    type: "problem",
-    docs: {
-      description:
-        "Disallow re-parsing already-decoded values: same-schema re-parse, element re-parse, closed-schema JSON string tunnels, and decode-then-re-encode codec round-trips.",
-    },
-    schema: SCOPE_SCHEMA,
-  },
-  create(context) {
-    if (!isRuleFile(context)) return {};
-    return {
-      CallExpression(node) {
-        checkRedundantSchemaParse(node, context);
-        checkCodecRoundtrip(node, context);
-      },
-    };
-  },
-};
-
-function isIdentityTransform(parameter, body) {
-  const expr = unwrapExpression(body);
-  if (!expr) return false;
-  if (parameter.type === "Identifier") {
-    return expr.type === "Identifier" && expr.name === parameter.name;
-  }
-  if (
-    parameter.type === "ObjectPattern" &&
-    parameter.properties.length > 0 &&
-    expr.type === "ObjectExpression" &&
-    expr.properties.length === parameter.properties.length
-  ) {
-    const bindings = new Map();
-    for (const prop of parameter.properties) {
-      if (
-        prop.type !== "Property" ||
-        prop.computed ||
-        prop.key?.type !== "Identifier" ||
-        prop.value?.type !== "Identifier"
-      ) {
-        return false;
-      }
-      bindings.set(prop.key.name, prop.value.name);
-    }
-    return expr.properties.every(
-      (property) =>
-        property.type === "Property" &&
-        !property.computed &&
-        property.key?.type === "Identifier" &&
-        property.value?.type === "Identifier" &&
-        bindings.get(property.key.name) === property.value.name
-    );
-  }
-  return false;
-}
-
-export const noIdentitySchemaTransformRule = {
-  meta: {
-    type: "problem",
-    docs: {
-      description:
-        "Disallow `.transform(x => x)` or exhaustive destructuring `.transform(({ a, b }) => ({ a, b }))` no-ops on schemas, and positional reads of schema `.options`.",
-    },
-    schema: SCOPE_SCHEMA,
-  },
-  create(context) {
-    if (!isRuleFile(context)) return {};
-
-    return {
-      MemberExpression(node) {
-        checkPositionalOptions(node, context);
-      },
-      CallExpression(node) {
-        if (
-          node.callee?.type !== "MemberExpression" ||
-          node.callee.computed ||
-          node.callee.property?.type !== "Identifier" ||
-          node.callee.property.name !== "transform" ||
-          schemaReceiverVerdict(node.callee, context.sourceCode) === "disproven"
-        ) {
-          return;
-        }
-        const callback = unwrapExpression(node.arguments[0]);
-        if (
-          !isFunctionLike(callback) ||
-          callback.async ||
-          callback.params.length !== 1
-        ) {
-          return;
-        }
-        const parameter = callback.params[0];
-        const returned =
-          callback.body?.type === "BlockStatement" &&
-          callback.body.body.length === 1 &&
-          callback.body.body[0].type === "ReturnStatement"
-            ? callback.body.body[0].argument
-            : callback.body;
-        if (isIdentityTransform(parameter, returned)) {
-          context.report({
-            node,
-            message:
-              "Schema `.transform()` performs an identity pass-through; remove the no-op transform.",
-          });
-        }
-      },
-    };
-  },
-};
-
-export const noSchemaValidatorTranscodingRule = {
-  meta: {
-    type: "problem",
-    docs: {
-      description:
-        "Disallow transcoding a runtime schema through `toJSONSchema` / `zodToJsonSchema` into another runtime validator.",
-    },
-    schema: SCOPE_SCHEMA,
-  },
-  create(context) {
-    if (!isRuleFile(context)) return {};
-    function isJsonSchemaCall(node) {
-      const expr = unwrapExpression(node);
-      if (expr?.type !== "CallExpression") return false;
-      const callee = unwrapExpression(expr.callee);
-      if (callee?.type === "Identifier") {
-        return (
-          callee.name === "zodToJsonSchema" || callee.name === "toJSONSchema"
-        );
-      }
-      return (
-        callee?.type === "MemberExpression" &&
-        callee.property?.type === "Identifier" &&
-        callee.property.name === "toJSONSchema"
-      );
-    }
-    function isLocalFunctionCall(node) {
-      const callee = unwrapExpression(node.callee);
-      if (callee?.type !== "Identifier") return false;
-      const binding = findVariable(context.sourceCode, callee);
-      const def = binding?.defs?.[0];
-      return (
-        def?.type === "FunctionName" ||
-        (def?.type === "Variable" && isFunctionLike(def.node?.init))
-      );
-    }
-    return {
-      CallExpression(node) {
-        if (isLocalFunctionCall(node)) return;
-        if (node.arguments.some(isJsonSchemaCall)) {
-          context.report({
-            node,
-            message:
-              "Do not transcode a schema through JSON Schema into another validator; share one canonical schema definition.",
-          });
-        }
-      },
     };
   },
 };

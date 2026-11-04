@@ -18,9 +18,7 @@ const allowedPathsFrom = (entry, enforcement) => {
   const allowedPaths = Array.isArray(allowed)
     ? allowed
         .map((candidate) =>
-          typeof candidate === "object" && candidate !== null
-            ? candidate.path
-            : undefined
+          typeof candidate === "string" ? candidate : candidate?.path
         )
         .filter((candidate) => typeof candidate === "string")
     : [];
@@ -126,7 +124,7 @@ export default {
     type: "problem",
     messages: {
       unownedUse:
-        "`{{id}}` is owned by {{owner}}. Go through the owner, or add this file to that entry's `allowed` list with a reason in {{registry}}.",
+        "`{{id}}` is owned by {{owner}}. Go through the owner, or add this file to that entry's `allowed` list in {{registry}}.",
     },
     schema: [
       {
@@ -169,13 +167,17 @@ export default {
                     allowed: {
                       type: "array",
                       items: {
-                        type: "object",
-                        required: ["path", "reason"],
-                        additionalProperties: false,
-                        properties: {
-                          path: { type: "string" },
-                          reason: { type: "string", minLength: 1 },
-                        },
+                        anyOf: [
+                          { type: "string", minLength: 1 },
+                          {
+                            type: "object",
+                            required: ["path"],
+                            additionalProperties: false,
+                            properties: {
+                              path: { type: "string", minLength: 1 },
+                            },
+                          },
+                        ],
                       },
                     },
                   },

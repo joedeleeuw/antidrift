@@ -1,5 +1,5 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
-import { staticPropertyName, unwrapExpression } from "../shared/scope.js";
+import { calleeName, unwrapExpression } from "../shared/scope.js";
 
 const defaultAttributes = ["class", "className"];
 const defaultHelpers = [];
@@ -38,11 +38,6 @@ function classTokens(classText) {
 
 function uniqueTokens(tokens) {
   return [...new Set(tokens)];
-}
-
-function calleeName(callee) {
-  if (callee?.type === "Identifier") return callee.name;
-  return staticPropertyName(callee);
 }
 
 function jsxAttributeName(node) {
@@ -179,7 +174,7 @@ function isClassHelperArgument(node, options) {
   if (parent?.type !== "CallExpression") return false;
   return (
     parent.arguments.includes(current) &&
-    options.helperNames.has(calleeName(parent.callee))
+    options.helperNames.has(calleeName(parent))
   );
 }
 
@@ -263,7 +258,7 @@ export default function ruleNoDuplicatedConditionalClassnames() {
           if (!isClassStringContext(node, options)) return;
           const consequentClass = staticString(node.consequent);
           const alternateClass = staticString(node.alternate);
-          if (consequentClass == null || alternateClass == null) return;
+          if (consequentClass === null || alternateClass === null) return;
           const evidence = overlapEvidence(
             consequentClass,
             alternateClass,

@@ -1,8 +1,5 @@
 import { getProgramIndex } from "../shared/program-index.js";
-import {
-  isRuleFile,
-  scopeProperties,
-} from "../../oxlint-plugin/shared/rule-scope.js";
+import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import { findVariable, unwrapExpression } from "../shared/scope.js";
 import { patternIdentifiers } from "./static-resolution.js";
 
@@ -87,7 +84,7 @@ function dualReadSide(expression, sourceCode) {
           key,
           source: sourceCode
             .getText(unwrapExpression(node.object))
-            .replace(/\s+/gu, ""),
+            .replaceAll(/\s+/gu, ""),
         };
   }
   return node?.type === "Identifier"
@@ -108,8 +105,8 @@ function checkDualKeyAliasRead(node, context) {
   ) {
     return;
   }
-  const leftText = sourceCode.getText(node.left).replace(/\s+/gu, " ");
-  const rightText = sourceCode.getText(node.right).replace(/\s+/gu, " ");
+  const leftText = sourceCode.getText(node.left).replaceAll(/\s+/gu, " ");
+  const rightText = sourceCode.getText(node.right).replaceAll(/\s+/gu, " ");
   context.report({
     node,
     message: `Dual-key read '${leftText} ${node.operator} ${rightText}' probes both snake_case and camelCase spellings on the same receiver; normalize once at the boundary schema and read one canonical property.`,
@@ -119,7 +116,7 @@ function checkDualKeyAliasRead(node, context) {
 function canonicalReplacementName(name, sourceCode) {
   const index = getProgramIndex(sourceCode);
   if (!index) return null;
-  const stripped = name.replace(AFFIX_STRIP_RE, "");
+  const stripped = name.replaceAll(AFFIX_STRIP_RE, "");
   if (!stripped || stripped === name) return null;
   const camel = stripped.charAt(0).toLowerCase() + stripped.slice(1);
   if (index.declaredNames.has(stripped)) return stripped;

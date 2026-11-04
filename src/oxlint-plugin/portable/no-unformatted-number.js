@@ -35,8 +35,8 @@ const NON_DISPLAY_ATTRS = new Set([
 ]);
 const segments = (name) =>
   name
-    .replace(/(?<=[a-z0-9])(?=[A-Z])/g, " ")
-    .replace(/_/g, " ")
+    .replaceAll(/(?<=[a-z0-9])(?=[A-Z])/g, " ")
+    .replaceAll("_", " ")
     .toLowerCase()
     .split(/\s+/);
 const isNumericName = (name) =>

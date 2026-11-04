@@ -3,9 +3,6 @@ const typeCheckerBySourceCode = new WeakMap();
 const SYMBOL_FLAG_OPTIONAL = 16_777_216;
 const TYPE_FLAG_ANY = 1;
 const TYPE_FLAG_UNKNOWN = 2;
-const TYPE_FLAG_STRING_LITERAL = 1024;
-const TYPE_FLAG_TYPE_PARAMETER = 524_288;
-const TYPE_FLAG_UNION = 134_217_728;
 
 export function getTypeServices(sourceCode) {
   const services = sourceCode?.parserServices;
@@ -44,9 +41,7 @@ export function getResolvedType(node, sourceCode) {
 }
 
 function typeConstituents(type) {
-  return type?.isUnion?.() || (type?.flags & TYPE_FLAG_UNION) !== 0
-    ? (type.types ?? [type])
-    : [type];
+  return type?.isUnion?.() ? (type.types ?? [type]) : [type];
 }
 
 export function resolvedTypeTexts(node, sourceCode) {
@@ -81,6 +76,35 @@ export function resolvedDeclarationFiles(node, sourceCode) {
   );
 }
 
+function isFirstPartyPropertySymbol(prop, program) {
+  const declarations = prop?.declarations ?? [];
+  if (declarations.length === 0) return false;
+  return declarations.some((decl) => {
+    const sf = decl.getSourceFile?.();
+    const fileName = (sf?.fileName ?? "").replaceAll("\\", "/");
+    return (
+      Boolean(fileName) &&
+      !fileName.includes("/node_modules/") &&
+      !program.isSourceFileDefaultLibrary?.(sf)
+    );
+  });
+}
+
+export function resolvedOwnedPropertyNames(node, sourceCode) {
+  const services = getTypeServices(sourceCode);
+  const type = getResolvedType(node, sourceCode);
+  if (!type || !services) return null;
+  const properties = services.checker.getPropertiesOfType(type) ?? [];
+  return properties
+    .filter(
+      (prop) =>
+        typeof prop?.name === "string" &&
+        !prop.name.startsWith("__") &&
+        isFirstPartyPropertySymbol(prop, services.program)
+    )
+    .map((prop) => prop.name);
+}
+
 export function resolvedPropertyShape(node, sourceCode) {
   const services = getTypeServices(sourceCode);
   const type = getResolvedType(node, sourceCode);
@@ -104,11 +128,15 @@ export function isBroadResolvedType(node, sourceCode) {
   if (!type || !services) return false;
   const flags = type.flags ?? 0;
   if ((flags & (TYPE_FLAG_ANY | TYPE_FLAG_UNKNOWN)) !== 0) return true;
-  if ((flags & TYPE_FLAG_TYPE_PARAMETER) !== 0) {
+  if (type.isTypeParameter?.()) {
     const constraint = services.checker.getBaseConstraintOfType?.(type);
     return !constraint;
   }
-  return false;
+  const text = services.checker.typeToString(type);
+  if (text === "object" || text === "{}") return true;
+  const indexInfos = services.checker.getIndexInfosOfType?.(type) ?? [];
+  const properties = services.checker.getPropertiesOfType(type) ?? [];
+  return indexInfos.length > 0 && properties.length === 0;
 }
 
 export function closedStringLiteralUnionValues(node, sourceCode) {
@@ -122,7 +150,7 @@ export function closedStringLiteralUnionValues(node, sourceCode) {
   const literals = [];
   for (const constituent of constituents) {
     if (
-      ((constituent?.flags ?? 0) & TYPE_FLAG_STRING_LITERAL) === 0 ||
+      !constituent?.isStringLiteral?.() ||
       typeof constituent.value !== "string"
     ) {
       return null;

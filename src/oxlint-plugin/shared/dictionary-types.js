@@ -1,3 +1,5 @@
+import { getResolvedType, getTypeServices } from "./type-services.js";
+
 const BUILT_INS = new Set([
   "Record",
   "Readonly",
@@ -22,7 +24,7 @@ function declaredStatement(statement) {
     : statement;
 }
 
-export function createTypeEnvironment(program) {
+export function createTypeEnvironment(program, sourceCode = null) {
   const aliases = new Map();
   const shadowedBuiltIns = new Set();
   for (const statement of program.body) {
@@ -62,7 +64,7 @@ export function createTypeEnvironment(program) {
       shadowedBuiltIns.add(declaration.id.name);
     }
   }
-  return { aliases, shadowedBuiltIns };
+  return { aliases, shadowedBuiltIns, sourceCode };
 }
 
 function typeReferenceName(type) {
@@ -177,6 +179,18 @@ function resolvesToDictionary(type, state) {
   return dictionaryValueTypes(type, state).length > 0;
 }
 
+function classifyImportedReferenceWidening(unwrapped, sourceCode) {
+  const services = getTypeServices(sourceCode);
+  const resolved = services && getResolvedType(unwrapped, sourceCode);
+  if (!resolved) return null;
+  if (((resolved.flags ?? 0) & 2) !== 0) return { kind: "unknown" };
+  const indexInfos = services.checker.getIndexInfosOfType?.(resolved) ?? [];
+  const properties = services.checker.getPropertiesOfType(resolved) ?? [];
+  return indexInfos.length > 0 && properties.length === 0
+    ? { kind: "open dictionary" }
+    : null;
+}
+
 function classifyReferenceWidening(unwrapped, environment) {
   const name = typeReferenceName(unwrapped);
   if (name === null) return null;
@@ -195,7 +209,9 @@ function classifyReferenceWidening(unwrapped, environment) {
       : null;
   }
   const alias = environment.aliases.get(name);
-  if (alias === undefined) return null;
+  if (alias === undefined) {
+    return classifyImportedReferenceWidening(unwrapped, environment.sourceCode);
+  }
   const substitutions = aliasSubstitution(alias, unwrapped, new Map());
   if (substitutions === null) return null;
   const state = {
@@ -215,6 +231,12 @@ export function classifyWideningTarget(type, environment) {
   const unwrapped = unwrapTransparentType(type);
   if (unwrapped.type === "TSUnknownKeyword") return { kind: "unknown" };
   if (unwrapped.type === "TSObjectKeyword") return { kind: "object" };
+  if (unwrapped.type === "TSArrayType") {
+    const elem = unwrapTransparentType(unwrapped.elementType);
+    return elem.type === "TSUnknownKeyword" || elem.type === "TSAnyKeyword"
+      ? { kind: "unknown" }
+      : null;
+  }
   if (unwrapped.type === "TSTypeLiteral") {
     if (
       unwrapped.members.some((member) => member.type === "TSIndexSignature")
@@ -353,14 +375,24 @@ export function isKnownEvidenceExpression(expression) {
     current = current.expression;
   }
   if (current.type === "ObjectExpression") return true;
+  if (current.type === "ArrayExpression") {
+    return (
+      current.elements.length === 0 ||
+      current.elements.some(
+        (member) =>
+          member &&
+          member.type !== "SpreadElement" &&
+          isKnownEvidenceExpression(member)
+      )
+    );
+  }
+  if (current.type === "Literal") return current.value !== null;
+  if (current.type === "UnaryExpression") return current.operator !== "void";
   return (
-    current.type === "ArrayExpression" ||
     current.type === "ArrowFunctionExpression" ||
     current.type === "ClassExpression" ||
     current.type === "FunctionExpression" ||
     current.type === "NewExpression" ||
-    current.type === "Literal" ||
-    current.type === "TemplateLiteral" ||
-    current.type === "UnaryExpression"
+    current.type === "TemplateLiteral"
   );
 }

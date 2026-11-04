@@ -1,4 +1,5 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
+import { hasWidgetDirective } from "../shared/scope.js";
 
 const DEFAULT_INJECTED_MODULES = new Set([
   "@expo/ui/swift-ui",
@@ -15,22 +16,6 @@ const REACT_NATIVE_WIDGET_GLOBALS = new Set([
   "Image",
   "useColorScheme",
 ]);
-
-function hasWidgetDirective(fnNode) {
-  if (fnNode?.body?.type !== "BlockStatement") return false;
-  for (const stmt of fnNode.body.body) {
-    if (stmt.type !== "ExpressionStatement") break;
-    const rawDirective =
-      stmt.directive ??
-      (stmt.expression?.type === "Literal" &&
-      typeof stmt.expression.value === "string"
-        ? stmt.expression.value
-        : null);
-    if (!rawDirective) break;
-    if (rawDirective === "widget") return true;
-  }
-  return false;
-}
 
 function isTypeReferenceNode(ident) {
   for (let cur = ident?.parent; cur; cur = cur.parent) {

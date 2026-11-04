@@ -1,14 +1,17 @@
-import { isKnownEvidenceExpression } from "../anti-slop/shared/dictionary-types.js";
 import { isJsonCall } from "./boundary-decode-checks.js";
 import { topLevelTypeDeclarations } from "./type-predicate-checks.js";
+import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import {
   hasRuntimeSchemaProvenance,
   isOpenEndedJsonSchema,
   schemaReceiverVerdict,
 } from "../shared/runtime-schema-libraries.js";
 import {
+  bindingTypeAnnotation,
+  constInitializer,
   findVariable,
   isFunctionLike,
+  staticPropertyKey,
   unwrapAwaitedExpression,
   unwrapExpression,
 } from "../shared/scope.js";
@@ -52,7 +55,7 @@ function schemaParseCall(node, sourceCode) {
   return {
     method,
     returnsDecodedValue: DECODED_VALUE_METHODS.has(method),
-    schemaText: sourceCode.getText(callee.object).replace(/\s+/gu, ""),
+    schemaText: sourceCode.getText(callee.object).replaceAll(/\s+/gu, ""),
   };
 }
 
@@ -71,7 +74,7 @@ function inferredSchemaFromAnnotation(ann, sourceCode, depth = 0) {
     typeArg?.type === "TSTypeQuery" &&
     typeArg.exprName
   ) {
-    return sourceCode.getText(typeArg.exprName).replace(/\s+/gu, "");
+    return sourceCode.getText(typeArg.exprName).replaceAll(/\s+/gu, "");
   }
   if (ann.typeName?.type === "Identifier" && !ann.typeArguments) {
     const aliasDecl = topLevelTypeDeclarations(sourceCode.ast).get(
@@ -86,12 +89,6 @@ function inferredSchemaFromAnnotation(ann, sourceCode, depth = 0) {
     }
   }
   return null;
-}
-
-function bindingTypeAnnotation(def) {
-  return def?.type === "Parameter"
-    ? def.name?.typeAnnotation?.typeAnnotation
-    : def?.node?.id?.typeAnnotation?.typeAnnotation;
 }
 
 function matchesSchemaOutputType(ann, arg, parseNode, schemaText, sourceCode) {
@@ -115,7 +112,6 @@ function matchesSchemaOutputType(ann, arg, parseNode, schemaText, sourceCode) {
     }
   }
   return Boolean(
-    ann &&
     hasTypeChecker(sourceCode) &&
     hasRuntimeSchemaProvenance(schemaExpr, sourceCode) &&
     !isBroadResolvedType(arg, sourceCode) &&
@@ -160,25 +156,33 @@ function isSchemaReceiver(expression, sourceCode) {
   );
 }
 
+function enclosingMapCallback(node) {
+  const parent = node.parent;
+  if (parent?.type === "ArrowFunctionExpression" && parent.body === node) {
+    return parent;
+  }
+  if (parent?.type !== "ReturnStatement" || parent.argument !== node) {
+    return null;
+  }
+  let cur = parent;
+  while (cur && !isFunctionLike(cur)) cur = cur.parent;
+  return cur ?? null;
+}
+
+function isMapCallWithCallback(call, callback) {
+  return (
+    call?.type === "CallExpression" &&
+    call.arguments[0] === callback &&
+    call.callee?.type === "MemberExpression" &&
+    !call.callee.computed &&
+    call.callee.property?.name === "map"
+  );
+}
+
 function isMappedSchemaDecode(node, sourceCode) {
   if (!hasRuntimeSchemaProvenance(node.callee.object, sourceCode)) return false;
-  let callback = node.parent;
-  if (callback?.type === "ReturnStatement" && callback.argument === node) {
-    while (callback && !isFunctionLike(callback)) callback = callback.parent;
-  } else if (
-    callback?.type !== "ArrowFunctionExpression" ||
-    callback.body !== node
-  ) {
-    return false;
-  }
-  const call = callback?.parent;
-  if (
-    call?.type !== "CallExpression" ||
-    call.arguments[0] !== callback ||
-    call.callee?.type !== "MemberExpression" ||
-    call.callee.computed ||
-    call.callee.property?.name !== "map"
-  ) {
+  const callback = enclosingMapCallback(node);
+  if (!callback || !isMapCallWithCallback(callback.parent, callback)) {
     return false;
   }
   const parameter = callback.params[0];
@@ -322,7 +326,7 @@ function isInverseCodecPair(outerName, innerName) {
   });
 }
 
-export function checkCodecRoundtrip(node, context) {
+function checkCodecRoundtrip(node, context) {
   const inner = unwrapAwaitedExpression(node.arguments[0]);
   const outerCallee = unwrapExpression(node.callee);
   const innerCallee = unwrapExpression(inner?.callee);
@@ -340,129 +344,7 @@ export function checkCodecRoundtrip(node, context) {
   }
 }
 
-function isAsUnknownExpression(node) {
-  return (
-    (node?.type === "TSAsExpression" || node?.type === "TSTypeAssertion") &&
-    node.typeAnnotation?.type === "TSUnknownKeyword"
-  );
-}
-
-function isUnknownOrAnyAnnotation(typeAnnotation) {
-  const inner = typeAnnotation?.typeAnnotation;
-  return inner?.type === "TSUnknownKeyword" || inner?.type === "TSAnyKeyword";
-}
-
-function rootIdentifierOf(expr) {
-  const unwrapped = unwrapExpression(expr);
-  if (unwrapped?.type === "Identifier") return unwrapped;
-  if (
-    unwrapped?.type === "MemberExpression" &&
-    unwrapped.object?.type === "Identifier"
-  ) {
-    return unwrapped.object;
-  }
-  return null;
-}
-
-function hasKnownAnnotation(identifiers) {
-  for (const ident of identifiers ?? []) {
-    if (
-      ident.typeAnnotation &&
-      !isUnknownOrAnyAnnotation(ident.typeAnnotation)
-    ) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function constInitOfVariable(binding) {
-  const def = binding?.defs?.[0];
-  if (def?.type !== "Variable") return null;
-  const decl = def.node;
-  if (decl?.type !== "VariableDeclarator" || decl.parent?.kind !== "const") {
-    return null;
-  }
-  if (isUnknownOrAnyAnnotation(decl.id?.typeAnnotation)) return null;
-  return decl.init ?? null;
-}
-
-function hasKnownValueOrigin(sourceCode, expr, seen = new Set()) {
-  if (!expr) return false;
-  if (isKnownEvidenceExpression(expr)) return !isContractFreeLiteral(expr);
-  const rootIdent = rootIdentifierOf(expr);
-  if (!rootIdent) return false;
-  const binding = findVariable(sourceCode, rootIdent);
-  if (!binding || seen.has(binding)) return false;
-  seen.add(binding);
-  if (hasKnownAnnotation(binding.identifiers)) return true;
-  const init = constInitOfVariable(binding);
-  return init ? hasKnownValueOrigin(sourceCode, init, seen) : false;
-}
-
-function erasedUnknownInitializer(sourceCode, node) {
-  if (isAsUnknownExpression(node.init)) {
-    const inner = node.init.expression;
-    return isContractFreeLiteral(inner) ? null : inner;
-  }
-  if (node.id?.typeAnnotation?.typeAnnotation?.type === "TSUnknownKeyword") {
-    return hasKnownValueOrigin(sourceCode, node.init) ? node.init : null;
-  }
-  return null;
-}
-
-function isContractFreeLiteral(expr) {
-  const unwrapped = unwrapExpression(expr);
-  return (
-    (unwrapped?.type === "ObjectExpression" &&
-      unwrapped.properties.length === 0) ||
-    (unwrapped?.type === "ArrayExpression" && unwrapped.elements.length === 0)
-  );
-}
-
-function isReestablishingRef(ident) {
-  const parent = ident.parent;
-  if (
-    parent?.type === "TSAsExpression" &&
-    parent.expression === ident &&
-    parent.typeAnnotation?.type === "TSTypeReference"
-  ) {
-    return true;
-  }
-  if (
-    parent?.type === "CallExpression" &&
-    parent.arguments[0] === ident &&
-    parent.callee?.type === "MemberExpression" &&
-    parent.callee.property?.type === "Identifier" &&
-    /^(?:parse|safeParse|parseAsync|decodeUnknownSync|decodeUnknownEither)$/u.test(
-      parent.callee.property.name
-    )
-  ) {
-    return true;
-  }
-  return false;
-}
-
-export function checkErasedUnknownReparse(node, context) {
-  const sourceCode = context.sourceCode;
-  if (node.id?.type !== "Identifier" || node.parent?.kind !== "const") return;
-  const binding = erasedUnknownInitializer(sourceCode, node)
-    ? findVariable(sourceCode, node.id)
-    : null;
-  if (
-    binding?.references.some(
-      (ref) => ref.isRead() && isReestablishingRef(ref.identifier)
-    )
-  ) {
-    context.report({
-      node: node.id,
-      message:
-        "Appeasement erasure: widening a known value to `unknown` only makes the parse or cast below look earned. Keep the precise type and validate at the real boundary.",
-    });
-  }
-}
-
-export function checkRedundantSchemaParse(node, context) {
+function checkRedundantSchemaParse(node, context) {
   const sourceCode = context.sourceCode;
   if (checkJsonTunnel(node, context)) return;
   const outer = schemaParseCall(node, sourceCode);
@@ -487,3 +369,189 @@ export function checkRedundantSchemaParse(node, context) {
   }
   checkDecodedBinding(node, outer.schemaText, context);
 }
+
+function isIdentityTransform(parameter, body) {
+  const expr = unwrapExpression(body);
+  if (!expr) return false;
+  if (parameter.type === "Identifier") {
+    return expr.type === "Identifier" && expr.name === parameter.name;
+  }
+  if (
+    parameter.type === "ObjectPattern" &&
+    parameter.properties.length > 0 &&
+    expr.type === "ObjectExpression" &&
+    expr.properties.length === parameter.properties.length
+  ) {
+    const bindings = new Map();
+    for (const prop of parameter.properties) {
+      if (
+        prop.type !== "Property" ||
+        prop.computed ||
+        prop.key?.type !== "Identifier" ||
+        prop.value?.type !== "Identifier"
+      ) {
+        return false;
+      }
+      bindings.set(prop.key.name, prop.value.name);
+    }
+    return expr.properties.every(
+      (property) =>
+        property.type === "Property" &&
+        !property.computed &&
+        property.key?.type === "Identifier" &&
+        property.value?.type === "Identifier" &&
+        bindings.get(property.key.name) === property.value.name
+    );
+  }
+  return false;
+}
+
+function checkIdentitySchemaTransform(node, context) {
+  if (
+    node.callee?.type !== "MemberExpression" ||
+    node.callee.computed ||
+    node.callee.property?.type !== "Identifier" ||
+    node.callee.property.name !== "transform" ||
+    schemaReceiverVerdict(node.callee, context.sourceCode) === "disproven"
+  ) {
+    return;
+  }
+  const callback = unwrapExpression(node.arguments[0]);
+  if (
+    !isFunctionLike(callback) ||
+    callback.async ||
+    callback.params.length !== 1
+  ) {
+    return;
+  }
+  const parameter = callback.params[0];
+  const returned =
+    callback.body?.type === "BlockStatement" &&
+    callback.body.body.length === 1 &&
+    callback.body.body[0].type === "ReturnStatement"
+      ? callback.body.body[0].argument
+      : callback.body;
+  if (isIdentityTransform(parameter, returned)) {
+    context.report({
+      node,
+      message:
+        "Schema `.transform()` performs an identity pass-through; remove the no-op transform.",
+    });
+  }
+}
+
+const JSON_SCHEMA_EMITTERS = new Set([
+  "toJSONSchema",
+  "toJsonSchema",
+  "zodToJsonSchema",
+]);
+
+function isJsonSchemaCall(node) {
+  const expr = unwrapExpression(node);
+  if (expr?.type !== "CallExpression") return false;
+  const callee = unwrapExpression(expr.callee);
+  if (callee?.type === "Identifier") {
+    return JSON_SCHEMA_EMITTERS.has(callee.name);
+  }
+  if (
+    callee?.type === "MemberExpression" &&
+    !callee.computed &&
+    callee.property?.type === "Identifier"
+  ) {
+    return (
+      JSON_SCHEMA_EMITTERS.has(callee.property.name) ||
+      (callee.object?.type === "Identifier" &&
+        callee.object.name === "JSONSchema" &&
+        callee.property.name === "make")
+    );
+  }
+  return false;
+}
+
+function isValidatorCompilerCall(node, sourceCode) {
+  const callee = unwrapExpression(node.callee);
+  if (hasRuntimeSchemaProvenance(callee, sourceCode)) return true;
+  if (
+    callee?.type === "MemberExpression" &&
+    !callee.computed &&
+    callee.property?.type === "Identifier" &&
+    /^(?:compile|validate|addSchema)$/u.test(callee.property.name)
+  ) {
+    const objectName =
+      callee.object?.type === "Identifier" ? callee.object.name : "";
+    return /ajv|validator|schema/iu.test(objectName);
+  }
+  return false;
+}
+
+const TRANSCODED_SCHEMA_KEYS = new Set([
+  "returns",
+  "args",
+  "input",
+  "output",
+  "schema",
+]);
+
+function isJsonSchemaExpression(node, sourceCode) {
+  const expr = unwrapExpression(node);
+  if (isJsonSchemaCall(expr)) return true;
+  if (expr?.type === "Identifier") {
+    return isJsonSchemaCall(constInitializer(sourceCode, expr));
+  }
+  return false;
+}
+
+function hasTranscodedRegistrationProperty(argNode, sourceCode) {
+  const expr = unwrapExpression(argNode);
+  if (expr?.type !== "ObjectExpression") return false;
+  return expr.properties.some(
+    (prop) =>
+      TRANSCODED_SCHEMA_KEYS.has(staticPropertyKey(prop)) &&
+      isJsonSchemaExpression(prop.value, sourceCode)
+  );
+}
+
+function checkSchemaValidatorTranscoding(node, context) {
+  const sourceCode = context.sourceCode;
+  const directTranscode =
+    isValidatorCompilerCall(node, sourceCode) &&
+    node.arguments.some((arg) => isJsonSchemaExpression(arg, sourceCode));
+  const registrationTranscode = node.arguments.some((arg) =>
+    hasTranscodedRegistrationProperty(arg, sourceCode)
+  );
+  if (directTranscode || registrationTranscode) {
+    context.report({
+      node,
+      message:
+        "Do not transcode a schema through JSON Schema into another validator; share one canonical schema definition.",
+    });
+  }
+}
+
+export const noRedundantSchemaParseRule = {
+  meta: {
+    type: "problem",
+    docs: {
+      description:
+        "Disallow redundant schema operations: re-parsing already-decoded values, closed-schema JSON string tunnels, inverse codec round-trips, identity `.transform()` no-ops, and transcoding a runtime schema through JSON Schema into another validator.",
+    },
+    schema: [
+      {
+        type: "object",
+        properties: scopeProperties,
+        additionalProperties: false,
+      },
+    ],
+  },
+  create(context) {
+    if (!isRuleFile(context)) return {};
+    return {
+      CallExpression(node) {
+        checkRedundantSchemaParse(node, context);
+        checkCodecRoundtrip(node, context);
+        checkIdentitySchemaTransform(node, context);
+        checkSchemaValidatorTranscoding(node, context);
+      },
+    };
+  },
+};
