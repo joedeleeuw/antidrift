@@ -8,6 +8,10 @@ import { ESLint } from "eslint";
 import "zod";
 
 import { createEslintConfig, createOxlintConfig } from "../src/index.js";
+import {
+  assertModuleFlowCompleteness,
+  writeModuleFlowProject,
+} from "./module-flow-smoke.mjs";
 
 const schemasSource = `
 import { z } from "zod";
@@ -268,6 +272,7 @@ export async function runTypedEslintSmoke({
   expectedDiagnostics,
 }) {
   const { typedGoodFile, typedBadFile } = writeTypedProject(workDir, repoRoot);
+  writeModuleFlowProject(workDir);
   const eslint = createTypedEslint(workDir);
   const [typedGood, typedBad, parityGood, parityBad] = await eslint.lintFiles([
     typedGoodFile,
@@ -284,4 +289,5 @@ export async function runTypedEslintSmoke({
   assertParityRules(parityGood, parityBad, expectedRules);
   assertReported(parityBad.messages, expectedDiagnostics, "typed ESLint");
   await assertUntypedHostsAbstain({ workDir, repoRoot, typedBadFile });
+  await assertModuleFlowCompleteness(workDir, eslint);
 }

@@ -1,14 +1,14 @@
+import { isExposedOutsideProgram } from "../shared/module-exposure.js";
 import {
-  canonicalSymbol,
-  isPackageEntryExport,
+  isMemberDispatchClosed,
   programReferences,
+  rootSymbols,
 } from "../shared/program-references.js";
 import { isFunctionLike, unwrapExpression } from "../shared/scope.js";
 import { getTypeServices } from "../shared/type-services.js";
 
 const SYMBOL_FLAG_OPTIONAL = 16_777_216;
 const TYPE_FLAG_ANY_OR_UNKNOWN = 3;
-const COMPONENT_NAME_RE = /^[A-Z][a-z0-9]/u;
 const COMPONENT_WRAPPERS = new Set(["memo", "forwardRef"]);
 const NEUTRAL_REFERENCE = "neutral";
 
@@ -67,7 +67,7 @@ function statementCandidates(statement) {
   if (declaration?.type !== "VariableDeclaration") return [];
   return declaration.declarations.flatMap((declarator) => {
     const declared =
-      declarator.id.type === "Identifier"
+      declarator.id.type === "Identifier" && !declarator.id.typeAnnotation
         ? declaredFunction(declarator.init)
         : null;
     return declared
@@ -83,9 +83,10 @@ function moduleExports(tsSourceFile, checker) {
   for (const exported of moduleSymbol
     ? checker.getExportsOfModule(moduleSymbol)
     : []) {
-    const local = canonicalSymbol(exported, checker);
-    if (exported.name === "default") defaultExport = local;
-    else named.add(local);
+    for (const local of rootSymbols(exported, checker)) {
+      if (exported.name === "default") defaultExport = local;
+      else named.add(local);
+    }
   }
   return { named, defaultExport };
 }
@@ -129,8 +130,8 @@ function invocationSite(call) {
 function referenceSite(identifier) {
   let expression = identifier;
   while (
-    expression.parent?.name === expression &&
-    expression.parent.expression
+    (expression.parent?.name === expression && expression.parent.expression) ||
+    expression.parent?.argumentExpression === expression
   ) {
     expression = expression.parent;
   }
@@ -159,8 +160,9 @@ function suppliedByType(argument, name, checker) {
     return undefined;
   }
   const property = checker.getPropertyOfType(type, name);
-  if (!property) return false;
-  return (property.flags & SYMBOL_FLAG_OPTIONAL) === 0 ? true : undefined;
+  return property && (property.flags & SYMBOL_FLAG_OPTIONAL) === 0
+    ? true
+    : undefined;
 }
 
 function memberSupplied(site, name, checker) {
@@ -266,32 +268,40 @@ function nodeLoc(tsNode, sourceCode) {
   };
 }
 
-function isEligible(candidate, services, exportsOfModule) {
+function exportState(candidate, services, exportsOfModule) {
   const { checker, nodeMap } = services;
   const symbol = checker.getSymbolAtLocation(nodeMap.get(candidate.nameNode));
-  if (!symbol || (symbol.declarations?.length ?? 0) > 1) return false;
-  const exportSymbol = canonicalSymbol(
+  if (!symbol || (symbol.declarations?.length ?? 0) > 1) return null;
+  const [exportRoot] = rootSymbols(
     checker.getSymbolAtLocation(nodeMap.get(candidate.exportNode)),
     checker
   );
-  if (exportSymbol === exportsOfModule.defaultExport) return false;
-  return (
-    exportsOfModule.named.has(exportSymbol) ||
-    (candidate.exportNode === candidate.nameNode &&
-      COMPONENT_NAME_RE.test(candidate.nameNode.name))
-  );
+  if (!exportRoot || exportRoot === exportsOfModule.defaultExport) return null;
+  const exported = exportsOfModule.named.has(exportRoot);
+  if (!exported && candidate.exportNode !== candidate.nameNode) return null;
+  return { exported };
 }
 
-function reportCandidate(context, candidate, services) {
+function provenSites(candidate, services, exportsOfModule) {
   const { nodeMap } = services;
-  if (isPackageEntryExport(nodeMap.get(candidate.exportNode), services)) return;
-  const references = programReferences(
-    nodeMap.get(candidate.nameNode),
-    services
-  );
-  if (!references) return;
-  const sites = callSites(references);
-  if (sites.length === 0) return;
+  const state = exportState(candidate, services, exportsOfModule);
+  const exportName = nodeMap.get(candidate.exportNode);
+  if (!state || isExposedOutsideProgram(exportName, state.exported, services)) {
+    return [];
+  }
+  const name = nodeMap.get(candidate.nameNode);
+  if (
+    candidate.exportNode !== candidate.nameNode &&
+    !isMemberDispatchClosed(name, exportName, services)
+  ) {
+    return [];
+  }
+  const references = programReferences(name, services);
+  const sites = references ? callSites(references) : [];
+  return state.exported || sites.some((site) => site.jsx) ? sites : [];
+}
+
+function reportCandidate(context, candidate, services, sites) {
   const tsFunction = services.nodeMap.get(candidate.fn);
   for (const input of optionalInputs(tsFunction, candidate.wrapped, services)) {
     const messageId = verdict(input, sites);
@@ -327,8 +337,9 @@ export default {
         const tsSourceFile = services.nodeMap.get(program);
         const exportsOfModule = moduleExports(tsSourceFile, services.checker);
         for (const candidate of program.body.flatMap(statementCandidates)) {
-          if (isEligible(candidate, services, exportsOfModule)) {
-            reportCandidate(context, candidate, services);
+          const sites = provenSites(candidate, services, exportsOfModule);
+          if (sites.length > 0) {
+            reportCandidate(context, candidate, services, sites);
           }
         }
       },

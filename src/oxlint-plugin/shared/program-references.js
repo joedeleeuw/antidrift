@@ -1,21 +1,14 @@
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-
 const SYMBOL_FLAG_ALIAS = 2_097_152;
 const IGNORED_SOURCE_FILE_RE =
   /(?:^|\/)(?:node_modules|dist|build|coverage|_generated)\/|\.d\.[cm]?ts$/u;
-const SCRIPT_EXTENSION_RE = /\.[cm]?[jt]sx?$/u;
-const SOURCE_EXTENSIONS = [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx"];
 
 const referenceIndexByProgram = new WeakMap();
-const packageDirByDir = new Map();
-const entryMatchersByPackageDir = new Map();
 
-function normalizedPath(fileName) {
+export function normalizedPath(fileName) {
   return fileName.replaceAll("\\", "/");
 }
 
-function workspaceSourceFiles(program) {
+export function workspaceSourceFiles(program) {
   return program
     .getSourceFiles()
     .filter(
@@ -25,166 +18,202 @@ function workspaceSourceFiles(program) {
     );
 }
 
-function collectIdentifiers(tsNode, identifiersByName) {
-  if (typeof tsNode.escapedText === "string") {
-    const bucket = identifiersByName.get(tsNode.text);
-    if (bucket) bucket.push(tsNode);
-    else identifiersByName.set(tsNode.text, [tsNode]);
+export function isStaticElementName(tsNode) {
+  return (
+    typeof tsNode?.text === "string" &&
+    tsNode.escapedText === undefined &&
+    tsNode.expression === undefined &&
+    tsNode.parent?.argumentExpression === tsNode
+  );
+}
+
+function addToBucket(map, key, entry) {
+  const bucket = map.get(key);
+  if (bucket) bucket.push(entry);
+  else map.set(key, [entry]);
+}
+
+function collectNames(tsNode, index) {
+  if (typeof tsNode.escapedText === "string" || isStaticElementName(tsNode)) {
+    addToBucket(index.namesByText, tsNode.text, tsNode);
   }
   tsNode.forEachChild((child) => {
-    collectIdentifiers(child, identifiersByName);
+    collectNames(child, index);
   });
 }
 
-function nearestPackageDir(directory) {
-  if (packageDirByDir.has(directory)) return packageDirByDir.get(directory);
-  const parent = dirname(directory);
-  let packageDir = null;
-  if (existsSync(join(directory, "package.json"))) packageDir = directory;
-  else if (parent !== directory) packageDir = nearestPackageDir(parent);
-  packageDirByDir.set(directory, packageDir);
-  return packageDir;
-}
-
-function exportTargets(exportsField) {
-  if (typeof exportsField === "string") return [exportsField];
-  if (Array.isArray(exportsField)) return exportsField.flatMap(exportTargets);
-  if (exportsField && typeof exportsField === "object") {
-    return Object.values(exportsField).flatMap(exportTargets);
-  }
-  return [];
-}
-
-function escapeRegExp(text) {
-  return text.replaceAll(/[.+?^${}()|[\]\\]/gu, String.raw`\$&`);
-}
-
-function entryMatcher(packageDir, target) {
-  const absolute = normalizedPath(resolve(packageDir, target));
-  const stem = absolute.replace(SCRIPT_EXTENSION_RE, "");
-  const pattern = escapeRegExp(stem).replaceAll("*", ".+");
-  const extensions = SOURCE_EXTENSIONS.map(escapeRegExp).join("|");
-  return new RegExp(`^${pattern}(?:${extensions})$`, "u");
-}
-
-function packageEntryMatchers(packageDir) {
-  if (entryMatchersByPackageDir.has(packageDir)) {
-    return entryMatchersByPackageDir.get(packageDir);
-  }
-  const manifest = JSON.parse(
-    readFileSync(join(packageDir, "package.json"), "utf8")
-  );
-  const targets = [
-    ...exportTargets(manifest.exports),
-    ...[manifest.main, manifest.module, manifest.types, manifest.typings]
-      .filter((target) => typeof target === "string")
-      .map((target) => (target.startsWith(".") ? target : `./${target}`)),
-  ].filter((target) => target.startsWith("./"));
-  const matchers = targets.map((target) => entryMatcher(packageDir, target));
-  entryMatchersByPackageDir.set(packageDir, matchers);
-  return matchers;
-}
-
-function isPackageEntry(fileName) {
-  const packageDir = nearestPackageDir(dirname(fileName));
-  return (
-    packageDir !== null &&
-    packageEntryMatchers(packageDir).some((matcher) => matcher.test(fileName))
-  );
-}
-
-export function canonicalSymbol(symbol, checker) {
-  if (!symbol) return null;
+export function rootSymbols(symbol, checker) {
+  if (!symbol) return [];
   const target =
     (symbol.flags & SYMBOL_FLAG_ALIAS) === 0
       ? symbol
       : checker.getAliasedSymbol(symbol);
-  return checker.getExportSymbolOfSymbol(target);
+  const roots = checker
+    .getRootSymbols(checker.getExportSymbolOfSymbol(target))
+    .map((root) => checker.getExportSymbolOfSymbol(root));
+  return [...new Set(roots)];
 }
 
-function entryExportedSymbols(program, checker) {
-  const exported = new Set();
-  for (const sourceFile of workspaceSourceFiles(program)) {
-    if (!isPackageEntry(normalizedPath(sourceFile.fileName))) continue;
-    const moduleSymbol = checker.getSymbolAtLocation(sourceFile);
-    if (!moduleSymbol) continue;
-    for (const exportSymbol of checker.getExportsOfModule(moduleSymbol)) {
-      exported.add(canonicalSymbol(exportSymbol, checker));
-    }
+function bindingPropertySymbol(tsNode, checker) {
+  const binding = tsNode.parent;
+  const pattern = binding?.parent;
+  if (
+    binding?.name !== tsNode ||
+    binding.propertyName ||
+    !Array.isArray(pattern?.elements) ||
+    !pattern.getText().startsWith("{")
+  ) {
+    return undefined;
   }
-  return exported;
-}
-
-function programReferenceIndex(program, checker) {
-  let index = referenceIndexByProgram.get(program);
-  if (!index) {
-    const identifiersByName = new Map();
-    for (const sourceFile of workspaceSourceFiles(program)) {
-      collectIdentifiers(sourceFile, identifiersByName);
-    }
-    index = { identifiersByName, entryExports: null };
-    referenceIndexByProgram.set(program, index);
-  }
-  index.entryExports ??= entryExportedSymbols(program, checker);
-  return index;
-}
-
-function referencedSymbol(identifier, checker) {
-  return canonicalSymbol(
-    checker.getShorthandAssignmentValueSymbol(identifier.parent) ??
-      checker.getSymbolAtLocation(identifier),
-    checker
+  return checker.getPropertyOfType(
+    checker.getTypeAtLocation(pattern),
+    tsNode.text
   );
 }
 
-function moduleBindingSpecifier(identifier) {
-  const specifier = identifier.parent;
+function referenceSymbol(tsNode, checker) {
+  return (
+    checker.getShorthandAssignmentValueSymbol(tsNode.parent) ??
+    bindingPropertySymbol(tsNode, checker) ??
+    checker.getSymbolAtLocation(tsNode)
+  );
+}
+
+function isMemberName(tsNode) {
+  const parent = tsNode.parent;
+  return (
+    (parent?.name === tsNode && parent.expression !== undefined) ||
+    parent?.argumentExpression === tsNode
+  );
+}
+
+function resolveBucket(index, text, checker) {
+  if (index.resolvedTexts.has(text)) return;
+  index.resolvedTexts.add(text);
+  for (const tsNode of index.namesByText.get(text) ?? []) {
+    const roots = rootSymbols(referenceSymbol(tsNode, checker), checker);
+    if (roots.length === 0 && isMemberName(tsNode)) {
+      index.unresolvedMemberTexts.add(text);
+    }
+    for (const root of roots) {
+      addToBucket(index.referencesByRoot, root, tsNode);
+      if (roots.length > 1) index.ambiguousRoots.add(root);
+    }
+  }
+}
+
+export function programIndex(services) {
+  const { program } = services;
+  let index = referenceIndexByProgram.get(program);
+  if (!index) {
+    index = {
+      namesByText: new Map(),
+      resolvedTexts: new Set(),
+      referencesByRoot: new Map(),
+      ambiguousRoots: new Set(),
+      unresolvedMemberTexts: new Set(),
+      exposure: null,
+    };
+    for (const sourceFile of workspaceSourceFiles(program)) {
+      collectNames(sourceFile, index);
+    }
+    referenceIndexByProgram.set(program, index);
+  }
+  return index;
+}
+
+export function declarationRoot(nameNode, checker) {
+  const roots = rootSymbols(checker.getSymbolAtLocation(nameNode), checker);
+  return roots.length === 1 ? roots[0] : null;
+}
+
+function moduleBindingSpecifier(tsNode) {
+  const specifier = tsNode.parent;
   const isSpecifier =
     Array.isArray(specifier?.parent?.elements) &&
-    (specifier.name === identifier || specifier.propertyName === identifier);
+    (specifier.name === tsNode || specifier.propertyName === tsNode);
   if (!isSpecifier) return null;
   const bindingOwner = specifier.parent.parent;
-  if (bindingOwner && "exportClause" in bindingOwner) return specifier;
+  if (bindingOwner && "exportClause" in bindingOwner) {
+    return { specifier, exported: true };
+  }
   return bindingOwner?.parent && "importClause" in bindingOwner.parent
-    ? specifier
+    ? { specifier, exported: false }
     : null;
 }
 
 export function programReferences(nameNode, services) {
-  const { checker, program } = services;
-  const target = canonicalSymbol(
-    checker.getSymbolAtLocation(nameNode),
-    checker
-  );
+  const { checker } = services;
+  const target = declarationRoot(nameNode, checker);
   if (!target) return null;
-  const index = programReferenceIndex(program, checker);
-  const references = [];
-  const names = [nameNode.text];
-  const visitedNames = new Set(names);
-  for (const name of names) {
-    for (const identifier of index.identifiersByName.get(name) ?? []) {
-      if (identifier === nameNode) continue;
-      if (referencedSymbol(identifier, checker) !== target) continue;
-      const specifier = moduleBindingSpecifier(identifier);
-      if (!specifier) {
-        references.push(identifier);
-        continue;
-      }
-      const alias = specifier.name?.text;
-      if (alias && !visitedNames.has(alias)) {
-        visitedNames.add(alias);
-        names.push(alias);
+  const index = programIndex(services);
+  const texts = new Set([nameNode.text]);
+  let references = [];
+  let pending = true;
+  while (pending) {
+    pending = false;
+    for (const text of texts) resolveBucket(index, text, checker);
+    references = index.referencesByRoot.get(target) ?? [];
+    for (const reference of references) {
+      const binding = moduleBindingSpecifier(reference);
+      const alias = binding?.specifier.name?.text;
+      if (alias === "default" && binding.exported) return null;
+      if (alias && !texts.has(alias)) {
+        texts.add(alias);
+        pending = true;
       }
     }
   }
-  return references;
+  if (index.ambiguousRoots.has(target)) return null;
+  return references.filter(
+    (reference) => reference !== nameNode && !moduleBindingSpecifier(reference)
+  );
 }
 
-export function isPackageEntryExport(nameNode, services) {
-  const { checker, program } = services;
-  const target = canonicalSymbol(
-    checker.getSymbolAtLocation(nameNode),
-    checker
+function isHeritageReference(reference) {
+  const heritageType = reference.parent;
+  return (
+    heritageType?.expression === reference &&
+    Array.isArray(heritageType.parent?.types) &&
+    heritageType.parent.token !== undefined
   );
-  return programReferenceIndex(program, checker).entryExports.has(target);
+}
+
+function receiverAcceptsInstance(reference, instanceType, checker) {
+  const access = reference.parent;
+  const receiver = access?.expression;
+  return (
+    receiver !== undefined &&
+    receiver !== reference &&
+    checker.isTypeAssignableTo(
+      instanceType,
+      checker.getTypeAtLocation(receiver)
+    )
+  );
+}
+
+export function isMemberDispatchClosed(
+  methodNameNode,
+  classNameNode,
+  services
+) {
+  const { checker } = services;
+  const index = programIndex(services);
+  const classReferences = programReferences(classNameNode, services);
+  const method = declarationRoot(methodNameNode, checker);
+  if (!classReferences || !method) return false;
+  if (classReferences.some(isHeritageReference)) return false;
+  const text = methodNameNode.text;
+  resolveBucket(index, text, checker);
+  if (index.unresolvedMemberTexts.has(text)) return false;
+  const instanceType = checker.getDeclaredTypeOfSymbol(
+    declarationRoot(classNameNode, checker)
+  );
+  const sameRoot = new Set(index.referencesByRoot.get(method) ?? []);
+  return (index.namesByText.get(text) ?? []).every(
+    (reference) =>
+      sameRoot.has(reference) ||
+      !isMemberName(reference) ||
+      !receiverAcceptsInstance(reference, instanceType, checker)
+  );
 }
