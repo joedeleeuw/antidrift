@@ -33,10 +33,19 @@ function addToBucket(map, key, entry) {
   else map.set(key, [entry]);
 }
 
+function isDynamicElementKey(tsNode) {
+  return (
+    tsNode.parent?.argumentExpression === tsNode &&
+    tsNode.parent.expression !== undefined &&
+    !isStaticElementName(tsNode)
+  );
+}
+
 function collectNames(tsNode, index) {
   if (typeof tsNode.escapedText === "string" || isStaticElementName(tsNode)) {
     addToBucket(index.namesByText, tsNode.text, tsNode);
   }
+  if (isDynamicElementKey(tsNode)) index.dynamicKeys.push(tsNode);
   tsNode.forEachChild((child) => {
     collectNames(child, index);
   });
@@ -112,6 +121,8 @@ export function programIndex(services) {
       referencesByRoot: new Map(),
       ambiguousRoots: new Set(),
       unresolvedMemberTexts: new Set(),
+      dynamicKeys: [],
+      dynamicKeyNames: null,
       exposure: null,
     };
     for (const sourceFile of workspaceSourceFiles(program)) {
@@ -192,6 +203,24 @@ function receiverAcceptsInstance(reference, instanceType, checker) {
   );
 }
 
+function literalKeyNames(keyNode, checker) {
+  const type = checker.getTypeAtLocation(keyNode);
+  const parts = type.isUnion() ? type.types : [type];
+  return parts.every((part) => part.isLiteral())
+    ? new Set(parts.map((part) => String(part.value)))
+    : null;
+}
+
+function dynamicKeysNaming(text, index, checker) {
+  index.dynamicKeyNames ??= index.dynamicKeys.map((keyNode) => ({
+    keyNode,
+    names: literalKeyNames(keyNode, checker),
+  }));
+  return index.dynamicKeyNames
+    .filter(({ names }) => names === null || names.has(text))
+    .map(({ keyNode }) => keyNode);
+}
+
 export function isMemberDispatchClosed(
   methodNameNode,
   classNameNode,
@@ -209,6 +238,13 @@ export function isMemberDispatchClosed(
   const instanceType = checker.getDeclaredTypeOfSymbol(
     declarationRoot(classNameNode, checker)
   );
+  if (
+    dynamicKeysNaming(text, index, checker).some((keyNode) =>
+      receiverAcceptsInstance(keyNode, instanceType, checker)
+    )
+  ) {
+    return false;
+  }
   const sameRoot = new Set(index.referencesByRoot.get(method) ?? []);
   return (index.namesByText.get(text) ?? []).every(
     (reference) =>
