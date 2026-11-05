@@ -83,7 +83,7 @@ export function queriesInRange(node, state, includeLifecycle = false) {
   const queries = new Set();
   const mapSites = new Set();
   const contributors = new Set();
-  if (!node) return { queries, mapSites, contributors };
+  if (!Array.isArray(node?.range)) return { queries, mapSites, contributors };
   const [start, end] = node.range;
   for (const [binding, origin] of state.provenance) {
     for (const reference of binding.references) {
@@ -96,8 +96,9 @@ export function queriesInRange(node, state, includeLifecycle = false) {
       ) {
         continue;
       }
-      if (!includeLifecycle && effectReceiver(identifier, state.sourceCode))
+      if (!includeLifecycle && effectReceiver(identifier, state.sourceCode)) {
         continue;
+      }
       const selected = referenceOrigin(identifier, origin, includeLifecycle);
       if (!selected || selected.queries.size === 0) continue;
       contributors.add(selected);

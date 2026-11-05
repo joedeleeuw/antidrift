@@ -825,7 +825,7 @@ function unionOwnershipVisitors(context, state, ownedUnionVisitors) {
     },
     CallExpression(node) {
       checkSchemaRename(node, context);
-      checkUnionOwnership(node, context, state.typeDeclarations);
+      checkUnionOwnership(node, context, state);
       const reportedLocalUnion = ownedUnionVisitors.CallExpression?.(node);
       checkRuntimeSchemaFork(node, context, state, reportedLocalUnion);
     },
@@ -836,7 +836,7 @@ function unionOwnershipVisitors(context, state, ownedUnionVisitors) {
       ownedUnionVisitors.TSLiteralType?.(node);
     },
     TSUnionType(node) {
-      checkUnionOwnership(node, context, state.typeDeclarations);
+      checkUnionOwnership(node, context, state);
       const reportedLocal = ownedUnionVisitors.TSUnionType?.(node);
       if (!reportedLocal) {
         const target = enclosingInlineTypeTarget(node);
@@ -987,6 +987,7 @@ export const noStructuralTypeForkRule = {
       },
       seenShapes: new Map(),
       seenRuntimeUnions: new Map(),
+      seenRepeatedUnions: new Set(),
       literalCounts: new Map(),
       typeDeclarations: new Map(),
     };

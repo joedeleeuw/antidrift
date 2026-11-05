@@ -100,8 +100,9 @@ export function firstPartyContract(type, services) {
     type.isUnion?.() ||
     !type.objectFlags ||
     type.declaration?.typeParameter
-  )
+  ) {
     return null;
+  }
   const symbol =
     namedSymbol(type.aliasSymbol) ?? namedSymbol(type.getSymbol?.());
   if (!symbol || !isFirstPartyPropertySymbol(symbol, services.program)) {

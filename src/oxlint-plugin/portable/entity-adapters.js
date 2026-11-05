@@ -1,3 +1,4 @@
+import { ruleFilename } from "../shared/rule-scope.js";
 import {
   sameSourcePath,
   sourcePath,
@@ -7,6 +8,7 @@ import {
   constInitializer,
   findVariable,
   isFunctionLike,
+  isTestFile,
   nearestFunction,
   staticPropertyKey,
   staticPropertyName,
@@ -37,8 +39,15 @@ function sameAssignment(left, right) {
     : left.literal === right.literal;
 }
 
+const IDENTIFIER_PROPERTY = /^[a-z][A-Za-z0-9_]*$/u;
+
 function aliasWrite(propertyName, expression, sourceCode) {
-  if (!propertyName || propertyName === "id" || propertyName === "key") {
+  if (
+    !propertyName ||
+    propertyName === "id" ||
+    propertyName === "key" ||
+    !IDENTIFIER_PROPERTY.test(propertyName)
+  ) {
     return null;
   }
   const assigned = stableAssignment(expression, sourceCode);
@@ -232,6 +241,7 @@ function adapterTarget(node, copied, sourceCode) {
 }
 
 export function checkPaddedEntity(node, context, resultTags) {
+  if (isTestFile(ruleFilename(context))) return;
   const copied = copiedEntitySource(node, context.sourceCode);
   if (!copied) return;
   const target = adapterTarget(node, copied, context.sourceCode);

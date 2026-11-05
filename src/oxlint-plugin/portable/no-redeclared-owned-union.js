@@ -257,8 +257,9 @@ function reportExportedBranches(group, rootName, context) {
   }
 }
 
-export function checkUnionOwnership(node, context, typeDeclarations) {
+export function checkUnionOwnership(node, context, state) {
   const sourceCode = context.sourceCode;
+  const typeDeclarations = state?.typeDeclarations ?? new Map();
   const union = unionBranches(node, sourceCode, typeDeclarations);
   const branches = union.branches;
   const resolvedFields = resolvedRepeatedFields(node, sourceCode);
@@ -280,9 +281,25 @@ export function checkUnionOwnership(node, context, typeDeclarations) {
     return;
   }
   const objectBranches = branches.filter((branch) => !branch.factory);
+  const canCheckRepeated =
+    objectBranches.length >= 3 ||
+    (objectBranches.length === 2 &&
+      (node.type !== "TSUnionType" ||
+        objectBranches.length === node.types.length));
   const repeated =
-    resolvedFields ?? repeatedFieldSignatures(objectBranches, sourceCode);
+    resolvedFields ??
+    (canCheckRepeated
+      ? repeatedFieldSignatures(objectBranches, sourceCode)
+      : []);
   if (repeated.length >= 2) {
+    const isNamedOwner =
+      node.parent?.type === "TSTypeAliasDeclaration" ||
+      node.parent?.type === "VariableDeclarator";
+    if (!isNamedOwner) {
+      const dedupeKey = `${sourceCode.getText(node).replaceAll(/\s+/gu, " ")}::${repeated.join(",")}`;
+      if (state?.seenRepeatedUnions?.has(dedupeKey)) return;
+      state?.seenRepeatedUnions?.add(dedupeKey);
+    }
     context.report({
       node,
       message: `Union branches each restate the fields ${repeated.map((text) => `'${text}'`).join(", ")}; factor them into one shared base and extend it per variant.`,

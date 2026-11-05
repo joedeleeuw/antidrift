@@ -20,30 +20,19 @@ export function sharesIdentifierStem(left, right) {
   );
 }
 
-function branchPairs(branches) {
-  return branches.flatMap((first, index) =>
-    branches.slice(index + 1).map((second) => [first, second])
-  );
-}
-
 export function repeatedBranchFields(branchSignatures) {
+  if (branchSignatures.length < 2) return [];
   const occurrences = new Map();
-  for (const [index, signatures] of branchSignatures.entries()) {
+  for (const signatures of branchSignatures) {
     for (const signature of new Set(signatures)) {
-      const branches = occurrences.get(signature) ?? [];
-      branches.push(index);
-      occurrences.set(signature, branches);
+      occurrences.set(signature, (occurrences.get(signature) ?? 0) + 1);
     }
   }
-  const groups = new Map();
-  for (const [signature, branches] of occurrences) {
-    if (branches.length < 2) continue;
-    for (const pair of branchPairs(branches)) {
-      const subset = pair.join(",");
-      groups.set(subset, [...(groups.get(subset) ?? []), signature]);
-    }
-  }
-  return [...groups.values()].find((fields) => fields.length >= 2) ?? [];
+  const minBranches = branchSignatures.length === 2 ? 2 : 3;
+  const shared = [...occurrences]
+    .filter(([, count]) => count >= minBranches)
+    .map(([signature]) => signature);
+  return shared.length >= 2 ? shared : [];
 }
 
 function relatedContracts(left, right) {
@@ -89,17 +78,20 @@ export function resolvedRepeatedFields(node, sourceCode) {
   const branches = node.types.map((branch) =>
     firstPartyContract(getResolvedType(branch, sourceCode), services)
   );
-  if (branches.every((contract) => !contract)) return null;
-  const signatures = branchPairs(branches).map(([contract, peer]) => {
-    if (!contract || !peer || !relatedContracts(contract, peer)) return [];
-    return contract.properties
-      .filter((property) => independentlyRepeated(property, peer, services))
-      .map(
-        (property) =>
-          `${property.name}${isOptionalProperty(property) ? "?" : ""}: ${services.checker.typeToString(propertyType(property, services))}`
-      );
-  });
-  return signatures.find((fields) => fields.length >= 2) ?? [];
+  if (branches.length < 2 || branches.some((contract) => !contract)) {
+    return null;
+  }
+  const [first, ...rest] = branches;
+  if (!rest.every((peer) => relatedContracts(first, peer))) return [];
+  const shared = first.properties
+    .filter((property) =>
+      rest.every((peer) => independentlyRepeated(property, peer, services))
+    )
+    .map(
+      (property) =>
+        `${property.name}${isOptionalProperty(property) ? "?" : ""}: ${services.checker.typeToString(propertyType(property, services))}`
+    );
+  return shared.length >= 2 ? shared : [];
 }
 
 function literalTypes(type) {

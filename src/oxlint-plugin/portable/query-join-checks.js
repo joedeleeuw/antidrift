@@ -202,13 +202,19 @@ function isImportedQueryCallee(call, sourceCode) {
   );
 }
 
+const STORE_HOOK_NAMES = new Set(["useAtomValue", "useSelector", "useStore"]);
+
+function isReactiveStoreCall(node) {
+  const call = unwrapExpression(node);
+  return (
+    call?.type === "CallExpression" && STORE_HOOK_NAMES.has(calleeName(call))
+  );
+}
+
 function isReactiveQueryCall(node, sourceCode) {
   const call = unwrapExpression(node);
   if (call?.type !== "CallExpression") return false;
   const name = calleeName(call);
-  if (new Set(["useAtomValue", "useSelector", "useStore"]).has(name)) {
-    return true;
-  }
   if (!HOOK_NAME.test(name) || /(?:Mutation|Client|Context)$/u.test(name)) {
     return false;
   }
@@ -227,7 +233,12 @@ function isIndexMapBuilder(node) {
   );
 }
 
+function asyncQueriesOnly(queries, state) {
+  return [...queries].filter((qid) => !state.storeQueryIds.has(qid));
+}
+
 function isMultiQueryBuilderNode(candidate, state) {
+  if (keyedCollectionJoin(candidate, state)) return true;
   const isBuilder =
     isIndexMapBuilder(candidate) ||
     (candidate.type === "CallExpression" &&
@@ -235,7 +246,13 @@ function isMultiQueryBuilderNode(candidate, state) {
     (candidate.type === "ObjectExpression" &&
       candidate.properties.length >= 2 &&
       candidate.properties.some((prop) => prop.type === "SpreadElement"));
-  return isBuilder && hasNewJoin(queriesInRange(candidate, state));
+  if (!isBuilder) return false;
+  const summary = queriesInRange(candidate, state);
+  if (!hasNewJoin(summary)) return false;
+  return (
+    isIndexMapBuilder(candidate) ||
+    asyncQueriesOnly(summary.queries, state).length >= 2
+  );
 }
 
 function isMultiQueryCallMerge(site, state) {
@@ -247,10 +264,10 @@ function isMultiQueryCallMerge(site, state) {
     return false;
   }
   const argQuerySets = site.arguments
-    .map((arg) => queriesInRange(arg, state).queries)
-    .filter((set) => set.size > 0);
+    .map((arg) => asyncQueriesOnly(queriesInRange(arg, state).queries, state))
+    .filter((list) => list.length > 0);
   if (argQuerySets.length < 2) return false;
-  const union = new Set(argQuerySets.flatMap((set) => [...set]));
+  const union = new Set(argQuerySets.flat());
   return union.size >= 2;
 }
 
@@ -288,23 +305,29 @@ function hasGatedArgWaterfall(arg, state) {
     const skipAlternate = isSkipSentinel(expr.alternate);
     if (!skipConsequent && !skipAlternate) return false;
     const payload = skipConsequent ? expr.alternate : expr.consequent;
-    const gatedOn = queriesInRange(expr.test, state, true).queries;
+    const gatedOn = asyncQueriesOnly(
+      queriesInRange(expr.test, state, true).queries,
+      state
+    );
     const usedInPayload = queriesInRange(payload, state, true).queries;
-    return [...gatedOn].some((qid) => !usedInPayload.has(qid));
+    return gatedOn.some((qid) => !usedInPayload.has(qid));
   }
   if (expr?.type !== "ObjectExpression") return false;
   const enabledProp = expr.properties.find(
     (prop) => staticPropertyKey(prop) === "enabled"
   );
   if (!enabledProp) return false;
-  const gatedOn = queriesInRange(enabledProp.value, state, true).queries;
-  if (gatedOn.size === 0) return false;
+  const gatedOn = asyncQueriesOnly(
+    queriesInRange(enabledProp.value, state, true).queries,
+    state
+  );
+  if (gatedOn.length === 0) return false;
   const usedInRest = new Set(
     expr.properties
       .filter((prop) => prop !== enabledProp)
       .flatMap((prop) => [...queriesInRange(prop, state, true).queries])
   );
-  return [...gatedOn].some((qid) => !usedInRest.has(qid));
+  return gatedOn.some((qid) => !usedInRest.has(qid));
 }
 
 function isUnnecessaryQueryGate(call, state) {
@@ -325,20 +348,32 @@ function isBooleanConditionExpr(node) {
   );
 }
 
+function isMemoWrappedSource(init, sourceCode) {
+  return (
+    calleeName(init) === "createMemo" &&
+    findDescendant(
+      init.arguments[0],
+      (candidate) =>
+        isReactiveQueryCall(candidate, sourceCode) ||
+        isReactiveStoreCall(candidate)
+    )
+  );
+}
+
 function recordDeclaratorOrigin(init, state) {
   const { sourceCode, reportedSites, waterfallSites } = state;
-  if (
-    isReactiveQueryCall(init, sourceCode) ||
-    (calleeName(init) === "createMemo" &&
-      findDescendant(init.arguments[0], (candidate) =>
-        isReactiveQueryCall(candidate, sourceCode)
-      ))
-  ) {
-    if (isUnnecessaryQueryGate(init, state)) {
+  const isQuery = isReactiveQueryCall(init, sourceCode);
+  const isStore =
+    !isQuery &&
+    (isReactiveStoreCall(init) ||
+      Boolean(isMemoWrappedSource(init, sourceCode)));
+  if (isQuery || isStore) {
+    if (isQuery && isUnnecessaryQueryGate(init, state)) {
       waterfallSites.add(init);
     }
     const qid = state.nextQueryId;
     state.nextQueryId += 1;
+    if (isStore) state.storeQueryIds.add(qid);
     return { queries: new Set([qid]), mapSites: new Set() };
   }
   const hook = calleeName(init);
@@ -354,14 +389,24 @@ function recordDeclaratorOrigin(init, state) {
   if (queries.size === 0) return null;
   if (joinSite) {
     reportedSites.add(joinSite);
-    return { queries, mapSites: new Set(), alreadyReportedJoin: true };
+    return {
+      queries: new Set([[...queries][0]]),
+      mapSites: new Set(),
+      alreadyReportedJoin: true,
+    };
   }
   const nextMaps = new Set(mapSites);
   if (findDescendant(init, isIndexMapBuilder)) nextMaps.add(init);
+  const asyncQueries = asyncQueriesOnly(queries, state);
+  const effectiveQueries =
+    queries.size > 1 && asyncQueries.length < 2 && nextMaps.size === 0
+      ? new Set([asyncQueries[0] ?? [...queries][0]])
+      : queries;
   return {
-    queries,
+    queries: effectiveQueries,
     mapSites: nextMaps,
-    alreadyReportedJoin: queries.size > 1 && !hasNewJoin(summary),
+    alreadyReportedJoin:
+      queries.size > 1 && asyncQueries.length < 2 && nextMaps.size === 0,
   };
 }
 
@@ -369,6 +414,7 @@ function collectOwnerJoinState(owner, sourceCode) {
   const state = {
     sourceCode,
     provenance: new Map(),
+    storeQueryIds: new Set(),
     reportedSites: new Set(),
     waterfallSites: new Set(),
     nextQueryId: 0,
@@ -397,7 +443,15 @@ function checkRenderJoins(owner, context, state) {
     });
   }
   findDescendant(owner.body, (node) => {
-    if (keyedCollectionJoin(node, state)) reportedSites.add(node);
+    if (
+      keyedCollectionJoin(node, state) &&
+      ![...reportedSites].some(
+        (site) =>
+          site.range[0] <= node.range[0] && site.range[1] >= node.range[1]
+      )
+    ) {
+      reportedSites.add(node);
+    }
     if (node.type !== "JSXOpeningElement" && node.type !== "CallExpression") {
       return false;
     }
