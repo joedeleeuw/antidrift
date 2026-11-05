@@ -21,14 +21,17 @@ export function sharesIdentifierStem(left, right) {
 }
 
 export function repeatedBranchFields(branchSignatures) {
-  if (branchSignatures.length < 2) return [];
+  const payloadBranches = branchSignatures.filter(
+    (signatures) => signatures.length > 0
+  );
+  if (payloadBranches.length < 2) return [];
   const occurrences = new Map();
-  for (const signatures of branchSignatures) {
+  for (const signatures of payloadBranches) {
     for (const signature of new Set(signatures)) {
       occurrences.set(signature, (occurrences.get(signature) ?? 0) + 1);
     }
   }
-  const minBranches = branchSignatures.length === 2 ? 2 : 3;
+  const minBranches = payloadBranches.length === 2 ? 2 : 3;
   const shared = [...occurrences]
     .filter(([, count]) => count >= minBranches)
     .map(([signature]) => signature);
