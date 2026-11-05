@@ -1,5 +1,9 @@
 import { singleReturnExpression } from "./type-predicate-checks.js";
 import {
+  repeatedBranchFields,
+  resolvedRepeatedFields,
+} from "./union-contracts.js";
+import {
   astLiteralText,
   exportedArraysFromProgram,
   importedArrays,
@@ -117,9 +121,15 @@ function resolveTypeBranch(branch, typeDeclarations) {
     branch.type === "TSTypeLiteral"
       ? branch
       : (declaration?.body ?? declaration?.typeAnnotation);
-  const members =
-    !declaration?.extends?.length && MEMBER_LISTS[root?.type]?.(root);
-  return members ? { root, members, owner: declaration } : null;
+  const members = MEMBER_LISTS[root?.type]?.(root);
+  return members
+    ? {
+        root,
+        members,
+        owner: declaration,
+        hasExtends: Boolean(declaration?.extends?.length),
+      }
+    : null;
 }
 
 function memberValidator(member) {
@@ -186,12 +196,13 @@ function branchResidual(branch, discriminantKey, sourceCode) {
 }
 
 function degenerateGroup(branches, discriminantKey, sourceCode) {
+  const plainBranches = branches.filter((branch) => !branch.hasExtends);
   const allTagOnly =
-    branches.length >= 2 &&
-    branches.every((branch) => branch.members.length === 1);
-  if (allTagOnly) return branches;
+    plainBranches.length >= 2 &&
+    plainBranches.every((branch) => branch.members.length === 1);
+  if (allTagOnly) return plainBranches;
   const groups = new Map();
-  for (const branch of branches) {
+  for (const branch of plainBranches) {
     const payloadSize = branch.members.length - 1;
     if (payloadSize < (branch.root.type.startsWith("TS") ? 2 : 1)) continue;
     const key = branchResidual(branch, discriminantKey, sourceCode);
@@ -201,9 +212,8 @@ function degenerateGroup(branches, discriminantKey, sourceCode) {
 }
 
 function repeatedFieldSignatures(branches, sourceCode) {
-  const counts = new Map();
-  for (const branch of branches) {
-    const signatures = new Set(
+  return repeatedBranchFields(
+    branches.map((branch) =>
       branch.members.flatMap((member) => {
         const key = staticPropertyKey(member);
         const validator = memberValidator(member);
@@ -216,12 +226,8 @@ function repeatedFieldSignatures(branches, sourceCode) {
             ]
           : [];
       })
-    );
-    for (const signature of signatures) {
-      counts.set(signature, (counts.get(signature) ?? 0) + 1);
-    }
-  }
-  return [...counts].filter(([, count]) => count >= 3).map(([text]) => text);
+    )
+  );
 }
 
 function exportedName(owner) {
@@ -255,7 +261,8 @@ export function checkUnionOwnership(node, context, typeDeclarations) {
   const sourceCode = context.sourceCode;
   const union = unionBranches(node, sourceCode, typeDeclarations);
   const branches = union.branches;
-  if (branches.length < 2) return;
+  const resolvedFields = resolvedRepeatedFields(node, sourceCode);
+  if (branches.length < 2 && resolvedFields === null) return;
   const discriminantKey = sharedDiscriminantKey(
     branches,
     union.discriminantKey,
@@ -273,8 +280,8 @@ export function checkUnionOwnership(node, context, typeDeclarations) {
     return;
   }
   const objectBranches = branches.filter((branch) => !branch.factory);
-  if (objectBranches.length < 3) return;
-  const repeated = repeatedFieldSignatures(objectBranches, sourceCode);
+  const repeated =
+    resolvedFields ?? repeatedFieldSignatures(objectBranches, sourceCode);
   if (repeated.length >= 2) {
     context.report({
       node,

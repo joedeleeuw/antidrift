@@ -14,6 +14,8 @@ import {
   writeModuleFlowProject,
 } from "./module-flow-smoke.mjs";
 
+import { mergedShapeGoodSource } from "./smoke-fixtures.mjs";
+
 const schemasSource = `
 import { z } from "zod";
 
@@ -51,6 +53,7 @@ declare module "@tauri-apps/api/core" {
 `;
 
 const typedGoodSource = `
+${mergedShapeGoodSource}
 import { invoke } from "@tauri-apps/api/core";
 import { z } from "zod";
 import { UserSchema, makeUrl } from "./schemas";
@@ -117,6 +120,34 @@ export function Hints() {
 function SpreadHint({ text, detail }: { text: string; detail?: string }) {
   return <span title={detail}>{text}</span>;
 }
+interface PullSummary { number: number; title: string; }
+interface PullDetail extends PullSummary { changedFiles?: string[]; }
+export function readOptionalDetail(pr: PullSummary | PullDetail) {
+  return "changedFiles" in pr;
+}
+interface TaggedSummary { kind: "summary"; number: number; }
+interface TaggedDetail { kind: "detail"; number: number; files: string[]; }
+export function readTagged(pr: TaggedSummary | TaggedDetail) {
+  return "files" in pr;
+}
+export function readNonUnion(pr: PullDetail) {
+  return "changedFiles" in pr;
+}
+interface SummaryConfig { id: string; title: string; author: string; }
+interface DetailConfig extends SummaryConfig { files: string[]; }
+export function configureEntity(summary: SummaryConfig, detail: DetailConfig) {
+  if (summary.id !== detail.id) throw new Error("mismatch");
+  return { title: summary.title ?? detail.title, author: summary.author ?? detail.author };
+}
+interface EntitySummary { slug: string; title: string; author: string; }
+interface EntityDetail extends EntitySummary { body: string; }
+export function uncorroboratedPrecedence(summary: EntitySummary, detail: EntityDetail) {
+  return { title: summary.title ?? detail.title, author: summary.author ?? detail.author };
+}
+export function inferredAdapter(source: EntityDetail) {
+  return { slug: source.slug, title: source.title, children: [], completed: false, retries: 0 };
+}
+
 `;
 
 const typedBadSource = `
@@ -232,11 +263,68 @@ function StatusBadge({ label, tone }: { label: string; tone?: "info" | "warn" })
 export function StatusBadges() {
   return <div><StatusBadge label="ready" /><StatusBadge label="idle" /></div>;
 }
+interface Summary { id: string; title: string; }
+interface Detail extends Summary { changedFiles: string[]; }
+export function probeProjection(pr: Summary | Detail) {
+  return "changedFiles" in pr;
+}
+export function probeAliasedProjection(props: { pr: Summary | Detail }) {
+  const { pr } = props;
+  const current = pr;
+  return "changedFiles" in current;
+}
+interface CommonBranch { revision: number; }
+interface TextBranch extends CommonBranch { id: string; parentId: string; text: string; }
+interface ImageBranch extends CommonBranch { id: string; parentId: string; src: string; }
+export type RepeatedInheritedBranches = TextBranch | ImageBranch;
+
+interface EntityPreview { id: string; title: string; author: string; state: string; }
+interface EntityComplete extends EntityPreview { comments: string[]; completed: boolean; retryCount: number; }
+export function reconcileEntity(summary: EntityPreview, detail: EntityComplete) {
+  if (summary.id !== detail.id) throw new Error("mismatch");
+  return { title: summary.title ?? detail.title, author: summary.author ?? detail.author };
+}
+export function exposeRepresentations(summary: EntityPreview, detail: EntityComplete) {
+  const merged = { ...summary, title: detail.title, author: detail.author, state: detail.state };
+  return { summary, detail, merged };
+}
+export function padPreview(preview: EntityPreview): EntityComplete {
+  const noComments = [];
+  return { id: preview.id, title: preview.title, author: preview.author, state: preview.state, comments: noComments, completed: false, retryCount: 0 };
+}
+export function contextualPreview(preview: EntityPreview) {
+  const projected: EntityComplete = { id: preview.id, title: preview.title, author: preview.author, state: preview.state, comments: [], completed: false, retryCount: 0 };
+  return projected;
+}
+
 `;
 
 const typedOnlyRule = "optional-input-earns-optionality";
 
 const typedBadDiagnostics = [
+  {
+    ruleId: "antidrift/no-structural-type-fork",
+    message:
+      "Union parameter mixes summary and detail representations ('Summary' and 'Detail') and probes 'changedFiles' with 'in'; pass one canonical contract or discriminate variants explicitly.",
+    count: 2,
+  },
+  {
+    ruleId: "antidrift/no-structural-type-fork",
+    message:
+      "Union branches each restate the fields 'id: string', 'parentId: string'; factor them into one shared base and extend it per variant.",
+  },
+  {
+    ruleId: "antidrift/no-query-join-or-tree-reshape",
+    message:
+      "Object literal reconciles overlapping fields across multiple entity representations ('summary' and 'detail'); normalize into one authoritative projection at the store or selector boundary.",
+    count: 2,
+  },
+  {
+    ruleId: "antidrift/no-contract-appeasement-projection",
+    message:
+      "Object literal adapts 'preview' by copying its identity and padding 3 required fields with empty/placeholder constants; project a narrower view contract or union instead of fabricating missing entity state.",
+    count: 2,
+  },
   {
     ruleId: "antidrift/unknown-input-must-be-decoded",
     message:
@@ -350,7 +438,17 @@ const typedBadDiagnostics = [
 ];
 
 function assertReported(messages, expected, hostLabel) {
-  for (const { ruleId, message } of expected) {
+  for (const { ruleId, message, count } of expected) {
+    if (count !== undefined) {
+      assert.equal(
+        messages.filter(
+          (diagnostic) =>
+            diagnostic.ruleId === ruleId && diagnostic.message === message
+        ).length,
+        count,
+        `Expected ${count} ${hostLabel} diagnostics: ${message}`
+      );
+    }
     assert.ok(
       messages.some(
         (diagnostic) =>

@@ -1,4 +1,139 @@
+const mergedShapeBadSource = `
+type InlineNodePair =
+  | { id: string; parentId: string; text: string }
+  | { id: string; parentId: string; src: string };
+
+interface BaseRoot { rootId: string; }
+interface FirstExtended extends BaseRoot { role: string; scope: string; }
+interface DuplicateExtended extends BaseRoot { role: string; scope: string; }
+
+declare function useEntityQuery<T>(key: string): { data: T; isPending: boolean; error: Error | null };
+declare function useAtomValue<T>(atom: string): T;
+declare function useSelector<T>(selector: string): T;
+declare function useStore<T>(store: string): T;
+declare function createMemo<T>(read: () => T): () => T;
+
+export function useReconciledEntity() {
+  const summary = useEntityQuery<{ title: string; author: string }>("summary");
+  const detail = useEntityQuery<{ title: string; author: string }>("detail");
+  return { title: summary.data.title ?? detail.data.title, author: summary.data.author ?? detail.data.author };
+}
+
+export function useKeyedEntities() {
+  const entries = useAtomValue<{ id: string; label: string }[]>("entries");
+  const lookup = useSelector<Map<string, string>>("labels");
+  const joined = entries.map((entry) => ({ ...entry, label: lookup.get(entry.id) }));
+  const filtered = joined.filter((entry) => entry.label);
+  const extras = useStore<Record<string, number>>("extras");
+  const enriched = filtered.map((entry) => ({ ...entry, count: extras[entry.id] }));
+  return enriched;
+}
+
+export function useLoopEntities() {
+  const entries = useAtomValue<{ id: string; title: string }[]>("entries");
+  const lookup = useStore<Record<string, string>>("labels");
+  const projected = [];
+  for (const entry of entries) {
+    const label = lookup[entry.id];
+    projected.push({ ...entry, label });
+  }
+  return projected;
+}
+
+export function useMemoEntities() {
+  const entries = createMemo(() => useAtomValue<{ id: string }[]>("entries"));
+  const labels = createMemo(() => useStore<Map<string, string>>("labels"));
+  return entries().map((entry) => ({ ...entry, label: labels().get(entry.id) }));
+}
+
+export function writeSessionAliases(sessionId: string) {
+  return { parentSessionId: sessionId, parentSessionID: sessionId };
+}
+export function assignSessionAliases(target: Record<string, string>, sessionId: string) {
+  target.parentSessionId = sessionId;
+  target.parent_session_id = sessionId;
+  return target;
+}
+
+interface ThreadCard { id: string; title: string; comments: string[]; completed: boolean; retryCount: number; }
+export function padThreadCard(thread: { id: string; title: string }) {
+  const comments = [];
+  return { id: thread.id, title: thread.title, comments, completed: false, retryCount: 0 } as ThreadCard;
+}
+`;
+
+export const mergedShapeGoodSource = `
+interface NodeBase { id: string; parentId: string; }
+interface TextNode extends NodeBase { text: string; }
+interface ImageNode extends NodeBase { src: string; }
+export function readNode(node: TextNode | ImageNode) {
+  return "text" in node ? node.text : node.src;
+}
+
+type DisjointSharedFields =
+  | { id: string; text: string }
+  | { id: string; parentId: string; count: number }
+  | { parentId: string; src: string };
+export function readDisjoint(entry: DisjointSharedFields) {
+  return Object.keys(entry);
+}
+
+interface Options { timeout: number; retries: number; }
+export function configureOptions(supplied: Partial<Options>, defaults: Options) {
+  const options = { timeout: supplied.timeout ?? defaults.timeout, retries: supplied.retries ?? defaults.retries };
+  return options;
+}
+interface CreateTask { id: string; title: string; }
+interface Task { id: string; title: string; comments: string[]; completed: boolean; retryCount: number; }
+export function createTask(command: CreateTask): Task {
+  return {
+    id: command.id,
+    title: command.title,
+    comments: [],
+    completed: false,
+    retryCount: 0,
+  };
+}
+
+declare function useCollectionQuery<T>(key: string): { data: T; isPending: boolean; error: Error | null };
+declare function useAtomValue<T>(atom: string): T;
+declare function useMemo<T>(build: () => T, dependencies: unknown[]): T;
+export function useSeparateQueryProperties() {
+  const first = useCollectionQuery<string[]>("entries");
+  const second = useCollectionQuery<string[]>("status");
+  const bag = { entries: first.data, loading: second.isPending, failure: second.error };
+  const { entries } = bag;
+  const selected = useMemo(() => entries.map((entry) => entry.trim()), [first, second]);
+  return { selected, loading: bag.loading };
+}
+export function useDistinctBagProperties() {
+  const first = useCollectionQuery<string[]>("first");
+  const second = useCollectionQuery<number[]>("second");
+  const bag = { entries: first.data, counts: second.data };
+  const alias = bag;
+  const { entries } = alias;
+  return entries.map((entry) => entry.trim());
+}
+export function useImperativeLookup() {
+  const entries = useAtomValue<{ id: string }[]>("entries");
+  const domMap = useAtomValue<Map<string, { focus(): void }>>("elements");
+  return entries.map((entry) => {
+    domMap.get(entry.id)?.focus();
+    return entry.id;
+  });
+}
+export function separateAliasWrites(target: Record<string, string>, nextId: () => string) {
+  target.parentSessionId = nextId();
+  target.parentSessionID = nextId();
+  return { userId: nextId(), userID: nextId() };
+}
+export function distinctAliasBindings(firstId: string, secondId: string) {
+  return { userId: firstId, userID: secondId };
+}
+`;
+
 export const badSource = `
+${mergedShapeBadSource}
 import { useState, useSyncExternalStore } from "react";
 import { TouchableOpacity } from "react-native";
 import { Text as WidgetText } from "@expo/ui/swift-ui";
@@ -172,6 +307,7 @@ export function DrillBanner({ title, active }: { title: string; active: boolean 
 `;
 
 export const goodSource = `
+${mergedShapeGoodSource}
 import { useSyncExternalStore } from "react";
 import { Text } from "@expo/ui/swift-ui";
 import { z } from "zod";
@@ -292,6 +428,42 @@ export const expectedRules = [
 ];
 
 export const expectedDiagnostics = [
+  {
+    ruleId: "antidrift/no-structural-type-fork",
+    message:
+      "Type 'DuplicateExtended' duplicates the exact 2-field shape of 'FirstExtended'; reuse 'FirstExtended' instead of forking a parallel contract.",
+  },
+  {
+    ruleId: "antidrift/no-structural-type-fork",
+    message:
+      "Union branches each restate the fields 'id: string', 'parentId: string'; factor them into one shared base and extend it per variant.",
+  },
+  {
+    ruleId: "antidrift/no-query-join-or-tree-reshape",
+    message:
+      "Object literal reconciles overlapping fields across multiple entity representations ('summary.data' and 'detail.data'); normalize into one authoritative projection at the store or selector boundary.",
+  },
+  {
+    ruleId: "antidrift/no-contract-appeasement-projection",
+    message:
+      "Assigns the same value to spelling-alias properties 'parentSessionId' and 'parentSessionID'; keep one canonical property name on the contract.",
+  },
+  {
+    ruleId: "antidrift/no-contract-appeasement-projection",
+    message:
+      "Assigns the same value to spelling-alias properties 'parentSessionId' and 'parent_session_id'; keep one canonical property name on the contract.",
+  },
+  {
+    ruleId: "antidrift/no-contract-appeasement-projection",
+    message:
+      "Object literal adapts 'thread' by copying its identity and padding 3 required fields with empty/placeholder constants; project a narrower view contract or union instead of fabricating missing entity state.",
+  },
+  {
+    ruleId: "antidrift/no-query-join-or-tree-reshape",
+    message:
+      "Two or more reactive query collections are joined during render; move the join to the query select, store selector, or producer so render receives one typed projection.",
+    count: 4,
+  },
   {
     ruleId: "antidrift/no-branch-tree",
     message:

@@ -1,6 +1,14 @@
 import { findDescendant, isMemberAccess } from "./ast.js";
 import { resolveTauriIpcMethod } from "./boundary-decode-checks.js";
 import { patternIdentifiers } from "./static-resolution.js";
+import { checkEntityPrecedence } from "./entity-precedence.js";
+import { keyedCollectionJoin } from "./keyed-collection-joins.js";
+import {
+  bindQueryOrigin,
+  hasNewJoin,
+  lifecycleKeys,
+  queriesInRange,
+} from "./query-provenance.js";
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import {
   HOOK_NAME,
@@ -151,18 +159,7 @@ const READ_ROOT =
   /^(?:api|client|ctx\.db|db|pool|prisma|supabase|axios|ky|http)\./u;
 const WRITE_OR_LIFECYCLE_CALLEE =
   /^(?:connect|begin|start|open|init|close|lock|acquire|login|transaction|create|insert|update|upsert|delete|remove|save|set|write|put|post|patch|send|emit|publish|execute|exec|run|commit|rollback|cancel|abort|reset|clear|drop|alter|migrate)/iu;
-const LIFECYCLE_ENVELOPE_KEYS = new Set([
-  "isLoading",
-  "isPending",
-  "isError",
-  "isSuccess",
-  "isFetching",
-  "isValidating",
-  "status",
-  "fetchStatus",
-  "refetch",
-  "loadMore",
-]);
+const LIFECYCLE_ENVELOPE_KEYS = lifecycleKeys;
 const ENVELOPE_KEYS = new Set([
   "data",
   "results",
@@ -209,6 +206,9 @@ function isReactiveQueryCall(node, sourceCode) {
   const call = unwrapExpression(node);
   if (call?.type !== "CallExpression") return false;
   const name = calleeName(call);
+  if (new Set(["useAtomValue", "useSelector", "useStore"]).has(name)) {
+    return true;
+  }
   if (!HOOK_NAME.test(name) || /(?:Mutation|Client|Context)$/u.test(name)) {
     return false;
   }
@@ -219,34 +219,6 @@ function isReactiveQueryCall(node, sourceCode) {
   return Boolean(shape && isEnvelopePropertyList(shape.all));
 }
 
-function queryDataIdentifiers(pattern) {
-  if (pattern?.type !== "ObjectPattern") return patternIdentifiers(pattern);
-  const ids = [];
-  for (const prop of pattern.properties) {
-    if (prop.type === "RestElement") {
-      ids.push(...patternIdentifiers(prop.argument));
-      continue;
-    }
-    const key = staticPropertyKey(prop);
-    if (key && (LIFECYCLE_ENVELOPE_KEYS.has(key) || key === "error")) continue;
-    ids.push(...patternIdentifiers(prop.value));
-  }
-  return ids;
-}
-
-function isLifecycleAccess(identifier) {
-  const parent = identifier.parent;
-  if (
-    parent?.type !== "MemberExpression" ||
-    parent.object !== identifier ||
-    parent.computed
-  ) {
-    return false;
-  }
-  const prop = parent.property?.name;
-  return LIFECYCLE_ENVELOPE_KEYS.has(prop) || prop === "error";
-}
-
 function isIndexMapBuilder(node) {
   if (node?.type === "NewExpression") return node.callee?.name === "Map";
   return (
@@ -255,25 +227,7 @@ function isIndexMapBuilder(node) {
   );
 }
 
-function queriesInRange(node, provenance) {
-  const [start, end] = node.range;
-  const queries = new Set();
-  const mapSites = new Set();
-  for (const [binding, origin] of provenance) {
-    const used = binding.references.some(
-      (ref) =>
-        ref.identifier.range[0] >= start &&
-        ref.identifier.range[1] <= end &&
-        !isLifecycleAccess(ref.identifier)
-    );
-    if (!used) continue;
-    for (const qid of origin.queries) queries.add(qid);
-    for (const site of origin.mapSites) mapSites.add(site);
-  }
-  return { queries, mapSites };
-}
-
-function isMultiQueryBuilderNode(candidate, provenance) {
+function isMultiQueryBuilderNode(candidate, state) {
   const isBuilder =
     isIndexMapBuilder(candidate) ||
     (candidate.type === "CallExpression" &&
@@ -281,10 +235,10 @@ function isMultiQueryBuilderNode(candidate, provenance) {
     (candidate.type === "ObjectExpression" &&
       candidate.properties.length >= 2 &&
       candidate.properties.some((prop) => prop.type === "SpreadElement"));
-  return isBuilder && queriesInRange(candidate, provenance).queries.size >= 2;
+  return isBuilder && hasNewJoin(queriesInRange(candidate, state));
 }
 
-function isMultiQueryCallMerge(site, provenance) {
+function isMultiQueryCallMerge(site, state) {
   if (
     site.type !== "CallExpression" ||
     NON_JOIN_CALLEES.has(calleeName(site)) ||
@@ -293,47 +247,31 @@ function isMultiQueryCallMerge(site, provenance) {
     return false;
   }
   const argQuerySets = site.arguments
-    .map((arg) => queriesInRange(arg, provenance).queries)
+    .map((arg) => queriesInRange(arg, state).queries)
     .filter((set) => set.size > 0);
   if (argQuerySets.length < 2) return false;
   const union = new Set(argQuerySets.flatMap((set) => [...set]));
   return union.size >= 2;
 }
 
-function findDirectJoinSite(init, provenance) {
+function findDirectJoinSite(init, state) {
   const unwrapped = unwrapExpression(init);
   if (!unwrapped) return null;
   const hook = calleeName(unwrapped);
   let site = null;
-  if (hook === "useMemo") {
+  if (hook === "useMemo" || hook === "createMemo") {
     site = unwrapExpression(unwrapped.arguments[0]);
   } else if (!HOOK_NAME.test(hook)) {
     site = unwrapped;
   }
-  if (!site || queriesInRange(site, provenance).queries.size < 2) return null;
+  if (!site || !hasNewJoin(queriesInRange(site, state))) return null;
   if (
-    isMultiQueryCallMerge(site, provenance) ||
-    findDescendant(site, (cand) => isMultiQueryBuilderNode(cand, provenance))
+    isMultiQueryCallMerge(site, state) ||
+    findDescendant(site, (cand) => isMultiQueryBuilderNode(cand, state))
   ) {
     return site;
   }
   return null;
-}
-
-function allQueriesInRange(node, provenance) {
-  if (!node) return new Set();
-  const [start, end] = node.range;
-  const queries = new Set();
-  for (const [binding, origin] of provenance) {
-    const used = binding.references.some(
-      (ref) =>
-        ref.identifier.range[0] >= start && ref.identifier.range[1] <= end
-    );
-    if (used) {
-      for (const qid of origin.queries) queries.add(qid);
-    }
-  }
-  return queries;
 }
 
 function isSkipSentinel(node) {
@@ -343,15 +281,15 @@ function isSkipSentinel(node) {
   );
 }
 
-function hasGatedArgWaterfall(arg, provenance) {
+function hasGatedArgWaterfall(arg, state) {
   const expr = unwrapExpression(arg);
   if (expr?.type === "ConditionalExpression") {
     const skipConsequent = isSkipSentinel(expr.consequent);
     const skipAlternate = isSkipSentinel(expr.alternate);
     if (!skipConsequent && !skipAlternate) return false;
     const payload = skipConsequent ? expr.alternate : expr.consequent;
-    const gatedOn = allQueriesInRange(expr.test, provenance);
-    const usedInPayload = allQueriesInRange(payload, provenance);
+    const gatedOn = queriesInRange(expr.test, state, true).queries;
+    const usedInPayload = queriesInRange(payload, state, true).queries;
     return [...gatedOn].some((qid) => !usedInPayload.has(qid));
   }
   if (expr?.type !== "ObjectExpression") return false;
@@ -359,20 +297,20 @@ function hasGatedArgWaterfall(arg, provenance) {
     (prop) => staticPropertyKey(prop) === "enabled"
   );
   if (!enabledProp) return false;
-  const gatedOn = allQueriesInRange(enabledProp.value, provenance);
+  const gatedOn = queriesInRange(enabledProp.value, state, true).queries;
   if (gatedOn.size === 0) return false;
   const usedInRest = new Set(
     expr.properties
       .filter((prop) => prop !== enabledProp)
-      .flatMap((prop) => [...allQueriesInRange(prop, provenance)])
+      .flatMap((prop) => [...queriesInRange(prop, state, true).queries])
   );
   return [...gatedOn].some((qid) => !usedInRest.has(qid));
 }
 
-function isUnnecessaryQueryGate(call, provenance) {
+function isUnnecessaryQueryGate(call, state) {
   return (
-    provenance.size > 0 &&
-    call.arguments.some((arg) => hasGatedArgWaterfall(arg, provenance))
+    state.provenance.size > 0 &&
+    call.arguments.some((arg) => hasGatedArgWaterfall(arg, state))
   );
 }
 
@@ -388,9 +326,15 @@ function isBooleanConditionExpr(node) {
 }
 
 function recordDeclaratorOrigin(init, state) {
-  const { sourceCode, provenance, reportedSites, waterfallSites } = state;
-  if (isReactiveQueryCall(init, sourceCode)) {
-    if (isUnnecessaryQueryGate(init, provenance)) {
+  const { sourceCode, reportedSites, waterfallSites } = state;
+  if (
+    isReactiveQueryCall(init, sourceCode) ||
+    (calleeName(init) === "createMemo" &&
+      findDescendant(init.arguments[0], (candidate) =>
+        isReactiveQueryCall(candidate, sourceCode)
+      ))
+  ) {
+    if (isUnnecessaryQueryGate(init, state)) {
       waterfallSites.add(init);
     }
     const qid = state.nextQueryId;
@@ -404,16 +348,21 @@ function recordDeclaratorOrigin(init, state) {
   ) {
     return null;
   }
-  const joinSite = findDirectJoinSite(init, provenance);
-  const { queries, mapSites } = queriesInRange(init, provenance);
+  const joinSite = findDirectJoinSite(init, state);
+  const summary = queriesInRange(init, state);
+  const { queries, mapSites } = summary;
   if (queries.size === 0) return null;
   if (joinSite) {
     reportedSites.add(joinSite);
-    return { queries: new Set([[...queries][0]]), mapSites: new Set() };
+    return { queries, mapSites: new Set(), alreadyReportedJoin: true };
   }
   const nextMaps = new Set(mapSites);
   if (findDescendant(init, isIndexMapBuilder)) nextMaps.add(init);
-  return { queries, mapSites: nextMaps };
+  return {
+    queries,
+    mapSites: nextMaps,
+    alreadyReportedJoin: queries.size > 1 && !hasNewJoin(summary),
+  };
 }
 
 function collectOwnerJoinState(owner, sourceCode) {
@@ -430,19 +379,15 @@ function collectOwnerJoinState(owner, sourceCode) {
       const init = unwrapExpression(declarator.init);
       const origin = init ? recordDeclaratorOrigin(init, state) : null;
       if (!origin) continue;
-      for (const ident of queryDataIdentifiers(declarator.id)) {
-        const binding = findVariable(sourceCode, ident);
-        if (binding) state.provenance.set(binding, origin);
-      }
+      bindQueryOrigin(declarator, origin, state);
     }
   }
   return state;
 }
 
-function checkRenderJoins(owner, context) {
+function checkRenderJoins(owner, context, state) {
   if (owner.body?.type !== "BlockStatement" || !isRenderOwner(owner)) return;
-  const { nextQueryId, provenance, reportedSites, waterfallSites } =
-    collectOwnerJoinState(owner, context.sourceCode);
+  const { nextQueryId, reportedSites, waterfallSites } = state;
   if (nextQueryId < 2) return;
   for (const site of waterfallSites) {
     context.report({
@@ -452,10 +397,11 @@ function checkRenderJoins(owner, context) {
     });
   }
   findDescendant(owner.body, (node) => {
+    if (keyedCollectionJoin(node, state)) reportedSites.add(node);
     if (node.type !== "JSXOpeningElement" && node.type !== "CallExpression") {
       return false;
     }
-    const { queries, mapSites } = queriesInRange(node, provenance);
+    const { queries, mapSites } = queriesInRange(node, state);
     if (queries.size >= 2 && mapSites.size > 0) {
       for (const site of mapSites) reportedSites.add(site);
     }
@@ -591,8 +537,19 @@ function isThenWaterfall(node, sourceCode) {
 }
 
 function queryJoinVisitors(context) {
-  const checkFunction = (node) => checkRenderJoins(node, context);
+  const ownerStates = new WeakMap();
+  const checkFunction = (node) => {
+    if (node.body?.type !== "BlockStatement") return;
+    const state = collectOwnerJoinState(node, context.sourceCode);
+    ownerStates.set(node, state);
+    checkRenderJoins(node, context, state);
+  };
   return {
+    ObjectExpression(node) {
+      let owner = nearestFunction(node);
+      while (owner && !ownerStates.has(owner)) owner = nearestFunction(owner);
+      checkEntityPrecedence(node, context, ownerStates.get(owner));
+    },
     CallExpression(node) {
       if (isThenWaterfall(node, context.sourceCode)) {
         context.report({

@@ -1,5 +1,9 @@
 import { basename } from "node:path";
 import {
+  checkProjectionUnionProbe,
+  sharesIdentifierStem,
+} from "./union-contracts.js";
+import {
   checkDecodedBlobEquality,
   checkPositionalOptions,
 } from "./boundary-decode-checks.js";
@@ -194,13 +198,17 @@ function shapeSignature(members, sourceCode, minFields) {
   return fields.toSorted().join(";");
 }
 
-function checkShape(context, state, name, members, reportNode) {
-  const signature = shapeSignature(
+function checkShape(context, state, members, reportNode, basePrefix = "") {
+  const name = reportNode.name;
+  const rawSignature = shapeSignature(
     members,
     context.sourceCode,
     Math.min(2, state.fieldBlocks.minFields)
   );
-  if (!signature) return;
+  if (!rawSignature) return;
+  const signature = basePrefix
+    ? `extends:${basePrefix};${rawSignature}`
+    : rawSignature;
   const existing = state.seenShapes.get(signature);
   if (existing && existing !== name) {
     context.report({
@@ -223,16 +231,6 @@ function redundantOwnerStem(typeName, fieldNames) {
     )
     ? stem
     : null;
-}
-
-function sharesIdentifierStem(left, right) {
-  if (left === right) return true;
-  const rightWords = new Set(
-    splitIdentifierWords(right).filter((word) => word.length >= 3)
-  );
-  return splitIdentifierWords(left).some(
-    (word) => word.length >= 3 && rightWords.has(word)
-  );
 }
 
 function hasExactSamePropertyTypes(declaration, owner, fieldNames, sourceCode) {
@@ -578,7 +576,7 @@ function checkRuntimeSchemaFork(node, context, state, reportedLocalUnion) {
     const properties = objectCall.shapeNode.properties;
     const name = declarator.id.name;
     checkParallelSidecarMaps(context, name, properties, declarator.id);
-    checkShape(context, state, name, properties, declarator.id);
+    checkShape(context, state, properties, declarator.id);
     const fieldNames = properties.map(staticPropertyKey);
     if (fieldNames.length > 0 && fieldNames.every(Boolean)) {
       const stem = redundantOwnerStem(name.replace(/Schema$/u, ""), fieldNames);
@@ -753,9 +751,18 @@ function checkTypeDeclaration(context, state, declaration, members) {
       state,
       context
     );
+    if (!extractOmitClause(declaration.extends)) {
+      const basePrefix = declaration.extends
+        .map((clause) =>
+          context.sourceCode.getText(clause).replaceAll(/\s+/gu, " ")
+        )
+        .toSorted()
+        .join("&");
+      checkShape(context, state, members, declaration.id, basePrefix);
+    }
     return;
   }
-  checkShape(context, state, name, members, declaration.id);
+  checkShape(context, state, members, declaration.id);
   const fieldNames = (members ?? []).map((member) =>
     member.type === "TSPropertySignature" ? staticPropertyKey(member) : null
   );
@@ -861,7 +868,7 @@ function checkInlineTypeLiteral(node, context, state) {
   ) {
     return;
   }
-  checkShape(context, state, target.id.name, node.members, target.id);
+  checkShape(context, state, node.members, target.id);
 }
 
 function checkTypeAliasDeclaration(node, context, state, reportedLocal) {
@@ -891,6 +898,7 @@ function typeShapeVisitors(context, state, ownedUnionVisitors) {
   return {
     BinaryExpression(node) {
       checkDecodedBlobEquality(node, context);
+      checkProjectionUnionProbe(node, context);
     },
     ObjectExpression(node) {
       if (!isTestFile(ruleFilename(context))) {

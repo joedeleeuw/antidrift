@@ -90,6 +90,58 @@ function isFirstPartyPropertySymbol(prop, program) {
   });
 }
 
+export function isOptionalProperty(property) {
+  return (property.flags & SYMBOL_FLAG_OPTIONAL) !== 0;
+}
+
+export function firstPartyContract(type, services) {
+  if (
+    !type ||
+    type.isUnion?.() ||
+    !type.objectFlags ||
+    type.declaration?.typeParameter
+  )
+    return null;
+  const symbol =
+    namedSymbol(type.aliasSymbol) ?? namedSymbol(type.getSymbol?.());
+  if (!symbol || !isFirstPartyPropertySymbol(symbol, services.program)) {
+    return null;
+  }
+  return {
+    type,
+    symbol,
+    name: symbol.name,
+    properties: services.checker.getPropertiesOfType(type),
+  };
+}
+
+export function propertyType(property, services) {
+  return services.checker.getTypeOfSymbolAtLocation(
+    property,
+    property.declarations[0]
+  );
+}
+
+export function isEntityIdentityKey(key) {
+  return /^(?:id|slug|number)$|(?:Id|ID)$/u.test(key);
+}
+
+export function shareEntityIdentity(left, right, services) {
+  return left.properties.some((property) => {
+    if (!isEntityIdentityKey(property.name)) return false;
+    const peer = right.properties.find(
+      (candidate) => candidate.name === property.name
+    );
+    if (!peer) return false;
+    const leftType = propertyType(property, services);
+    const rightType = propertyType(peer, services);
+    return (
+      services.checker.isTypeAssignableTo(leftType, rightType) &&
+      services.checker.isTypeAssignableTo(rightType, leftType)
+    );
+  });
+}
+
 export function resolvedOwnedPropertyNames(node, sourceCode) {
   const services = getTypeServices(sourceCode);
   const type = getResolvedType(node, sourceCode);
@@ -115,7 +167,7 @@ export function resolvedPropertyShape(node, sourceCode) {
   for (const prop of properties) {
     if (typeof prop?.name !== "string" || prop.name.startsWith("__")) continue;
     all.push(prop.name);
-    if (((prop.flags ?? 0) & SYMBOL_FLAG_OPTIONAL) === 0) {
+    if (!isOptionalProperty(prop)) {
       required.push(prop.name);
     }
   }

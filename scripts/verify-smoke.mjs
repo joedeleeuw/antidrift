@@ -158,8 +158,19 @@ try {
       `Expected Oxlint to report ${expected}, got codes: ${[...oxlintCodes].join(", ")}`
     );
   }
-  for (const { ruleId, message } of expectedDiagnostics) {
+  for (const { ruleId, message, count } of expectedDiagnostics) {
     const ruleSlug = ruleId.split("/")[1];
+    if (count !== undefined) {
+      assert.equal(
+        oxlintDiagnostics.filter(
+          (diagnostic) =>
+            diagnostic.code === `antidrift(${ruleSlug})` &&
+            diagnostic.message === message
+        ).length,
+        count,
+        `Expected ${count} Oxlint diagnostics: ${message}`
+      );
+    }
     assert.ok(
       oxlintDiagnostics.some(
         (diagnostic) =>
@@ -207,7 +218,17 @@ try {
       `Expected ESLint to report ${expected}, got: ${[...eslintRuleIds].join(", ")}`
     );
   }
-  for (const { ruleId, message } of expectedDiagnostics) {
+  for (const { ruleId, message, count } of expectedDiagnostics) {
+    if (count !== undefined) {
+      assert.equal(
+        eslintBad.messages.filter(
+          (diagnostic) =>
+            diagnostic.ruleId === ruleId && diagnostic.message === message
+        ).length,
+        count,
+        `Expected ${count} ESLint diagnostics: ${message}`
+      );
+    }
     assert.ok(
       eslintBad.messages.some(
         (diagnostic) =>

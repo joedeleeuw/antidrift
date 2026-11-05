@@ -5,6 +5,11 @@ import {
   forEachOwnNode,
   topLevelTypeDeclarations,
 } from "./type-predicate-checks.js";
+import {
+  checkBlockAliasWrites,
+  checkObjectAliasWrites,
+  checkPaddedEntity,
+} from "./entity-adapters.js";
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import {
   isObjectSchemaMethod,
@@ -393,7 +398,10 @@ export const noContractAppeasementProjectionRule = {
       },
       ObjectExpression(node) {
         checkContractProjection(node, context);
+        checkObjectAliasWrites(node, context);
+        checkPaddedEntity(node, context, RESULT_TAGS);
       },
+      BlockStatement: (node) => checkBlockAliasWrites(node, context),
       TSTupleType(node) {
         checkNullableTuple(node, aliases, context);
       },
