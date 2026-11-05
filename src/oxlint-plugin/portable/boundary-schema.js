@@ -4,6 +4,7 @@ import {
   checkSchemaCatch,
   checkRepairOnReadTernary,
   checkSerializationRoundtrip,
+  checkUncheckedSplitNumericCoercion,
   checkUnvalidatedSchemaHole,
   isAliasedRawDeserialize,
   isPassedToDecoder,
@@ -337,6 +338,7 @@ export const unknownInputMustBeDecodedRule = {
         checkSchemaCatch(node, reportedObjects, context);
         checkCatchClauseSchemaDecode(node, context);
         checkUnvalidatedSchemaHole(node, context);
+        checkUncheckedSplitNumericCoercion(node, context);
         checkTauriIpcTypeArguments(node, context);
       },
       ConditionalExpression(node) {

@@ -163,13 +163,31 @@ export const UnvalidatedHoleSchema = z.object({
   anything: z.any(),
   uncheckedCustom: z.custom<FirstContract>(),
   noopUnknownTransform: z.unknown().transform((rawPayload) => String(rawPayload)),
+  widenedUnion: z.union([z.string(), z.unknown()]),
+  throwingRefine: z.string().refine((token) => {
+    if (token.length === 0) throw new Error("token cannot be empty");
+    return true;
+  }),
 });
 const LsofExitSchema = z.object({ code: z.literal(1) });
-export function catchWithSchemaDecode(run: () => number[]): number[] {
+export function catchWithSchemaDecode(
+  run: () => number[],
+  rawStdout: string,
+  narrowedFailure: unknown,
+  netServer: { address(): unknown }
+): number[] {
+  if (narrowedFailure instanceof Error && LsofExitSchema.safeParse(narrowedFailure).success) {
+    return [];
+  }
+  LsofExitSchema.parse(netServer.address());
   try {
-    return run();
+    return rawStdout
+      .split("\\n")
+      .filter((line) => line.trim())
+      .map((line) => Number(line));
   } catch (caughtErr) {
     if (LsofExitSchema.safeParse(caughtErr).success) return [];
+    if (caughtErr.message.includes("ENOENT")) return [0];
     throw new Error("lsof failed", { cause: caughtErr });
   }
 }
@@ -612,5 +630,35 @@ export const expectedDiagnostics = [
     ruleId: "antidrift/unknown-input-must-be-decoded",
     message:
       "Do not decode caught exception 'caughtErr' with a boundary schema; narrow with `instanceof Error` (and `'code' in caughtErr`) or handle expected exit statuses at the process boundary.",
+  },
+  {
+    ruleId: "antidrift/unknown-input-must-be-decoded",
+    message:
+      "Do not include `z.unknown()` as a branch of `z.union([...])`; an unvalidated branch absorbs every validation failure and widens the union to untyped input.",
+  },
+  {
+    ruleId: "antidrift/unknown-input-must-be-decoded",
+    message:
+      "Do not throw inside schema `.refine()`; return `false` or add a validation issue so `.safeParse()` and structured error reporting still work.",
+  },
+  {
+    ruleId: "antidrift/unknown-input-must-be-decoded",
+    message:
+      "Do not decode `instanceof`-narrowed parameter 'narrowedFailure' with a boundary schema; inspect structured properties on the narrowed instance directly.",
+  },
+  {
+    ruleId: "antidrift/unknown-input-must-be-decoded",
+    message:
+      "Do not decode typed stdlib return 'netServer.address()' with a boundary schema; narrow the return value directly (e.g., check `typeof address === 'object' && address !== null`).",
+  },
+  {
+    ruleId: "antidrift/unknown-input-must-be-decoded",
+    message:
+      "Do not coerce split string tokens with unchecked `Number(...)` in `.map()` (which silently produces `NaN` on non-numeric output); validate numeric tokens explicitly or decode with a boundary schema.",
+  },
+  {
+    ruleId: "antidrift/no-anemic-errors",
+    message:
+      "Catch block branches on 'caughtErr' message substring 'ENOENT'; match a typed error class (`instanceof`), structured `.code` field, or domain variant instead of substring probing.",
   },
 ];

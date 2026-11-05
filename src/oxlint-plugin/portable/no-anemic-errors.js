@@ -130,6 +130,32 @@ function isErrorMemberRead(node, errorName, allowedProperties) {
   );
 }
 
+const CASE_NORMALIZER_METHODS = new Set(["toLowerCase", "toUpperCase", "trim"]);
+
+function isCaughtErrorMessageReceiver(expression, errorName) {
+  let target = unwrapChainExpression(expression);
+  if (
+    target?.type === "CallExpression" &&
+    target.arguments.length === 0 &&
+    CASE_NORMALIZER_METHODS.has(getMemberPropertyName(target.callee))
+  ) {
+    target = unwrapChainExpression(target.callee.object);
+  }
+  if (isErrorMemberRead(target, errorName, new Set(["message"]))) return true;
+  if (
+    target?.type === "CallExpression" &&
+    getIdentifierName(target.callee) === "String" &&
+    target.arguments.length === 1
+  ) {
+    const arg = target.arguments[0];
+    return (
+      getIdentifierName(arg) === errorName ||
+      isErrorMemberRead(arg, errorName, new Set(["message"]))
+    );
+  }
+  return false;
+}
+
 function enclosingFunctionName(node) {
   for (let cur = node.parent; cur; cur = cur.parent) {
     if (!isFunctionLike(cur)) continue;
@@ -390,6 +416,22 @@ class ErrorDiagnostics {
         node,
         messageId: "unguardedSyncFsInLogger",
       });
+      return;
+    }
+    const errorName = this.catchParamStack.at(-1);
+    const callee = unwrapChainExpression(node.callee);
+    const substring =
+      errorName &&
+      getMemberPropertyName(callee) === "includes" &&
+      node.arguments.length === 1
+        ? getLiteralString(node.arguments[0])
+        : null;
+    if (substring && isCaughtErrorMessageReceiver(callee.object, errorName)) {
+      this.context.report({
+        node,
+        messageId: "catchErrorMessageSubstring",
+        data: { name: errorName, substring },
+      });
     }
   };
 
@@ -460,6 +502,8 @@ const noAnemicErrorsRule = {
         "Boundary decode '{{callee}}' is collapsed to {{sentinel}}, erasing schema and syntax failures into absence; propagate or report the decode error explicitly.",
       catchErrorCodeOrStdoutFallback:
         "Catch block falls back from '{{name}}.{{field}}' to another error field or a sentinel code; rethrow or return a typed failure instead of collapsing process output and error codes.",
+      catchErrorMessageSubstring:
+        "Catch block branches on '{{name}}' message substring '{{substring}}'; match a typed error class (`instanceof`), structured `.code` field, or domain variant instead of substring probing.",
       unguardedSyncFsInLogger:
         "Synchronous filesystem write inside a logger/audit function is unguarded and can crash callers on I/O errors.",
     },

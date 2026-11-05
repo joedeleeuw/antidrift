@@ -562,6 +562,29 @@ export function checkSchemaCatch(node, reportedObjects, context) {
   }
 }
 
+function bindingHasInstanceofGuard(binding) {
+  return Boolean(
+    binding?.references.some((ref) => {
+      const parent = ref.identifier?.parent;
+      return (
+        parent?.type === "BinaryExpression" &&
+        parent.operator === "instanceof" &&
+        parent.left === ref.identifier
+      );
+    })
+  );
+}
+
+function isStdlibAddressCall(node) {
+  return (
+    node?.type === "CallExpression" &&
+    node.arguments.length === 0 &&
+    node.callee?.type === "MemberExpression" &&
+    !node.callee.computed &&
+    node.callee.property?.name === "address"
+  );
+}
+
 export function checkCatchClauseSchemaDecode(node, context) {
   const sourceCode = context.sourceCode;
   const callee = unwrapExpression(node.callee);
@@ -570,17 +593,95 @@ export function checkCatchClauseSchemaDecode(node, context) {
     callee?.type !== "MemberExpression" ||
     callee.computed ||
     node.arguments.length !== 1 ||
-    arg?.type !== "Identifier" ||
     !SCHEMA_DECODE_METHODS.has(callee.property?.name) ||
-    !hasRuntimeSchemaProvenance(callee.object, sourceCode) ||
-    findVariable(sourceCode, arg)?.defs?.[0]?.type !== "CatchClause"
+    !hasRuntimeSchemaProvenance(callee.object, sourceCode)
   ) {
     return;
   }
-  context.report({
-    node,
-    message: `Do not decode caught exception '${arg.name}' with a boundary schema; narrow with \`instanceof Error\` (and \`'code' in ${arg.name}\`) or handle expected exit statuses at the process boundary.`,
+  if (isStdlibAddressCall(arg)) {
+    context.report({
+      node,
+      message: `Do not decode typed stdlib return '${sourceCode.getText(arg)}' with a boundary schema; narrow the return value directly (e.g., check \`typeof address === 'object' && address !== null\`).`,
+    });
+    return;
+  }
+  if (arg?.type !== "Identifier") return;
+  const binding = findVariable(sourceCode, arg);
+  const defType = binding?.defs?.[0]?.type;
+  if (defType === "CatchClause") {
+    context.report({
+      node,
+      message: `Do not decode caught exception '${arg.name}' with a boundary schema; narrow with \`instanceof Error\` (and \`'code' in ${arg.name}\`) or handle expected exit statuses at the process boundary.`,
+    });
+  } else if (defType === "Parameter" && bindingHasInstanceofGuard(binding)) {
+    context.report({
+      node,
+      message: `Do not decode \`instanceof\`-narrowed parameter '${arg.name}' with a boundary schema; inspect structured properties on the narrowed instance directly.`,
+    });
+  }
+}
+
+function unvalidatedSchemaBranchMethod(expression, sourceCode) {
+  const node = unwrapExpression(expression);
+  const builder = resolveSchemaBuilderCall(node, sourceCode);
+  if (!builder) return null;
+  if (
+    (builder.method === "unknown" ||
+      builder.method === "any" ||
+      builder.method === "custom") &&
+    builder.args.length === 0
+  ) {
+    return builder.method;
+  }
+  if (
+    builder.method === "transform" &&
+    node?.callee?.type === "MemberExpression"
+  ) {
+    return unvalidatedSchemaBranchMethod(node.callee.object, sourceCode);
+  }
+  return null;
+}
+
+function hasThrowInRefineBody(node, sourceCode) {
+  if (!node || isFunctionLike(node)) return false;
+  if (node.type === "ThrowStatement") return true;
+  return (sourceCode.visitorKeys[node.type] ?? []).some((key) => {
+    const children = Array.isArray(node[key]) ? node[key] : [node[key]];
+    return children.some((child) => hasThrowInRefineBody(child, sourceCode));
   });
+}
+
+function checkUnionSchemaWidening(node, builder, context) {
+  const sourceCode = context.sourceCode;
+  if (
+    builder.method === "union" &&
+    builder.args[0]?.type === "ArrayExpression" &&
+    builder.args[0].elements.length >= 2
+  ) {
+    const holeBranch = builder.args[0].elements.find((element) =>
+      Boolean(unvalidatedSchemaBranchMethod(element, sourceCode))
+    );
+    const holeMethod =
+      holeBranch && unvalidatedSchemaBranchMethod(holeBranch, sourceCode);
+    if (holeBranch && holeMethod) {
+      context.report({
+        node: holeBranch,
+        message: `Do not include \`z.${holeMethod}()\` as a branch of \`z.union([...])\`; an unvalidated branch absorbs every validation failure and widens the union to untyped input.`,
+      });
+    }
+    return;
+  }
+  if (builder.method === "or" && node.callee?.type === "MemberExpression") {
+    const holeMethod =
+      unvalidatedSchemaBranchMethod(builder.args[0], sourceCode) ??
+      unvalidatedSchemaBranchMethod(node.callee.object, sourceCode);
+    if (holeMethod) {
+      context.report({
+        node,
+        message: `Do not combine a typed schema with \`z.${holeMethod}()\` via \`.or()\`; an unvalidated branch absorbs every validation failure and widens the schema to untyped input.`,
+      });
+    }
+  }
 }
 
 export function checkUnvalidatedSchemaHole(node, context) {
@@ -619,6 +720,103 @@ export function checkUnvalidatedSchemaHole(node, context) {
         node,
         message: `Do not chain \`.transform()\` directly on \`z.${receiverBuilder.method}()\`; validate the input schema before transforming or call a plain function instead of wrapping it in a no-op schema.`,
       });
+      return;
     }
+  }
+  if (builder.method === "refine" || builder.method === "superRefine") {
+    const callback = unwrapExpression(builder.args[0]);
+    if (
+      isFunctionLike(callback) &&
+      hasThrowInRefineBody(callback.body, sourceCode)
+    ) {
+      context.report({
+        node,
+        message: `Do not throw inside schema \`.${builder.method}()\`; return \`false\` or add a validation issue so \`.safeParse()\` and structured error reporting still work.`,
+      });
+    }
+    return;
+  }
+  checkUnionSchemaWidening(node, builder, context);
+}
+
+const SPLIT_CHAIN_STEPS = new Set(["filter", "slice", "trim", "flatMap"]);
+const NUMERIC_COERCERS = new Set(["Number", "parseInt", "parseFloat"]);
+
+function isSplitStringReceiver(expression) {
+  let current = unwrapExpression(expression);
+  while (
+    current?.type === "CallExpression" &&
+    current.callee?.type === "MemberExpression" &&
+    !current.callee.computed &&
+    current.callee.property?.type === "Identifier"
+  ) {
+    const method = current.callee.property.name;
+    if (method === "split") return true;
+    if (!SPLIT_CHAIN_STEPS.has(method)) return false;
+    current = unwrapExpression(current.callee.object);
+  }
+  return false;
+}
+
+function numericCoercerName(callee) {
+  const target = unwrapExpression(callee);
+  if (target?.type === "Identifier" && NUMERIC_COERCERS.has(target.name)) {
+    return target.name;
+  }
+  if (
+    target?.type === "MemberExpression" &&
+    !target.computed &&
+    target.object?.type === "Identifier" &&
+    target.object.name === "Number" &&
+    (target.property?.name === "parseInt" ||
+      target.property?.name === "parseFloat")
+  ) {
+    return `Number.${target.property.name}`;
+  }
+  return null;
+}
+
+function callbackNumericCoercer(callbackNode) {
+  const callback = unwrapExpression(callbackNode);
+  if (callback?.type === "Identifier") return numericCoercerName(callback);
+  if (!isFunctionLike(callback) || callback.params[0]?.type !== "Identifier") {
+    return null;
+  }
+  const paramName = callback.params[0].name;
+  const bodyExpr =
+    callback.body?.type === "BlockStatement" &&
+    callback.body.body.length === 1 &&
+    callback.body.body[0].type === "ReturnStatement"
+      ? unwrapExpression(callback.body.body[0].argument)
+      : unwrapExpression(callback.body);
+  if (bodyExpr?.type !== "CallExpression") return null;
+  const coercer = numericCoercerName(bodyExpr.callee);
+  const firstArg = unwrapExpression(bodyExpr.arguments[0]);
+  const passesParam =
+    (firstArg?.type === "Identifier" && firstArg.name === paramName) ||
+    (firstArg?.type === "CallExpression" &&
+      firstArg.callee?.type === "MemberExpression" &&
+      firstArg.callee.object?.type === "Identifier" &&
+      firstArg.callee.object.name === paramName &&
+      firstArg.callee.property?.name === "trim");
+  return passesParam ? coercer : null;
+}
+
+export function checkUncheckedSplitNumericCoercion(node, context) {
+  if (
+    node.callee?.type !== "MemberExpression" ||
+    node.callee.computed ||
+    node.callee.property?.name !== "map" ||
+    node.arguments.length === 0 ||
+    !isSplitStringReceiver(node.callee.object)
+  ) {
+    return;
+  }
+  const coercer = callbackNumericCoercer(node.arguments[0]);
+  if (coercer) {
+    context.report({
+      node,
+      message: `Do not coerce split string tokens with unchecked \`${coercer}(...)\` in \`.map()\` (which silently produces \`NaN\` on non-numeric output); validate numeric tokens explicitly or decode with a boundary schema.`,
+    });
   }
 }
