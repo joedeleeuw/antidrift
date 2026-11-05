@@ -25,7 +25,7 @@ const FUNCTION_TYPES = new Set([
   "FunctionExpression",
 ]);
 const DOMAINLESS_TYPES = new Set(["TSUnknownKeyword", "TSNeverKeyword"]);
-const KEY_PARAMETER = /^(?:key|name|field|label|id|\w+(?:Key|Name))$/;
+const KEY_NAME = /^(?:key|name|field|label|id|\w+(?:Key|Name))$/;
 
 function bindingSlot(identifier) {
   const parent = identifier.parent;
@@ -46,7 +46,7 @@ function parameterOwner(slot) {
     : null;
 }
 
-function isOwnTypeParameter(owner, annotation) {
+function isUnconstrainedTypeParameter(owner, annotation) {
   if (
     annotation?.type !== "TSTypeReference" ||
     annotation.typeName?.type !== "Identifier"
@@ -55,6 +55,7 @@ function isOwnTypeParameter(owner, annotation) {
   }
   return (owner.typeParameters?.params ?? []).some(
     (parameter) =>
+      !parameter.constraint &&
       (parameter.name?.name ?? parameter.name) === annotation.typeName.name
   );
 }
@@ -173,27 +174,18 @@ class BindingNames {
     if (!owner) return false;
     return (
       owner.returnType?.typeAnnotation?.type === "TSTypePredicate" ||
-      isOwnTypeParameter(owner, annotation)
+      isUnconstrainedTypeParameter(owner, annotation)
     );
   };
 
   isKeyedValue = (identifier) => {
     const slot = bindingSlot(identifier);
     const pattern = slot.parent;
-    if (pattern?.type === "ArrayPattern") {
-      return (
-        pattern.elements.length === 2 &&
-        pattern.elements[1] === slot &&
-        slotName(pattern.elements[0]) !== null
-      );
-    }
-    const owner = parameterOwner(slot);
     return (
-      owner !== null &&
-      owner.params.some(
-        (parameter) =>
-          parameter !== slot && KEY_PARAMETER.test(slotName(parameter) ?? "")
-      )
+      pattern?.type === "ArrayPattern" &&
+      pattern.elements.length === 2 &&
+      pattern.elements[1] === slot &&
+      KEY_NAME.test(slotName(pattern.elements[0]) ?? "")
     );
   };
 

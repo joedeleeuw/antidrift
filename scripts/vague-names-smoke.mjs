@@ -14,11 +14,25 @@ export function collectRest({ title, ...props }: { title: string; hidden: boolea
 export function headerLines(headers: Map<string, string>) {
   const lines: string[] = [];
   for (const [name, value] of headers) lines.push(name + value);
+  for (const [fieldKey, value = ""] of headers) lines.push(fieldKey + value);
   headers.forEach((value, headerName) => lines.push(headerName + value));
   return lines;
 }
 export function storeSetting(key: string, value = "") {
   return key + value;
+}
+export function repeatText(label: string, value: number) {
+  return label.repeat(value);
+}
+export function scheduleReminder(id: string, value: number) {
+  return [id, Date.now() + value];
+}
+export function boxSize() {
+  const [width, value] = [320, 200];
+  return width * value;
+}
+export function pointSum(points: [number, number][]) {
+  return points.map(([x, value]) => x + value);
 }
 export function tripleRows(rows: [string, string, string][]) {
   return rows.map(([first, second, value]) => first + second + value);
@@ -29,15 +43,15 @@ export function suffixedPair(entries: [string, string][]) {
 export function keyedParams(key: string, params: string) {
   return key + params;
 }
-export function scaled(factor: number, value: number) {
-  return factor * value;
-}
 export const value = 1;
 export function assertUnreachable(value: never): never {
   throw new Error(String(value));
 }
 export function cloned<T>(value: T): T {
   return structuredClone(value);
+}
+export function paid<T extends { amount: number }>(value: T) {
+  return value.amount;
 }
 export function spreadAll<T>(value: Array<T>): T[] {
   return [...value];
@@ -49,13 +63,19 @@ export function outerOwned<T>(entries: T[]) {
 
 const expectedReports = [
   "4:props is an abbreviation of 'properties'",
+  "11:value is a vague noun",
+  "14:value is a vague noun",
   "17:value is a vague noun",
-  "20:fieldValue is a filler suffix",
-  "22:params is a vague noun",
-  "25:value is a vague noun",
+  "20:value is a vague noun",
+  "24:value is a vague noun",
   "28:value is a vague noun",
-  "35:value is a vague noun",
+  "31:value is a vague noun",
+  "34:fieldValue is a filler suffix",
+  "36:params is a vague noun",
   "39:value is a vague noun",
+  "46:value is a vague noun",
+  "49:value is a vague noun",
+  "53:value is a vague noun",
 ];
 
 const reportPattern = /^'(\w+)' is (.+?)\. Name the binding/;
