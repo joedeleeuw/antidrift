@@ -156,6 +156,44 @@ function isCaughtErrorMessageReceiver(expression, errorName) {
   return false;
 }
 
+function isUnshadowedBranchSubstringCheck(node, errorName) {
+  let inBranchCondition = false;
+  for (
+    let cur = node, parent = cur.parent;
+    parent;
+    cur = parent, parent = cur.parent
+  ) {
+    if (
+      (parent.type === "IfStatement" ||
+        parent.type === "ConditionalExpression" ||
+        parent.type === "WhileStatement" ||
+        parent.type === "DoWhileStatement" ||
+        parent.type === "SwitchCase") &&
+      parent.test === cur
+    ) {
+      inBranchCondition = true;
+    } else if (parent.type === "ReturnStatement" && parent.argument === cur) {
+      inBranchCondition = true;
+    }
+    if (parent.type === "CatchClause") {
+      return inBranchCondition;
+    }
+    if (isFunctionLike(parent)) {
+      if (promiseCatchCallbackParamName(parent) === errorName) {
+        return inBranchCondition;
+      }
+      if (
+        getNodeArray(parent, "params").some(
+          (formal) => getIdentifierName(formal) === errorName
+        )
+      ) {
+        return false;
+      }
+    }
+  }
+  return false;
+}
+
 function enclosingFunctionName(node) {
   for (let cur = node.parent; cur; cur = cur.parent) {
     if (!isFunctionLike(cur)) continue;
@@ -426,7 +464,11 @@ class ErrorDiagnostics {
       node.arguments.length === 1
         ? getLiteralString(node.arguments[0])
         : null;
-    if (substring && isCaughtErrorMessageReceiver(callee.object, errorName)) {
+    if (
+      substring &&
+      isCaughtErrorMessageReceiver(callee.object, errorName) &&
+      isUnshadowedBranchSubstringCheck(node, errorName)
+    ) {
       this.context.report({
         node,
         messageId: "catchErrorMessageSubstring",

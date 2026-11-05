@@ -562,29 +562,6 @@ export function checkSchemaCatch(node, reportedObjects, context) {
   }
 }
 
-function bindingHasInstanceofGuard(binding) {
-  return Boolean(
-    binding?.references.some((ref) => {
-      const parent = ref.identifier?.parent;
-      return (
-        parent?.type === "BinaryExpression" &&
-        parent.operator === "instanceof" &&
-        parent.left === ref.identifier
-      );
-    })
-  );
-}
-
-function isStdlibAddressCall(node) {
-  return (
-    node?.type === "CallExpression" &&
-    node.arguments.length === 0 &&
-    node.callee?.type === "MemberExpression" &&
-    !node.callee.computed &&
-    node.callee.property?.name === "address"
-  );
-}
-
 export function checkCatchClauseSchemaDecode(node, context) {
   const sourceCode = context.sourceCode;
   const callee = unwrapExpression(node.callee);
@@ -594,29 +571,16 @@ export function checkCatchClauseSchemaDecode(node, context) {
     callee.computed ||
     node.arguments.length !== 1 ||
     !SCHEMA_DECODE_METHODS.has(callee.property?.name) ||
-    !hasRuntimeSchemaProvenance(callee.object, sourceCode)
+    !hasRuntimeSchemaProvenance(callee.object, sourceCode) ||
+    arg?.type !== "Identifier"
   ) {
     return;
   }
-  if (isStdlibAddressCall(arg)) {
-    context.report({
-      node,
-      message: `Do not decode typed stdlib return '${sourceCode.getText(arg)}' with a boundary schema; narrow the return value directly (e.g., check \`typeof address === 'object' && address !== null\`).`,
-    });
-    return;
-  }
-  if (arg?.type !== "Identifier") return;
   const binding = findVariable(sourceCode, arg);
-  const defType = binding?.defs?.[0]?.type;
-  if (defType === "CatchClause") {
+  if (binding?.defs?.[0]?.type === "CatchClause") {
     context.report({
       node,
       message: `Do not decode caught exception '${arg.name}' with a boundary schema; narrow with \`instanceof Error\` (and \`'code' in ${arg.name}\`) or handle expected exit statuses at the process boundary.`,
-    });
-  } else if (defType === "Parameter" && bindingHasInstanceofGuard(binding)) {
-    context.report({
-      node,
-      message: `Do not decode \`instanceof\`-narrowed parameter '${arg.name}' with a boundary schema; inspect structured properties on the narrowed instance directly.`,
     });
   }
 }
@@ -633,22 +597,30 @@ function unvalidatedSchemaBranchMethod(expression, sourceCode) {
   ) {
     return builder.method;
   }
-  if (
-    builder.method === "transform" &&
-    node?.callee?.type === "MemberExpression"
-  ) {
-    return unvalidatedSchemaBranchMethod(node.callee.object, sourceCode);
-  }
   return null;
 }
 
-function hasThrowInRefineBody(node, sourceCode) {
-  if (!node || isFunctionLike(node)) return false;
-  if (node.type === "ThrowStatement") return true;
-  return (sourceCode.visitorKeys[node.type] ?? []).some((key) => {
-    const children = Array.isArray(node[key]) ? node[key] : [node[key]];
-    return children.some((child) => hasThrowInRefineBody(child, sourceCode));
-  });
+function isUnionBranchTransform(node, sourceCode) {
+  let current = node.parent;
+  while (
+    current?.type === "CallExpression" &&
+    current.callee?.type === "MemberExpression" &&
+    /^(?:nullish|nullable|optional|readonly)$/u.test(
+      current.callee.property?.name ?? ""
+    )
+  ) {
+    current = current.parent;
+  }
+  if (current?.type === "ArrayExpression") {
+    const parentCall = current.parent;
+    const unionBuilder = resolveSchemaBuilderCall(parentCall, sourceCode);
+    return unionBuilder?.method === "union";
+  }
+  if (current?.type === "CallExpression") {
+    const orBuilder = resolveSchemaBuilderCall(current, sourceCode);
+    return orBuilder?.method === "or";
+  }
+  return false;
 }
 
 function checkUnionSchemaWidening(node, builder, context) {
@@ -706,7 +678,8 @@ export function checkUnvalidatedSchemaHole(node, context) {
   }
   if (
     builder.method === "transform" &&
-    node.callee?.type === "MemberExpression"
+    node.callee?.type === "MemberExpression" &&
+    !isUnionBranchTransform(node, sourceCode)
   ) {
     const receiverBuilder = resolveSchemaBuilderCall(
       node.callee.object,
@@ -723,26 +696,30 @@ export function checkUnvalidatedSchemaHole(node, context) {
       return;
     }
   }
-  if (builder.method === "refine" || builder.method === "superRefine") {
-    const callback = unwrapExpression(builder.args[0]);
-    if (
-      isFunctionLike(callback) &&
-      hasThrowInRefineBody(callback.body, sourceCode)
-    ) {
-      context.report({
-        node,
-        message: `Do not throw inside schema \`.${builder.method}()\`; return \`false\` or add a validation issue so \`.safeParse()\` and structured error reporting still work.`,
-      });
-    }
-    return;
-  }
   checkUnionSchemaWidening(node, builder, context);
 }
 
-const SPLIT_CHAIN_STEPS = new Set(["filter", "slice", "trim", "flatMap"]);
+const SPLIT_CHAIN_STEPS = new Set([
+  "filter",
+  "slice",
+  "trim",
+  "flatMap",
+  "map",
+]);
 const NUMERIC_COERCERS = new Set(["Number", "parseInt", "parseFloat"]);
 
-function isSplitStringReceiver(expression) {
+function isLineSplitDelimiter(argNode) {
+  const arg = unwrapExpression(argNode);
+  if (arg?.type === "Literal" && typeof arg.value === "string") {
+    return arg.value === "\n" || arg.value === "\r\n";
+  }
+  if (arg?.type === "Literal" && arg.regex) {
+    return /\\n/u.test(arg.regex.pattern);
+  }
+  return false;
+}
+
+function splitCallKind(expression) {
   let current = unwrapExpression(expression);
   while (
     current?.type === "CallExpression" &&
@@ -751,11 +728,28 @@ function isSplitStringReceiver(expression) {
     current.callee.property?.type === "Identifier"
   ) {
     const method = current.callee.property.name;
-    if (method === "split") return true;
-    if (!SPLIT_CHAIN_STEPS.has(method)) return false;
+    if (method === "split") {
+      return isLineSplitDelimiter(current.arguments?.[0]) ? "line" : "other";
+    }
+    if (!SPLIT_CHAIN_STEPS.has(method)) return null;
     current = unwrapExpression(current.callee.object);
   }
-  return false;
+  return null;
+}
+
+function isChainedIntoNumericGuard(mapCallNode, sourceCode) {
+  const parent = mapCallNode.parent;
+  if (
+    parent?.type !== "MemberExpression" ||
+    parent.object !== mapCallNode ||
+    !/^(?:filter|every|some)$/u.test(parent.property?.name ?? "") ||
+    parent.parent?.type !== "CallExpression"
+  ) {
+    return false;
+  }
+  const guardArg = parent.parent.arguments?.[0];
+  const text = guardArg ? sourceCode.getText(guardArg) : "";
+  return /\b(?:isFinite|isInteger|isNaN)\b/u.test(text);
 }
 
 function numericCoercerName(callee) {
@@ -776,9 +770,22 @@ function numericCoercerName(callee) {
   return null;
 }
 
+function passesCallbackParam(argNode, paramName) {
+  const firstArg = unwrapExpression(argNode);
+  if (firstArg?.type === "Identifier") return firstArg.name === paramName;
+  return (
+    firstArg?.type === "CallExpression" &&
+    firstArg.callee?.type === "MemberExpression" &&
+    firstArg.callee.object?.type === "Identifier" &&
+    firstArg.callee.object.name === paramName &&
+    firstArg.callee.property?.name === "trim"
+  );
+}
+
 function callbackNumericCoercer(callbackNode) {
   const callback = unwrapExpression(callbackNode);
-  if (callback?.type === "Identifier") return numericCoercerName(callback);
+  const directCoercer = numericCoercerName(callback);
+  if (directCoercer) return directCoercer;
   if (!isFunctionLike(callback) || callback.params[0]?.type !== "Identifier") {
     return null;
   }
@@ -790,16 +797,9 @@ function callbackNumericCoercer(callbackNode) {
       ? unwrapExpression(callback.body.body[0].argument)
       : unwrapExpression(callback.body);
   if (bodyExpr?.type !== "CallExpression") return null;
-  const coercer = numericCoercerName(bodyExpr.callee);
-  const firstArg = unwrapExpression(bodyExpr.arguments[0]);
-  const passesParam =
-    (firstArg?.type === "Identifier" && firstArg.name === paramName) ||
-    (firstArg?.type === "CallExpression" &&
-      firstArg.callee?.type === "MemberExpression" &&
-      firstArg.callee.object?.type === "Identifier" &&
-      firstArg.callee.object.name === paramName &&
-      firstArg.callee.property?.name === "trim");
-  return passesParam ? coercer : null;
+  return passesCallbackParam(bodyExpr.arguments[0], paramName)
+    ? numericCoercerName(bodyExpr.callee)
+    : null;
 }
 
 export function checkUncheckedSplitNumericCoercion(node, context) {
@@ -807,9 +807,20 @@ export function checkUncheckedSplitNumericCoercion(node, context) {
     node.callee?.type !== "MemberExpression" ||
     node.callee.computed ||
     node.callee.property?.name !== "map" ||
-    node.arguments.length === 0 ||
-    !isSplitStringReceiver(node.callee.object)
+    node.arguments.length === 0
   ) {
+    return;
+  }
+  const splitKind = splitCallKind(node.callee.object);
+  if (!splitKind || isChainedIntoNumericGuard(node, context.sourceCode)) {
+    return;
+  }
+  const callbackArg = unwrapExpression(node.arguments[0]);
+  const isBareParseIntCallback =
+    (callbackArg?.type === "Identifier" && callbackArg.name === "parseInt") ||
+    (callbackArg?.type === "MemberExpression" &&
+      numericCoercerName(callbackArg) === "Number.parseInt");
+  if (splitKind !== "line" && !isBareParseIntCallback) {
     return;
   }
   const coercer = callbackNumericCoercer(node.arguments[0]);

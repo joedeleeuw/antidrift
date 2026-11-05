@@ -164,26 +164,23 @@ export const UnvalidatedHoleSchema = z.object({
   uncheckedCustom: z.custom<FirstContract>(),
   noopUnknownTransform: z.unknown().transform((rawPayload) => String(rawPayload)),
   widenedUnion: z.union([z.string(), z.unknown()]),
-  throwingRefine: z.string().refine((token) => {
-    if (token.length === 0) throw new Error("token cannot be empty");
-    return true;
-  }),
 });
 const LsofExitSchema = z.object({ code: z.literal(1) });
 export function catchWithSchemaDecode(
   run: () => number[],
-  rawStdout: string,
-  narrowedFailure: unknown,
-  netServer: { address(): unknown }
+  rawStdout: string
 ): number[] {
-  if (narrowedFailure instanceof Error && LsofExitSchema.safeParse(narrowedFailure).success) {
-    return [];
-  }
-  LsofExitSchema.parse(netServer.address());
+  const [hours, minutes] = "08:30".split(":").map(Number);
+  const finiteRows = rawStdout
+    .split(/\\r?\\n/)
+    .map((line) => Number(line))
+    .filter((seconds) => Number.isFinite(seconds));
+  if (hours < 0 || minutes < 0 || finiteRows.length < 0) return [];
   try {
     return rawStdout
       .split("\\n")
-      .filter((line) => line.trim())
+      .map((line) => line.trim())
+      .filter(Boolean)
       .map((line) => Number(line));
   } catch (caughtErr) {
     if (LsofExitSchema.safeParse(caughtErr).success) return [];
@@ -635,21 +632,6 @@ export const expectedDiagnostics = [
     ruleId: "antidrift/unknown-input-must-be-decoded",
     message:
       "Do not include `z.unknown()` as a branch of `z.union([...])`; an unvalidated branch absorbs every validation failure and widens the union to untyped input.",
-  },
-  {
-    ruleId: "antidrift/unknown-input-must-be-decoded",
-    message:
-      "Do not throw inside schema `.refine()`; return `false` or add a validation issue so `.safeParse()` and structured error reporting still work.",
-  },
-  {
-    ruleId: "antidrift/unknown-input-must-be-decoded",
-    message:
-      "Do not decode `instanceof`-narrowed parameter 'narrowedFailure' with a boundary schema; inspect structured properties on the narrowed instance directly.",
-  },
-  {
-    ruleId: "antidrift/unknown-input-must-be-decoded",
-    message:
-      "Do not decode typed stdlib return 'netServer.address()' with a boundary schema; narrow the return value directly (e.g., check `typeof address === 'object' && address !== null`).",
   },
   {
     ruleId: "antidrift/unknown-input-must-be-decoded",
