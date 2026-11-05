@@ -1,5 +1,6 @@
 import {
   hasRuntimeSchemaProvenance,
+  resolveSchemaBuilderCall,
   schemaReceiverVerdict,
 } from "../shared/runtime-schema-libraries.js";
 import {
@@ -558,5 +559,66 @@ export function checkSchemaCatch(node, reportedObjects, context) {
       message:
         "Schema `.catch(fallback)` silently repairs invalid boundary input on read; reject invalid input instead.",
     });
+  }
+}
+
+export function checkCatchClauseSchemaDecode(node, context) {
+  const sourceCode = context.sourceCode;
+  const callee = unwrapExpression(node.callee);
+  const arg = unwrapExpression(node.arguments?.[0]);
+  if (
+    callee?.type !== "MemberExpression" ||
+    callee.computed ||
+    node.arguments.length !== 1 ||
+    arg?.type !== "Identifier" ||
+    !SCHEMA_DECODE_METHODS.has(callee.property?.name) ||
+    !hasRuntimeSchemaProvenance(callee.object, sourceCode) ||
+    findVariable(sourceCode, arg)?.defs?.[0]?.type !== "CatchClause"
+  ) {
+    return;
+  }
+  context.report({
+    node,
+    message: `Do not decode caught exception '${arg.name}' with a boundary schema; narrow with \`instanceof Error\` (and \`'code' in ${arg.name}\`) or handle expected exit statuses at the process boundary.`,
+  });
+}
+
+export function checkUnvalidatedSchemaHole(node, context) {
+  const sourceCode = context.sourceCode;
+  const builder = resolveSchemaBuilderCall(node, sourceCode);
+  if (!builder) return;
+  if (builder.method === "any" && builder.args.length === 0) {
+    context.report({
+      node,
+      message:
+        "Do not use `z.any()` in a boundary schema; validate the expected shape or use `z.unknown()` when the payload is intentionally opaque.",
+    });
+    return;
+  }
+  if (builder.method === "custom" && builder.args.length === 0) {
+    context.report({
+      node,
+      message:
+        "Do not call `z.custom()` without a validation predicate; bare `z.custom<T>()` accepts any value at runtime like an unchecked `as T` cast.",
+    });
+    return;
+  }
+  if (
+    builder.method === "transform" &&
+    node.callee?.type === "MemberExpression"
+  ) {
+    const receiverBuilder = resolveSchemaBuilderCall(
+      node.callee.object,
+      sourceCode
+    );
+    if (
+      receiverBuilder?.method === "unknown" ||
+      receiverBuilder?.method === "any"
+    ) {
+      context.report({
+        node,
+        message: `Do not chain \`.transform()\` directly on \`z.${receiverBuilder.method}()\`; validate the input schema before transforming or call a plain function instead of wrapping it in a no-op schema.`,
+      });
+    }
   }
 }

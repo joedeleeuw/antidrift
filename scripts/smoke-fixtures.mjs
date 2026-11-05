@@ -159,6 +159,20 @@ export function readDualKeyAlias(input: { taskId?: string; task_id?: string }) {
   return input.taskId ?? input.task_id;
 }
 const BaseItemSchema = z.object({ oldField: z.string(), payloadJson: z.string().catch("default") });
+export const UnvalidatedHoleSchema = z.object({
+  anything: z.any(),
+  uncheckedCustom: z.custom<FirstContract>(),
+  noopUnknownTransform: z.unknown().transform((rawPayload) => String(rawPayload)),
+});
+const LsofExitSchema = z.object({ code: z.literal(1) });
+export function catchWithSchemaDecode(run: () => number[]): number[] {
+  try {
+    return run();
+  } catch (caughtErr) {
+    if (LsofExitSchema.safeParse(caughtErr).success) return [];
+    throw new Error("lsof failed", { cause: caughtErr });
+  }
+}
 type NamedItem = z.infer<typeof BaseItemSchema>;
 export function reparseNamedAlias(entry: NamedItem) {
   return BaseItemSchema.parse(entry);
@@ -388,6 +402,21 @@ export const ClientClickSchema = ClickEventSchema.omit({ x: true }).extend({
   clientY: z.number(),
 });
 
+export const ValidCustomSchema = z.custom<OrderSummary>(
+  (candidate) =>
+    typeof candidate === "object" &&
+    candidate !== null &&
+    "orderId" in candidate
+);
+
+export function isExitCodedFailure(failure: unknown): boolean {
+  if (!(failure instanceof Error)) return false;
+  return (
+    ("exitCode" in failure && failure.exitCode === 2) ||
+    ("code" in failure && failure.code === "ENOENT")
+  );
+}
+
 export async function consumeStreamSafely(stream: ReadableStream<Uint8Array>) {
   const reader = stream.getReader();
   try {
@@ -563,5 +592,25 @@ export const expectedDiagnostics = [
     ruleId: "antidrift/no-pass-through-parameters",
     message:
       "Parameter 'title' is only forwarded unchanged to 'LeafHeader'. Resolve it at the leaf or pass a narrower domain object.",
+  },
+  {
+    ruleId: "antidrift/unknown-input-must-be-decoded",
+    message:
+      "Do not use `z.any()` in a boundary schema; validate the expected shape or use `z.unknown()` when the payload is intentionally opaque.",
+  },
+  {
+    ruleId: "antidrift/unknown-input-must-be-decoded",
+    message:
+      "Do not call `z.custom()` without a validation predicate; bare `z.custom<T>()` accepts any value at runtime like an unchecked `as T` cast.",
+  },
+  {
+    ruleId: "antidrift/unknown-input-must-be-decoded",
+    message:
+      "Do not chain `.transform()` directly on `z.unknown()`; validate the input schema before transforming or call a plain function instead of wrapping it in a no-op schema.",
+  },
+  {
+    ruleId: "antidrift/unknown-input-must-be-decoded",
+    message:
+      "Do not decode caught exception 'caughtErr' with a boundary schema; narrow with `instanceof Error` (and `'code' in caughtErr`) or handle expected exit statuses at the process boundary.",
   },
 ];

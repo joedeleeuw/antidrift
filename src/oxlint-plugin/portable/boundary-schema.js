@@ -1,8 +1,10 @@
 import {
+  checkCatchClauseSchemaDecode,
   checkDiscardedDecode,
   checkSchemaCatch,
   checkRepairOnReadTernary,
   checkSerializationRoundtrip,
+  checkUnvalidatedSchemaHole,
   isAliasedRawDeserialize,
   isPassedToDecoder,
   isRawDeserializeCall,
@@ -124,6 +126,7 @@ function checkUnknownParameterBinding(ident, context, probeThreshold) {
   const binding = findVariable(context.sourceCode, ident);
   if (!binding) return;
   let inCheckCount = 0;
+  let hasInstanceofGuard = false;
   for (const ref of binding.references) {
     const parent = ref.identifier?.parent;
     if (
@@ -138,13 +141,20 @@ function checkUnknownParameterBinding(ident, context, probeThreshold) {
     }
     if (
       parent?.type === "BinaryExpression" &&
+      parent.operator === "instanceof" &&
+      parent.left === ref.identifier
+    ) {
+      hasInstanceofGuard = true;
+    }
+    if (
+      parent?.type === "BinaryExpression" &&
       parent.operator === "in" &&
       parent.right === ref.identifier
     ) {
       inCheckCount += 1;
     }
   }
-  if (inCheckCount >= probeThreshold) {
+  if (!hasInstanceofGuard && inCheckCount >= probeThreshold) {
     context.report({
       node: ident,
       message: `Unknown input '${ident.name}' is probed with ${inCheckCount} ad-hoc 'in' checks; decode once with a boundary schema instead.`,
@@ -325,6 +335,8 @@ export const unknownInputMustBeDecodedRule = {
         checkJsonStringFields(node, context);
         checkSerializationRoundtrip(node, context);
         checkSchemaCatch(node, reportedObjects, context);
+        checkCatchClauseSchemaDecode(node, context);
+        checkUnvalidatedSchemaHole(node, context);
         checkTauriIpcTypeArguments(node, context);
       },
       ConditionalExpression(node) {
