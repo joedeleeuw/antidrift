@@ -24,6 +24,54 @@ const FUNCTION_TYPES = new Set([
   "FunctionDeclaration",
   "FunctionExpression",
 ]);
+const DOMAINLESS_TYPES = new Set(["TSUnknownKeyword", "TSNeverKeyword"]);
+const KEY_PARAMETER = /^(?:key|name|field|label|id|\w+(?:Key|Name))$/;
+
+function bindingSlot(identifier) {
+  const parent = identifier.parent;
+  return parent?.type === "AssignmentPattern" && parent.left === identifier
+    ? parent
+    : identifier;
+}
+
+function slotName(slot) {
+  const target = slot?.type === "AssignmentPattern" ? slot.left : slot;
+  return target?.type === "Identifier" ? target.name : null;
+}
+
+function parameterOwner(slot) {
+  const owner = slot.parent;
+  return FUNCTION_TYPES.has(owner?.type) && owner.params.includes(slot)
+    ? owner
+    : null;
+}
+
+function isOwnTypeParameter(owner, annotation) {
+  if (
+    annotation?.type !== "TSTypeReference" ||
+    annotation.typeName?.type !== "Identifier"
+  ) {
+    return false;
+  }
+  return (owner.typeParameters?.params ?? []).some(
+    (parameter) =>
+      (parameter.name?.name ?? parameter.name) === annotation.typeName.name
+  );
+}
+
+function componentPropsBinding(parameter) {
+  if (parameter.type === "Identifier") {
+    return parameter.name === "props" ? parameter : null;
+  }
+  if (parameter.type !== "ObjectPattern") return null;
+  const rest = parameter.properties.find(
+    (property) =>
+      property.type === "RestElement" &&
+      property.argument?.type === "Identifier" &&
+      property.argument.name === "props"
+  );
+  return rest?.argument ?? null;
+}
 
 function isJsx(node) {
   if (!node) return false;
@@ -118,17 +166,34 @@ class BindingNames {
     );
   };
 
-  isUnknownCandidateParam = (identifier) => {
-    if (identifier.name !== "value") return false;
-    if (
-      identifier.typeAnnotation?.typeAnnotation?.type === "TSUnknownKeyword"
-    ) {
-      return true;
-    }
-    const fnNode = identifier.parent;
+  isDomainlessValue = (identifier) => {
+    const annotation = identifier.typeAnnotation?.typeAnnotation;
+    if (DOMAINLESS_TYPES.has(annotation?.type)) return true;
+    const owner = parameterOwner(bindingSlot(identifier));
+    if (!owner) return false;
     return (
-      FUNCTION_TYPES.has(fnNode?.type) &&
-      fnNode.returnType?.typeAnnotation?.type === "TSTypePredicate"
+      owner.returnType?.typeAnnotation?.type === "TSTypePredicate" ||
+      isOwnTypeParameter(owner, annotation)
+    );
+  };
+
+  isKeyedValue = (identifier) => {
+    const slot = bindingSlot(identifier);
+    const pattern = slot.parent;
+    if (pattern?.type === "ArrayPattern") {
+      return (
+        pattern.elements.length === 2 &&
+        pattern.elements[1] === slot &&
+        slotName(pattern.elements[0]) !== null
+      );
+    }
+    const owner = parameterOwner(slot);
+    return (
+      owner !== null &&
+      owner.params.some(
+        (parameter) =>
+          parameter !== slot && KEY_PARAMETER.test(slotName(parameter) ?? "")
+      )
     );
   };
 
@@ -156,7 +221,12 @@ class BindingNames {
       }
     }
     if (this.isQueryBuilderParam(identifier)) return;
-    if (this.isUnknownCandidateParam(identifier)) return;
+    if (
+      identifier.name === "value" &&
+      (this.isDomainlessValue(identifier) || this.isKeyedValue(identifier))
+    ) {
+      return;
+    }
     if (this.isTestHarnessVariable(identifier)) return;
     const reason = vagueReason(identifier.name);
     if (reason) {
@@ -201,11 +271,11 @@ class BindingNames {
     }
   };
 
-  checkPattern = (pattern) => {
+  checkPattern = (pattern, exempt = null) => {
     for (const identifier of patternIdentifiers(pattern, {
       skipShorthand: true,
     })) {
-      this.check(identifier);
+      if (identifier !== exempt) this.check(identifier);
     }
   };
 
@@ -245,15 +315,12 @@ class BindingNames {
       this.checkDuplicateContext(node.id, node);
     }
     for (const [index, parameter] of node.params.entries()) {
-      if (
-        index === 0 &&
-        parameter.type === "Identifier" &&
-        parameter.name === "props" &&
-        this.isComponent(node)
-      ) {
-        continue;
-      }
-      this.checkPattern(parameter);
+      const propsBinding =
+        index === 0 ? componentPropsBinding(parameter) : null;
+      this.checkPattern(
+        parameter,
+        propsBinding && this.isComponent(node) ? propsBinding : null
+      );
     }
   };
 

@@ -29,6 +29,7 @@ import {
   goodSource,
 } from "./smoke-fixtures.mjs";
 import { runTypedEslintSmoke } from "./typed-eslint-smoke.mjs";
+import { runVagueNamesSmoke } from "./vague-names-smoke.mjs";
 
 const repoRoot = resolve(import.meta.dirname, "..");
 const expectedRuleCount = 83;
@@ -215,6 +216,8 @@ try {
       `Expected ESLint ${ruleId}: ${message}`
     );
   }
+
+  await runVagueNamesSmoke({ workDir, oxlintBin, oxlintConfigFile, eslint });
 
   await runTypedEslintSmoke({
     workDir,
