@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { mkdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
@@ -6,8 +7,12 @@ import tsParser from "@typescript-eslint/parser";
 import { ESLint } from "eslint";
 import "zod";
 
-import { createEslintConfig } from "../src/index.js";
+import { createEslintConfig, createOxlintConfig } from "../src/index.js";
 import { typedRuleNames } from "../src/oxlint-config/index.js";
+import {
+  assertModuleFlowCompleteness,
+  writeModuleFlowProject,
+} from "./module-flow-smoke.mjs";
 
 const schemasSource = `
 import { z } from "zod";
@@ -91,6 +96,27 @@ export function readUser(raw: unknown) {
 
 export const serializedUserJsonSchema = JSON.stringify(z.toJSONSchema(UserSchema));
 export const ExtendedUserSchema = UserSchema.extend({ role: z.string().optional() });
+
+function Hint({ text, detail }: { text: string; detail?: string }) {
+  return <span title={detail}>{text}</span>;
+}
+
+const spreadHint = { text: "spread", detail: "from spread" };
+
+export function Hints() {
+  return (
+    <p>
+      <Hint text="first" detail="shown" />
+      <Hint text="second" />
+      <SpreadHint text="plain" />
+      <SpreadHint {...spreadHint} />
+    </p>
+  );
+}
+
+function SpreadHint({ text, detail }: { text: string; detail?: string }) {
+  return <span title={detail}>{text}</span>;
+}
 `;
 
 const typedBadSource = `
@@ -192,7 +218,23 @@ export function forwardCrossFileUrl(
   const combined = combineRemoteUrl(first, second);
   return \`\${prefix}:\${combined}:\${suffix}\`;
 }
+
+export function joinPath(root: string, leaf?: string) {
+  return leaf === undefined ? root : root + "/" + leaf;
+}
+
+export const assetPaths = [joinPath("/a", "b"), joinPath("/c", "d")];
+
+function StatusBadge({ label, tone }: { label: string; tone?: "info" | "warn" }) {
+  return <span>{label}{tone}</span>;
+}
+
+export function StatusBadges() {
+  return <div><StatusBadge label="ready" /><StatusBadge label="idle" /></div>;
+}
 `;
+
+const typedOnlyRule = "optional-input-earns-optionality";
 
 const typedBadDiagnostics = [
   {
@@ -289,6 +331,16 @@ const typedBadDiagnostics = [
     ruleId: "antidrift/no-pass-through-parameters",
     message:
       "Parameter 'first' is only forwarded unchanged to 'combineRemoteUrl'. Resolve it at the leaf or pass a narrower domain object.",
+  },
+  {
+    ruleId: "antidrift/optional-input-earns-optionality",
+    message:
+      "Optional input 'leaf' is passed by all 2 call sites; make it required.",
+  },
+  {
+    ruleId: "antidrift/optional-input-earns-optionality",
+    message:
+      "Optional input 'tone' is never passed by any of its 2 call sites; delete it.",
   },
   {
     ruleId: "antidrift/no-unformatted-number",
@@ -447,6 +499,62 @@ async function verifySelfTypedRules(repoRoot) {
   );
 }
 
+function oxlintRuleCodes(workDir, repoRoot, file) {
+  const oxlintConfigFile = join(workDir, "oxlint.untyped.json");
+  writeFileSync(
+    oxlintConfigFile,
+    JSON.stringify(
+      createOxlintConfig({
+        pluginSpecifier: resolve(repoRoot, "src/oxlint-plugin/index.js"),
+      })
+    ),
+    "utf8"
+  );
+  let oxlintOut = "";
+  try {
+    oxlintOut = execFileSync(
+      resolve(repoRoot, "node_modules/.bin/oxlint"),
+      ["-c", oxlintConfigFile, "--format", "json", file],
+      { encoding: "utf8" }
+    );
+  } catch (error) {
+    oxlintOut = String(error.stdout ?? "");
+  }
+  return (JSON.parse(oxlintOut).diagnostics ?? []).map(
+    (diagnostic) => diagnostic.code
+  );
+}
+
+async function assertUntypedHostsAbstain({ workDir, repoRoot, typedBadFile }) {
+  const oxlintCodes = oxlintRuleCodes(workDir, repoRoot, typedBadFile);
+  assert.ok(
+    oxlintCodes.length > 0 &&
+      !oxlintCodes.includes(`antidrift(${typedOnlyRule})`),
+    `Expected Oxlint to lint typed-bad.tsx and abstain from ${typedOnlyRule}, got: ${oxlintCodes.join(", ")}`
+  );
+  const untyped = new ESLint({
+    cwd: workDir,
+    overrideConfigFile: true,
+    overrideConfig: [
+      {
+        files: ["**/*.{ts,tsx}"],
+        languageOptions: {
+          parser: tsParser,
+          parserOptions: { ecmaFeatures: { jsx: true } },
+        },
+      },
+      createEslintConfig({ files: ["**/*.{ts,tsx}"] }),
+    ],
+  });
+  const [untypedBad] = await untyped.lintFiles([typedBadFile]);
+  const untypedRuleIds = untypedBad.messages.map((message) => message.ruleId);
+  assert.ok(
+    untypedRuleIds.length > 0 &&
+      !untypedRuleIds.includes(`antidrift/${typedOnlyRule}`),
+    `Expected untyped ESLint to lint typed-bad.tsx and abstain from ${typedOnlyRule}, got: ${untypedRuleIds.join(", ")}`
+  );
+}
+
 export async function runTypedEslintSmoke({
   workDir,
   repoRoot,
@@ -456,6 +564,7 @@ export async function runTypedEslintSmoke({
   expectedDiagnostics,
 }) {
   const { typedGoodFile, typedBadFile } = writeTypedProject(workDir, repoRoot);
+  writeModuleFlowProject(workDir);
   const eslint = createTypedEslint(workDir);
   const [typedGood, typedBad, parityGood, parityBad] = await eslint.lintFiles([
     typedGoodFile,
@@ -471,6 +580,8 @@ export async function runTypedEslintSmoke({
   assertReported(typedBad.messages, typedBadDiagnostics, "typed ESLint");
   assertParityRules(parityGood, parityBad, expectedRules);
   assertReported(parityBad.messages, expectedDiagnostics, "typed ESLint");
+  await assertUntypedHostsAbstain({ workDir, repoRoot, typedBadFile });
+  await assertModuleFlowCompleteness(workDir, eslint);
   await verifyProgramEditInvalidation(workDir, typedBadFile);
   await verifySelfTypedRules(repoRoot);
 }

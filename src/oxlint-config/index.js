@@ -52,6 +52,7 @@ export const typedRuleNames = Object.freeze([
   "no-unformatted-number",
   "no-unresolved-dependency-types",
   "no-wrapping-functions",
+  "optional-input-earns-optionality",
   "react-max-component-props",
   "unknown-input-must-be-decoded",
 ]);

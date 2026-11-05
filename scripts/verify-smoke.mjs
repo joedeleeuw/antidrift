@@ -31,7 +31,7 @@ import {
 import { runTypedEslintSmoke } from "./typed-eslint-smoke.mjs";
 
 const repoRoot = resolve(import.meta.dirname, "..");
-const expectedRuleCount = 82;
+const expectedRuleCount = 83;
 
 assert.equal(antidriftPlugin.meta.name, "antidrift");
 const ruleNames = Object.keys(rules);
@@ -41,8 +41,8 @@ assert.equal(
   `Expected ${expectedRuleCount} rules, got ${ruleNames.length}`
 );
 assert.equal(Object.keys(recommendedRules).length, expectedRuleCount);
-assert.equal(typedRuleNames.length, 20);
-assert.equal(Object.keys(typedRules).length, 20);
+assert.equal(typedRuleNames.length, 21);
+assert.equal(Object.keys(typedRules).length, 21);
 assert.equal(Object.keys(astOnlyRules).length, 62);
 assert.equal(
   Object.keys(typedRules).length + Object.keys(astOnlyRules).length,

@@ -29,7 +29,7 @@ export default defineConfig({
 
 ## Two-Host Setup (Oxlint + Typed ESLint)
 
-To run the 62 AST-only rules in Oxlint and the 20 TypeChecker-enhanced rules in Typed ESLint without duplicate diagnostics:
+To run the 62 AST-only rules in Oxlint and the 21 TypeChecker-enhanced rules in Typed ESLint without duplicate diagnostics:
 
 ```ts
 // oxlint.config.mts
@@ -71,6 +71,8 @@ export default [
 ### Progressive type information
 
 Every rule runs on syntax and scope alone. When the ESLint parser also exposes `parserServices.program` (typescript-eslint with `projectService: true` or `project`), the schema rules additionally resolve runtime-schema provenance through the TypeChecker: a receiver whose type or symbol is declared by a runtime-schema package (`zod`, `valibot`, `effect/Schema`, ...) is proven even when the schema is imported from project code, and a receiver the checker cannot trace to such a package is treated as a plain value instead of falling back to name heuristics. `no-unformatted-number` likewise skips JSX expressions whose resolved type is a string.
+
+`optional-input-earns-optionality` is the one rule that needs the program: it resolves every call site of a component or exported function through the TypeChecker and reports an optional prop or parameter that no caller passes (delete it) or that every caller passes (make it required). A verdict requires a provably complete call-site set, so it abstains on spread props or arguments; references that escape a direct call or JSX element; default exports and `as default` re-exports; symbols reachable from a `package.json` entry (`exports`, `main`, `types`, mapped back through `rootDir`/`outDir` or a declaration entry), and every export of a package whose entries cannot be mapped to program source; modules whose namespace escapes (`export * as`, `import * as` used as a value or with a dynamic key, `import()`/`require()` results not immediately member-accessed); a nonliteral argument that does not prove supply through a required property; methods of subclassed classes or ones reachable through another assignable receiver type; props types shared outside the parameter; and declarations with no call site. Full coverage comes from typed ESLint (`projectService: true` or `project`); in Oxlint and untyped ESLint it reports nothing. Call sites in files outside the linted file's TypeScript program are not seen, so declarations reachable from another program must be exported through a package entry.
 
 ## Development
 
