@@ -162,7 +162,9 @@ function isBagReference(typeNode, sourceCode) {
   const files = sourceCode
     ? resolvedDeclarationFiles(typeNode, sourceCode)
     : [];
-  return files.every((file) => !file.includes("node_modules"));
+  return (
+    files.length > 0 && files.every((file) => !file.includes("node_modules"))
+  );
 }
 
 function shouldCollectAnnotatedNames(parameter, annotation, localDeclaration) {

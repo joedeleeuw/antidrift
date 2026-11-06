@@ -10,8 +10,7 @@ const UNLOADED_SEAM_IMPL_RE =
 
 export function contentSignature(text) {
   let hash = 2_166_136_261;
-  const step = Math.max(1, Math.floor(text.length / 512));
-  for (let idx = 0; idx < text.length; idx += step) {
+  for (let idx = 0; idx < text.length; idx += 1) {
     hash ^= text.charCodeAt(idx);
     hash = Math.imul(hash, 16_777_619);
   }

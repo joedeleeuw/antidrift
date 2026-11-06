@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+
 import { getTypeServices } from "./type-services.js";
 import { isTestFile } from "./scope.js";
 import {
@@ -728,10 +730,12 @@ function syncProgramIntoWorkspace(program, checker, workspaceState) {
     ORIGIN_PRIORITY.package
   );
   const sourceFiles = program.getSourceFiles?.() ?? [];
+  const activeSourceFiles = new Set();
   for (const sourceFile of sourceFiles) {
     const origin = classifySourceFileOrigin(program, sourceFile);
     if (!origin) continue;
     const fileName = sourceFile.fileName.replaceAll("\\", "/");
+    activeSourceFiles.add(fileName);
     const signature = contentSignature(sourceFile.text ?? "");
     const existing = workspaceState.fileSnapshots.get(fileName);
     if (existing && existing.signature === signature && !existing.astOnly) {
@@ -740,6 +744,16 @@ function syncProgramIntoWorkspace(program, checker, workspaceState) {
     const snapshot = buildSourceFileSnapshot(sourceFile, origin, checker);
     workspaceState.fileSnapshots.set(fileName, snapshot);
     changed = true;
+  }
+  for (const [fileName, snapshot] of workspaceState.fileSnapshots) {
+    if (
+      !snapshot.astOnly &&
+      !activeSourceFiles.has(fileName) &&
+      !existsSync(fileName)
+    ) {
+      workspaceState.fileSnapshots.delete(fileName);
+      changed = true;
+    }
   }
   if (changed || !workspaceState.mergedIndex) {
     workspaceState.version += 1;

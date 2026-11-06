@@ -93,16 +93,26 @@ function moduleExports(tsSourceFile, checker) {
 
 function jsxSite(element) {
   const supplied = new Set();
+  const attributeValues = new Map();
   for (const attribute of element.attributes.properties) {
     if (!attribute.name) return null;
-    supplied.add(attribute.name.getText());
+    const name = attribute.name.getText();
+    supplied.add(name);
+    attributeValues.set(name, attribute.initializer?.expression ?? null);
   }
   const children =
     element.parent?.openingElement === element ? element.parent.children : [];
   if (children.some((child) => !child.containsOnlyTriviaWhiteSpaces)) {
     supplied.add("children");
   }
-  return { jsx: true, supplied, argumentCount: 0, objectArgument: null };
+  return {
+    jsx: true,
+    supplied,
+    attributeValues,
+    callArguments: [],
+    argumentCount: 0,
+    objectArgument: null,
+  };
 }
 
 function invocationSite(call) {
@@ -122,6 +132,7 @@ function invocationSite(call) {
   return {
     jsx: false,
     supplied,
+    callArguments: args,
     argumentCount: args.length,
     objectArgument: first ?? null,
   };
@@ -165,8 +176,24 @@ function suppliedByType(argument, name, checker) {
     : undefined;
 }
 
+function suppliedExpression(expression, checker) {
+  if (!expression) return true;
+  const type = checker.getTypeAtLocation(expression);
+  return (type.flags & TYPE_FLAG_ANY_OR_UNKNOWN) !== 0 ||
+    (type.isUnion() &&
+      type.types.some(
+        (constituent) => constituent.intrinsicName === "undefined"
+      ))
+    ? undefined
+    : true;
+}
+
 function memberSupplied(site, name, checker) {
-  if (site.supplied) return site.supplied.has(name);
+  if (site.supplied) {
+    return site.supplied.has(name) && site.jsx
+      ? suppliedExpression(site.attributeValues.get(name), checker)
+      : site.supplied.has(name);
+  }
   return site.objectArgument
     ? suppliedByType(site.objectArgument, name, checker)
     : false;
@@ -223,6 +250,7 @@ function memberInputs(parameter, services) {
 }
 
 function optionalInputs(tsFunction, wrapped, services) {
+  const { checker } = services;
   const callableParameters = tsFunction.parameters.filter(
     (parameter) => parameter.name.getText() !== "this"
   );
@@ -236,8 +264,12 @@ function optionalInputs(tsFunction, wrapped, services) {
           ? parameter.name.text
           : `parameter ${position + 1}`,
       node: parameter,
-      supplied: (site) =>
-        site.jsx ? undefined : site.argumentCount > position,
+      supplied: (site) => {
+        if (site.jsx) return undefined;
+        return site.argumentCount > position
+          ? suppliedExpression(site.callArguments[position], checker)
+          : false;
+      },
     });
   }
   const objectParameter =

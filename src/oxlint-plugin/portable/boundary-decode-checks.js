@@ -14,6 +14,7 @@ import {
   closedStringLiteralUnionValues,
   hasTypeChecker,
   isBroadResolvedType,
+  isErrorResolvedType,
   resolvedPropertyShape,
   resolvedTypeTexts,
 } from "../shared/type-services.js";
@@ -400,7 +401,12 @@ function isSyntacticBroadExpression(expression, sourceCode) {
 }
 
 function isBroadTargetCast(expression, target, sourceCode) {
-  if (!hasTypeChecker(sourceCode)) return false;
+  if (
+    !hasTypeChecker(sourceCode) ||
+    isErrorResolvedType(expression, sourceCode)
+  ) {
+    return false;
+  }
   const targetShape = resolvedPropertyShape(target, sourceCode);
   return (
     Boolean(targetShape && targetShape.all.length > 0) &&

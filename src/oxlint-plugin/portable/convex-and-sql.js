@@ -180,17 +180,30 @@ function queryFnReturnsConcreteType(options, sourceCode) {
   return fnReturnsConcreteType(queryFn?.value, sourceCode);
 }
 
-function hasTypedDescriptorArg(arg, sourceCode) {
+function mutationRegistrationSuppliesType(node, options, sourceCode) {
+  const mutationFn = options?.properties?.find(
+    (property) => staticPropertyKey(property) === "mutationFn"
+  );
   if (
-    !arg ||
-    arg.type === "Literal" ||
-    arg.type === "ArrayExpression" ||
-    arg.type === "ObjectExpression"
+    options?.type !== "ObjectExpression" ||
+    !fnReturnsConcreteType(mutationFn?.value, sourceCode)
   ) {
     return false;
   }
-  const resolved = getResolvedType(arg, sourceCode);
-  return Boolean(resolved && !isBroadResolvedType(arg, sourceCode));
+  const typeArgs = node.typeArguments ?? node.typeParameters;
+  if (typeArgs.params.length < 3) return true;
+  const expression = unwrapExpression(mutationFn.value);
+  const declaration =
+    expression?.type === "Identifier"
+      ? findVariable(sourceCode, expression)?.defs?.[0]?.node
+      : expression;
+  const mutationFunction =
+    declaration?.type === "VariableDeclarator"
+      ? unwrapExpression(declaration.init)
+      : declaration;
+  return (mutationFunction?.params ?? []).every(
+    (parameter) => parameter.typeAnnotation
+  );
 }
 
 function isTrpcRoot(identifier, sourceCode) {
@@ -216,6 +229,11 @@ function ownedApiCallee(node, importedHooks, sourceCode) {
         ? callee.name
         : null;
     }
+    if (importedName === "useMutation") {
+      return mutationRegistrationSuppliesType(node, options, sourceCode)
+        ? callee.name
+        : null;
+    }
     const inlineQuery =
       INFERRED_QUERY_HOOK.test(importedName) &&
       options?.type === "ObjectExpression";
@@ -226,8 +244,7 @@ function ownedApiCallee(node, importedHooks, sourceCode) {
   if (
     callee?.type === "Identifier" &&
     OWNED_HOOK.test(callee.name) &&
-    (queryFnReturnsConcreteType(options, sourceCode) ||
-      hasTypedDescriptorArg(options, sourceCode))
+    queryFnReturnsConcreteType(options, sourceCode)
   ) {
     return callee.name;
   }

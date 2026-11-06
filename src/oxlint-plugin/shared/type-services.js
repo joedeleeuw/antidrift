@@ -1,5 +1,6 @@
 const typeCheckerBySourceCode = new WeakMap();
 
+const SYMBOL_FLAG_ALIAS = 2_097_152;
 const SYMBOL_FLAG_OPTIONAL = 16_777_216;
 const TYPE_FLAG_ANY = 1;
 const TYPE_FLAG_UNKNOWN = 2;
@@ -40,6 +41,10 @@ export function getResolvedType(node, sourceCode) {
   return services.checker.getTypeAtLocation(tsNode);
 }
 
+export function isErrorResolvedType(node, sourceCode) {
+  return getResolvedType(node, sourceCode)?.intrinsicName === "error";
+}
+
 function typeConstituents(type) {
   return type?.isUnion?.() ? (type.types ?? [type]) : [type];
 }
@@ -57,6 +62,38 @@ function namedSymbol(symbol) {
   return symbol && !symbol.name.startsWith("__") ? symbol : null;
 }
 
+function resolveAliasSymbol(symbol, checker) {
+  const named = namedSymbol(symbol);
+  if (
+    !named ||
+    (named.flags & SYMBOL_FLAG_ALIAS) === 0 ||
+    typeof checker.getAliasedSymbol !== "function"
+  ) {
+    return named;
+  }
+  try {
+    const resolved = checker.getAliasedSymbol(named);
+    return resolved && resolved !== named && resolved.name !== "unknown"
+      ? namedSymbol(resolved)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function isImportSyntaxDeclaration(declaration) {
+  for (let current = declaration; current; current = current.parent) {
+    if (
+      current.moduleSpecifier ||
+      current.moduleReference ||
+      current.importClause
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function resolvedDeclarationFiles(node, sourceCode) {
   const services = getTypeServices(sourceCode);
   const tsNode = node ? services?.nodeMap.get(node) : null;
@@ -68,12 +105,14 @@ export function resolvedDeclarationFiles(node, sourceCode) {
     namedSymbol(constituent?.getSymbol?.()),
   ]);
   symbols.push(namedSymbol(checker.getSymbolAtLocation(tsNode)));
-  return symbols.flatMap((symbol) =>
-    (symbol?.declarations ?? []).flatMap((declaration) => {
+  return symbols.flatMap((symbol) => {
+    const resolved = resolveAliasSymbol(symbol, checker);
+    return (resolved?.declarations ?? []).flatMap((declaration) => {
+      if (isImportSyntaxDeclaration(declaration)) return [];
       const fileName = declaration.getSourceFile?.()?.fileName;
       return typeof fileName === "string" ? [fileName] : [];
-    })
-  );
+    });
+  });
 }
 
 function isFirstPartyPropertySymbol(prop, program) {
@@ -87,6 +126,14 @@ function isFirstPartyPropertySymbol(prop, program) {
       !fileName.includes("/node_modules/") &&
       !program.isSourceFileDefaultLibrary?.(sf)
     );
+  });
+}
+
+function isStructuralPropertySymbol(prop, program, ownedOnly) {
+  if (ownedOnly) return isFirstPartyPropertySymbol(prop, program);
+  return (prop?.declarations ?? []).some((declaration) => {
+    const sourceFile = declaration.getSourceFile?.();
+    return sourceFile && !program.isSourceFileDefaultLibrary?.(sourceFile);
   });
 }
 
@@ -112,15 +159,19 @@ export function firstPartyContract(type, services) {
     type,
     symbol,
     name: symbol.name,
-    properties: services.checker.getPropertiesOfType(type),
+    properties: services.checker
+      .getPropertiesOfType(type)
+      .filter((property) =>
+        isFirstPartyPropertySymbol(property, services.program)
+      ),
   };
 }
 
 export function propertyType(property, services) {
-  return services.checker.getTypeOfSymbolAtLocation(
-    property,
-    property.declarations[0]
-  );
+  const declaration = property.declarations?.[0];
+  return declaration
+    ? services.checker.getTypeOfSymbolAtLocation(property, declaration)
+    : null;
 }
 
 export function isEntityIdentityKey(key) {
@@ -137,6 +188,8 @@ export function shareEntityIdentity(left, right, services) {
     const leftType = propertyType(property, services);
     const rightType = propertyType(peer, services);
     return (
+      leftType &&
+      rightType &&
       services.checker.isTypeAssignableTo(leftType, rightType) &&
       services.checker.isTypeAssignableTo(rightType, leftType)
     );
@@ -158,15 +211,31 @@ export function resolvedOwnedPropertyNames(node, sourceCode) {
     .map((prop) => prop.name);
 }
 
-export function resolvedPropertyShape(node, sourceCode) {
+export function resolvedPropertyShape(node, sourceCode, options = {}) {
   const services = getTypeServices(sourceCode);
   const type = getResolvedType(node, sourceCode);
-  if (!type || !services) return null;
+  if (
+    !type ||
+    !services ||
+    type.intrinsicName === "error" ||
+    (type.flags & (TYPE_FLAG_ANY | TYPE_FLAG_UNKNOWN)) !== 0 ||
+    type.isUnion?.() ||
+    !type.objectFlags
+  ) {
+    return null;
+  }
+  const { ownedOnly = false } = options;
   const properties = services.checker.getPropertiesOfType(type) ?? [];
   const all = [];
   const required = [];
   for (const prop of properties) {
-    if (typeof prop?.name !== "string" || prop.name.startsWith("__")) continue;
+    if (
+      typeof prop?.name !== "string" ||
+      prop.name.startsWith("__") ||
+      !isStructuralPropertySymbol(prop, services.program, ownedOnly)
+    ) {
+      continue;
+    }
     all.push(prop.name);
     if (!isOptionalProperty(prop)) {
       required.push(prop.name);

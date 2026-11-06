@@ -664,7 +664,7 @@ function baseFieldIsStrict(baseMembers, baseShape, fieldName) {
   }
   return baseShape && baseShape.all.length > 0
     ? baseShape.required.includes(fieldName)
-    : true;
+    : false;
 }
 
 function isOmitTypeRename(baseMembers, omittedKeys, addedMembers, sourceCode) {

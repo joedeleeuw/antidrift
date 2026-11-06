@@ -271,8 +271,8 @@ function targetContract(target, typeFields, sourceCode) {
   ) {
     return null;
   }
-  const shape = resolvedPropertyShape(target, sourceCode);
-  return shape
+  const shape = resolvedPropertyShape(target, sourceCode, { ownedOnly: true });
+  return shape && shape.required.length > 0
     ? { name: sourceCode.getText(target), required: shape.required }
     : null;
 }
