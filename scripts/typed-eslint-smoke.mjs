@@ -97,6 +97,10 @@ export function readUser(raw: unknown) {
   return UserSchema.parse(raw);
 }
 
+export function validatePositivePort(port: number) {
+  return z.number().int().positive().parse(port);
+}
+
 export const serializedUserJsonSchema = JSON.stringify(z.toJSONSchema(UserSchema));
 export const ExtendedUserSchema = UserSchema.extend({ role: z.string().optional() });
 

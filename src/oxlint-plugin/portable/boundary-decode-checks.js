@@ -7,6 +7,7 @@ import {
   constInitializer,
   findVariable,
   isFunctionLike,
+  staticPropertyKey,
   staticPropertyName,
   unwrapAwaitedExpression,
   unwrapExpression,
@@ -562,6 +563,83 @@ export function checkSchemaCatch(node, reportedObjects, context) {
   }
 }
 
+const BASE_ERROR_SCHEMA_KEYS = new Set(["name", "message", "stack", "cause"]);
+
+function isBaseErrorObjectSchema(schemaExpr, sourceCode) {
+  const target =
+    schemaExpr?.type === "Identifier"
+      ? (constInitializer(sourceCode, schemaExpr) ?? schemaExpr)
+      : schemaExpr;
+  const builder = resolveSchemaBuilderCall(target, sourceCode);
+  if (builder?.method !== "object") return false;
+  const shapeArg = unwrapExpression(builder.args[0]);
+  if (
+    shapeArg?.type !== "ObjectExpression" ||
+    shapeArg.properties.length === 0
+  ) {
+    return false;
+  }
+  return shapeArg.properties.every((prop) => {
+    const key = staticPropertyKey(prop);
+    return key !== null && BASE_ERROR_SCHEMA_KEYS.has(key);
+  });
+}
+
+function isNegatedErrorInstanceofTest(testNode, paramName) {
+  if (!testNode) return false;
+  if (testNode.type === "UnaryExpression" && testNode.operator === "!") {
+    const arg = unwrapExpression(testNode.argument);
+    return (
+      arg?.type === "BinaryExpression" &&
+      arg.operator === "instanceof" &&
+      arg.left?.type === "Identifier" &&
+      arg.left.name === paramName &&
+      arg.right?.type === "Identifier" &&
+      arg.right.name === "Error"
+    );
+  }
+  if (testNode.type === "LogicalExpression" && testNode.operator === "||") {
+    return (
+      isNegatedErrorInstanceofTest(testNode.left, paramName) ||
+      isNegatedErrorInstanceofTest(testNode.right, paramName)
+    );
+  }
+  return false;
+}
+
+function statementExitsEarly(stmt) {
+  if (!stmt) return false;
+  if (stmt.type === "ReturnStatement" || stmt.type === "ThrowStatement") {
+    return true;
+  }
+  return (
+    stmt.type === "BlockStatement" &&
+    stmt.body.length > 0 &&
+    statementExitsEarly(stmt.body.at(-1))
+  );
+}
+
+function hasDominatingErrorInstanceofGuard(node, paramName) {
+  for (let cur = node; cur; cur = cur.parent) {
+    if (cur.parent?.type === "BlockStatement") {
+      const statements = cur.parent.body;
+      const idx = statements.indexOf(cur);
+      for (let i = 0; i < idx; i++) {
+        const stmt = statements[i];
+        if (
+          stmt?.type === "IfStatement" &&
+          statementExitsEarly(stmt.consequent) &&
+          isNegatedErrorInstanceofTest(stmt.test, paramName)
+        ) {
+          return true;
+        }
+      }
+    }
+    if (isFunctionLike(cur)) break;
+  }
+  return false;
+}
+
 export function checkCatchClauseSchemaDecode(node, context) {
   const sourceCode = context.sourceCode;
   const callee = unwrapExpression(node.callee);
@@ -577,10 +655,20 @@ export function checkCatchClauseSchemaDecode(node, context) {
     return;
   }
   const binding = findVariable(sourceCode, arg);
-  if (binding?.defs?.[0]?.type === "CatchClause") {
+  const defType = binding?.defs?.[0]?.type;
+  if (defType === "CatchClause") {
     context.report({
       node,
       message: `Do not decode caught exception '${arg.name}' with a boundary schema; narrow with \`instanceof Error\` (and \`'code' in ${arg.name}\`) or handle expected exit statuses at the process boundary.`,
+    });
+  } else if (
+    defType === "Parameter" &&
+    hasDominatingErrorInstanceofGuard(node, arg.name) &&
+    isBaseErrorObjectSchema(callee.object, sourceCode)
+  ) {
+    context.report({
+      node,
+      message: `Do not decode \`instanceof Error\`-narrowed parameter '${arg.name}' with a base Error schema; inspect structured properties on the narrowed instance directly.`,
     });
   }
 }
@@ -708,18 +796,7 @@ const SPLIT_CHAIN_STEPS = new Set([
 ]);
 const NUMERIC_COERCERS = new Set(["Number", "parseInt", "parseFloat"]);
 
-function isLineSplitDelimiter(argNode) {
-  const arg = unwrapExpression(argNode);
-  if (arg?.type === "Literal" && typeof arg.value === "string") {
-    return arg.value === "\n" || arg.value === "\r\n";
-  }
-  if (arg?.type === "Literal" && arg.regex) {
-    return /\\n/u.test(arg.regex.pattern);
-  }
-  return false;
-}
-
-function splitCallKind(expression) {
+function isSplitStringReceiver(expression) {
   let current = unwrapExpression(expression);
   while (
     current?.type === "CallExpression" &&
@@ -728,28 +805,39 @@ function splitCallKind(expression) {
     current.callee.property?.type === "Identifier"
   ) {
     const method = current.callee.property.name;
-    if (method === "split") {
-      return isLineSplitDelimiter(current.arguments?.[0]) ? "line" : "other";
-    }
-    if (!SPLIT_CHAIN_STEPS.has(method)) return null;
+    if (method === "split") return true;
+    if (!SPLIT_CHAIN_STEPS.has(method)) return false;
     current = unwrapExpression(current.callee.object);
   }
-  return null;
+  return false;
 }
 
-function isChainedIntoNumericGuard(mapCallNode, sourceCode) {
+function isTupleDestructuredOrGuarded(mapCallNode, sourceCode) {
+  if (
+    mapCallNode.parent?.type === "VariableDeclarator" &&
+    mapCallNode.parent.id?.type === "ArrayPattern"
+  ) {
+    return true;
+  }
   const parent = mapCallNode.parent;
   if (
-    parent?.type !== "MemberExpression" ||
-    parent.object !== mapCallNode ||
-    !/^(?:filter|every|some)$/u.test(parent.property?.name ?? "") ||
-    parent.parent?.type !== "CallExpression"
+    parent?.type === "MemberExpression" &&
+    parent.object === mapCallNode &&
+    /^(?:filter|every|some)$/u.test(parent.property?.name ?? "") &&
+    parent.parent?.type === "CallExpression"
   ) {
-    return false;
+    const guardArg = parent.parent.arguments?.[0];
+    const text = guardArg ? sourceCode.getText(guardArg) : "";
+    if (/\b(?:isFinite|isInteger|isNaN)\b/u.test(text)) return true;
   }
-  const guardArg = parent.parent.arguments?.[0];
-  const text = guardArg ? sourceCode.getText(guardArg) : "";
-  return /\b(?:isFinite|isInteger|isNaN)\b/u.test(text);
+  for (let cur = mapCallNode.parent; cur; cur = cur.parent) {
+    if (isFunctionLike(cur)) {
+      return /\b(?:isFinite|isInteger|isNaN)\b/u.test(
+        sourceCode.getText(cur.body)
+      );
+    }
+  }
+  return false;
 }
 
 function numericCoercerName(callee) {
@@ -807,12 +895,9 @@ export function checkUncheckedSplitNumericCoercion(node, context) {
     node.callee?.type !== "MemberExpression" ||
     node.callee.computed ||
     node.callee.property?.name !== "map" ||
-    node.arguments.length === 0
+    node.arguments.length === 0 ||
+    !isSplitStringReceiver(node.callee.object)
   ) {
-    return;
-  }
-  const splitKind = splitCallKind(node.callee.object);
-  if (!splitKind || isChainedIntoNumericGuard(node, context.sourceCode)) {
     return;
   }
   const callbackArg = unwrapExpression(node.arguments[0]);
@@ -820,7 +905,10 @@ export function checkUncheckedSplitNumericCoercion(node, context) {
     (callbackArg?.type === "Identifier" && callbackArg.name === "parseInt") ||
     (callbackArg?.type === "MemberExpression" &&
       numericCoercerName(callbackArg) === "Number.parseInt");
-  if (splitKind !== "line" && !isBareParseIntCallback) {
+  if (
+    !isBareParseIntCallback &&
+    isTupleDestructuredOrGuarded(node, context.sourceCode)
+  ) {
     return;
   }
   const coercer = callbackNumericCoercer(node.arguments[0]);

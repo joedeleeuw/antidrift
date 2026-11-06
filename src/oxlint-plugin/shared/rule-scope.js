@@ -89,22 +89,38 @@ export function ruleFilename(context) {
   return (context.filename ?? "").replaceAll("\\", "/");
 }
 
+const baseRuleFileCache = new WeakMap();
+
+function isBaseEligibleFile(filename, sourceCode) {
+  if (sourceCode && typeof sourceCode === "object") {
+    const cached = baseRuleFileCache.get(sourceCode);
+    if (cached !== undefined) return cached;
+    const eligible =
+      !IGNORED_PATH_RE.test(filename) && !hasGeneratedHeader(sourceCode);
+    baseRuleFileCache.set(sourceCode, eligible);
+    return eligible;
+  }
+  return !IGNORED_PATH_RE.test(filename);
+}
+
 export function isRuleFile(context, inferredScope) {
   const [options] = context.options ?? [];
   const filename = ruleFilename(context);
-  if (IGNORED_PATH_RE.test(filename)) return false;
-  if (hasGeneratedHeader(context.sourceCode)) return false;
+  if (!isBaseEligibleFile(filename, context.sourceCode)) return false;
+  const files = scopePatterns(options, "files");
+  const excludeFiles = scopePatterns(options, "excludeFiles");
+  if (files === undefined && !excludeFiles?.length && !inferredScope) {
+    return true;
+  }
   const cwd = context.cwd ?? process.cwd();
   const local = isAbsolute(filename)
     ? relative(cwd, filename).replaceAll("\\", "/")
     : filename;
   const matches = (pattern) =>
     matchesGlob(local, pattern) || matchesGlob(filename, pattern);
-  const files = scopePatterns(options, "files");
-  const excludeFiles = scopePatterns(options, "excludeFiles") ?? [];
   return (
     (files === undefined || files.some(matches)) &&
     (files !== undefined || inferredScope?.(filename) !== false) &&
-    !excludeFiles.some(matches)
+    !(excludeFiles ?? []).some(matches)
   );
 }

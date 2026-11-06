@@ -166,16 +166,17 @@ export const UnvalidatedHoleSchema = z.object({
   widenedUnion: z.union([z.string(), z.unknown()]),
 });
 const LsofExitSchema = z.object({ code: z.literal(1) });
+const BaseFailureSchema = z.object({ name: z.string(), message: z.string(), cause: z.unknown().optional() });
 export function catchWithSchemaDecode(
   run: () => number[],
-  rawStdout: string
+  rawStdout: string,
+  unknownError: unknown
 ): number[] {
+  if (!(unknownError instanceof Error)) return [];
+  if (LsofExitSchema.safeParse(unknownError).success) return [];
+  if (BaseFailureSchema.safeParse(unknownError).success) return [];
   const [hours, minutes] = "08:30".split(":").map(Number);
-  const finiteRows = rawStdout
-    .split(/\\r?\\n/)
-    .map((line) => Number(line))
-    .filter((seconds) => Number.isFinite(seconds));
-  if (hours < 0 || minutes < 0 || finiteRows.length < 0) return [];
+  if (hours < 0 || minutes < 0) return [];
   try {
     return rawStdout
       .split("\\n")
@@ -632,6 +633,11 @@ export const expectedDiagnostics = [
     ruleId: "antidrift/unknown-input-must-be-decoded",
     message:
       "Do not include `z.unknown()` as a branch of `z.union([...])`; an unvalidated branch absorbs every validation failure and widens the union to untyped input.",
+  },
+  {
+    ruleId: "antidrift/unknown-input-must-be-decoded",
+    message:
+      "Do not decode `instanceof Error`-narrowed parameter 'unknownError' with a base Error schema; inspect structured properties on the narrowed instance directly.",
   },
   {
     ruleId: "antidrift/unknown-input-must-be-decoded",

@@ -111,12 +111,15 @@ function matchesSchemaOutputType(ann, arg, parseNode, schemaText, sourceCode) {
       return true;
     }
   }
+  const resolvedArgType = hasTypeChecker(sourceCode)
+    ? getResolvedType(arg, sourceCode)
+    : null;
   return Boolean(
-    hasTypeChecker(sourceCode) &&
+    resolvedArgType !== null &&
+    !resolvedArgType.intrinsicName &&
     hasRuntimeSchemaProvenance(schemaExpr, sourceCode) &&
     !isBroadResolvedType(arg, sourceCode) &&
-    getResolvedType(arg, sourceCode) !== null &&
-    getResolvedType(arg, sourceCode) === getResolvedType(parseNode, sourceCode)
+    resolvedArgType === getResolvedType(parseNode, sourceCode)
   );
 }
 
