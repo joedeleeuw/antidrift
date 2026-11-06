@@ -1,17 +1,19 @@
 import {
-  checkCatchClauseSchemaDecode,
   checkDiscardedDecode,
   checkSchemaCatch,
   checkRepairOnReadTernary,
   checkSerializationRoundtrip,
-  checkUncheckedSplitNumericCoercion,
-  checkUnvalidatedSchemaHole,
   isAliasedRawDeserialize,
   isPassedToDecoder,
   isRawDeserializeCall,
   RAW_DESERIALIZE_CAST_MESSAGE,
   resolveTauriIpcMethod,
 } from "./boundary-decode-checks.js";
+import {
+  checkCatchClauseSchemaDecode,
+  checkUncheckedSplitNumericCoercion,
+  checkUnvalidatedSchemaHole,
+} from "./boundary-schema-hole-checks.js";
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import { resolveSchemaBuilderCall } from "../shared/runtime-schema-libraries.js";
 import {

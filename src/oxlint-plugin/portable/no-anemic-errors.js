@@ -1,5 +1,5 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
-import { isFunctionLike } from "../shared/scope.js";
+import { findVariable, isFunctionLike } from "../shared/scope.js";
 import {
   getCallChain,
   getFunctionStatements,
@@ -132,7 +132,7 @@ function isErrorMemberRead(node, errorName, allowedProperties) {
 
 const CASE_NORMALIZER_METHODS = new Set(["toLowerCase", "toUpperCase", "trim"]);
 
-function isCaughtErrorMessageReceiver(expression, errorName) {
+function caughtErrorMessageIdentifier(expression) {
   let target = unwrapChainExpression(expression);
   if (
     target?.type === "CallExpression" &&
@@ -141,26 +141,37 @@ function isCaughtErrorMessageReceiver(expression, errorName) {
   ) {
     target = unwrapChainExpression(target.callee.object);
   }
-  if (isErrorMemberRead(target, errorName, new Set(["message"]))) return true;
   if (
     target?.type === "CallExpression" &&
     getIdentifierName(target.callee) === "String" &&
     target.arguments.length === 1
   ) {
-    const arg = target.arguments[0];
-    return (
-      getIdentifierName(arg) === errorName ||
-      isErrorMemberRead(arg, errorName, new Set(["message"]))
-    );
+    target = unwrapChainExpression(target.arguments[0]);
+    if (target?.type === "Identifier") return target;
   }
-  return false;
+  return target?.type === "MemberExpression" &&
+    getMemberPropertyName(target) === "message" &&
+    target.object?.type === "Identifier"
+    ? target.object
+    : null;
 }
 
-function isUnshadowedBranchSubstringCheck(node, errorName) {
-  let inBranchCondition = false;
+function catchBindingBoundary(sourceCode, identifier) {
+  const def = findVariable(sourceCode, identifier)?.defs?.[0];
+  if (def?.type === "CatchClause") return def.node;
+  if (
+    def?.type === "Parameter" &&
+    promiseCatchCallbackParamName(def.node) === identifier.name
+  ) {
+    return def.node;
+  }
+  return null;
+}
+
+function isBranchConditionBefore(node, boundary) {
   for (
     let cur = node, parent = cur.parent;
-    parent;
+    parent && cur !== boundary;
     cur = parent, parent = cur.parent
   ) {
     if (
@@ -171,24 +182,10 @@ function isUnshadowedBranchSubstringCheck(node, errorName) {
         parent.type === "SwitchCase") &&
       parent.test === cur
     ) {
-      inBranchCondition = true;
-    } else if (parent.type === "ReturnStatement" && parent.argument === cur) {
-      inBranchCondition = true;
+      return true;
     }
-    if (parent.type === "CatchClause") {
-      return inBranchCondition;
-    }
-    if (isFunctionLike(parent)) {
-      if (promiseCatchCallbackParamName(parent) === errorName) {
-        return inBranchCondition;
-      }
-      if (
-        getNodeArray(parent, "params").some(
-          (formal) => getIdentifierName(formal) === errorName
-        )
-      ) {
-        return false;
-      }
+    if (parent.type === "ReturnStatement" && parent.argument === cur) {
+      return true;
     }
   }
   return false;
@@ -456,23 +453,23 @@ class ErrorDiagnostics {
       });
       return;
     }
-    const errorName = this.catchParamStack.at(-1);
     const callee = unwrapChainExpression(node.callee);
     const substring =
-      errorName &&
       getMemberPropertyName(callee) === "includes" &&
       node.arguments.length === 1
         ? getLiteralString(node.arguments[0])
         : null;
-    if (
-      substring &&
-      isCaughtErrorMessageReceiver(callee.object, errorName) &&
-      isUnshadowedBranchSubstringCheck(node, errorName)
-    ) {
+    const errorIdent = substring
+      ? caughtErrorMessageIdentifier(callee.object)
+      : null;
+    const boundary = errorIdent
+      ? catchBindingBoundary(this.context.sourceCode, errorIdent)
+      : null;
+    if (boundary && isBranchConditionBefore(node, boundary)) {
       this.context.report({
         node,
         messageId: "catchErrorMessageSubstring",
-        data: { name: errorName, substring },
+        data: { name: errorIdent.name, substring },
       });
     }
   };
