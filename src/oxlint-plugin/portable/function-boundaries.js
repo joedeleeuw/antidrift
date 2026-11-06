@@ -156,6 +156,7 @@ function reportWrapperCandidate(context, cand, exportedNames) {
     context.report({ node: cand.node, messageId: "wrapper", data: hop });
     return;
   }
+  if (cand.externalParamWrapper) return;
   const programIndex = getProgramIndex(context.sourceCode);
   if (!programIndex) return;
   const services = getTypeServices(context.sourceCode);

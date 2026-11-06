@@ -28,6 +28,24 @@ const hasArrayTypeAnnotation = (identifier) => {
         annotation.typeName.name === "ReadonlyArray"))
   );
 };
+const isArrayInitializer = (node) => {
+  const unwrapped = unwrapExpression(node);
+  if (!unwrapped || typeof unwrapped.type !== "string") return false;
+  if (unwrapped.type === "ArrayExpression") return true;
+  if (
+    unwrapped.type === "LogicalExpression" &&
+    (unwrapped.operator === "??" || unwrapped.operator === "||")
+  ) {
+    return isArrayInitializer(unwrapped.right);
+  }
+  if (unwrapped.type === "ConditionalExpression") {
+    return (
+      isArrayInitializer(unwrapped.consequent) ||
+      isArrayInitializer(unwrapped.alternate)
+    );
+  }
+  return false;
+};
 const isLeakySpread = (element, sourceCode) => {
   if (!element || element.type !== "SpreadElement") {
     return false;
@@ -40,7 +58,7 @@ const isLeakySpread = (element, sourceCode) => {
       (definition?.name?.parent?.type === "RestElement" &&
         definition.name.parent.parent?.type === "ArrayPattern") ||
       hasArrayTypeAnnotation(definition?.name ?? {}) ||
-      unwrapExpression(definition?.node?.init)?.type === "ArrayExpression"
+      isArrayInitializer(definition?.node?.init)
     ) {
       return false;
     }

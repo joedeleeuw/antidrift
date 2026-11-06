@@ -407,8 +407,7 @@ declare function createMdxComponents(
   components: Record<string, unknown>
 ): Record<string, unknown>;
 export function useMDXComponents(components: Record<string, unknown>) {
-  const mapped = createMdxComponents(components);
-  return Object.assign(mapped, components);
+  return createMdxComponents(components);
 }
 
 declare function useSnapshotStore<T>(selector: (state: T) => T): T;
@@ -435,9 +434,10 @@ declare function useSWR(key: unknown[]): void;
 export const widgetKeys = {
   all: (queryKeyExtra: unknown[]) => ["widgets", ...queryKeyExtra],
 };
-export function usePagedWidgets(keys: { invalidationKey: unknown[] }) {
+export function usePagedWidgets(keys: { invalidationKey: unknown[]; recomputeQueryKey?: unknown[] }) {
   const [stablePrefix, ...rest] = keys.invalidationKey;
-  useSWR([stablePrefix + "-inf", ...rest]);
+  const queryKeyExtra = keys.recomputeQueryKey ?? [];
+  useSWR([stablePrefix + "-inf", ...rest, ...queryKeyExtra]);
 }
 
 const terminatedPrefixes = ["/dev/", "/proc/"];

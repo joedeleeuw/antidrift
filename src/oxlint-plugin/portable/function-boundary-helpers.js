@@ -202,15 +202,15 @@ export function wrapperCandidate(node, sourceCode) {
   }
   const callee = forwardableCallee(node, call, binding, sourceCode);
   if (!callee) return null;
-  const isFirstPartyParamWrapper =
+  const externalParamWrapper =
     node.params.length > 0 &&
     callee.type === "Identifier" &&
-    isLocalFunctionBinding(callee, sourceCode);
+    !isLocalFunctionBinding(callee, sourceCode);
   return {
     node: node.id ?? node,
     ...binding,
     callee: sourceCode.getText(callee),
-    isFirstPartyParamWrapper,
+    externalParamWrapper,
   };
 }
 
