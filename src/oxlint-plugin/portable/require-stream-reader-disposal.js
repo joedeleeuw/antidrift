@@ -704,8 +704,22 @@ class ReaderDisposalAnalysis {
     });
   };
 
+  directlyPassedAsArgument = (node) => {
+    const expression = unwrapReaderExpression(node);
+    const parent = expression?.parent;
+    return (
+      (parent?.type === "CallExpression" || parent?.type === "NewExpression") &&
+      parent.arguments.includes(expression)
+    );
+  };
+
   acquisitionProblem = (acquisition) => {
-    if (this.directlyReturned(acquisition.node)) return null;
+    if (
+      this.directlyReturned(acquisition.node) ||
+      this.directlyPassedAsArgument(acquisition.node)
+    ) {
+      return null;
+    }
     const binding = acquisition.binding;
     if (
       binding !== null &&

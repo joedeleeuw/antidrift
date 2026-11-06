@@ -27,7 +27,9 @@ export default {
       if (!owner || typeof source !== "string" || !source.startsWith(".")) {
         return;
       }
-      const destination = packageOwner(resolve(dirname(filename), source));
+      const destination = packageOwner(
+        resolve(dirname(filename), source, "__package_probe__.js")
+      );
       if (
         destination &&
         destination.directory !== owner.directory &&

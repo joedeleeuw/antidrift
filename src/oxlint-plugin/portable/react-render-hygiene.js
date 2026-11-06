@@ -82,6 +82,7 @@ export const noHooklessUseFunctionRule = {
       const frame = stack.pop();
       const hookless =
         HOOK_NAME.test(frame?.name ?? "") &&
+        frame.name !== "useMDXComponents" &&
         !frame.calledHook &&
         !isPlatformHookStub(frame.node);
       if (!hookless) return;

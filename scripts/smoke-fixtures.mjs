@@ -138,6 +138,46 @@ import { useState, useSyncExternalStore } from "react";
 import { TouchableOpacity } from "react-native";
 import { Text as WidgetText } from "@expo/ui/swift-ui";
 import { z } from "zod";
+import undeclaredPackage from "undeclared-real-package";
+import nodePath from "node:path";
+
+export const undeclaredValue = undeclaredPackage;
+/* TODO(ABC-123): tracked work. TODO: untracked work. */
+// FIXME: AI-generated debt without a ticket.
+window.open("/admin", "_blank");
+
+export function acquireUnusedReader(stream: ReadableStream<Uint8Array>) {
+  stream.getReader();
+}
+
+declare function useSnapshotStore<T>(selector: (state: T) => T): T;
+export const freshStore = useSnapshotStore((state: { isMobile: boolean }) => ({
+  isMobile: state.isMobile,
+}));
+
+export function renderOptions(options: { title: string }) {
+  options.title = "changed";
+}
+
+declare const queryClient: {
+  invalidateQueries: (options: { queryKey: unknown[] }) => void;
+};
+declare function useSWR(key: unknown[]): void;
+export function invalidatePages(keys: { invalidationKey: unknown[] }) {
+  const [stablePrefix, ...rest] = keys.invalidationKey;
+  queryClient.invalidateQueries({ queryKey: [stablePrefix + "-inf", ...rest] });
+}
+export function spreadFilters(filters: { status: string }) {
+  useSWR(["widgets", ...filters]);
+}
+
+const barePrefixes = ["/dev"];
+export function hasBareVirtualPrefix(path: string) {
+  const normalized = nodePath.posix.normalize(path);
+  return barePrefixes.some((prefix) => normalized.startsWith(prefix));
+}
+
+export const badColor = <div style={{ color: "#666" }} />;
 
 declare const process: { env: { NODE_ENV: string } };
 declare function makeMutable(initial: number): { current: number };
@@ -338,9 +378,77 @@ export function DrillBanner({ title, active }: { title: string; active: boolean 
 
 export const goodSource = `
 ${mergedShapeGoodSource}
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Text } from "@expo/ui/swift-ui";
 import { z } from "zod";
+import nodePath from "node:path";
+
+/** Synthetic part for a folded run of todo snapshots. */
+// Errors are swallowed; a later cursor retries.
+// TODO(ABC-123): tracked work.
+// TODO: ABC-123 is also tracked.
+const emptyTab = window.open("", "_blank");
+const aboutTab = window.open("about:blank", "_blank");
+emptyTab.location.href = "/admin";
+aboutTab.document.title = "Admin";
+window.open("/admin", "_blank", "noreferrer");
+window.open("/same-tab", "_self");
+
+declare function parseNDJSON(
+  reader: ReadableStreamDefaultReader<Uint8Array>
+): AsyncIterable<unknown>;
+export async function consumeTransferredReader(combined: ReadableStream<Uint8Array>) {
+  for await (const chunk of parseNDJSON(combined.getReader())) {
+    console.log(chunk);
+  }
+}
+
+declare function createMdxComponents(
+  components: Record<string, unknown>
+): Record<string, unknown>;
+export function useMDXComponents(components: Record<string, unknown>) {
+  const mapped = createMdxComponents(components);
+  return Object.assign(mapped, components);
+}
+
+declare function useSnapshotStore<T>(selector: (state: T) => T): T;
+export const mobileStore = useSnapshotStore(() => ({ isMobile: false }));
+
+export function resizeRef(ref: React.MutableRefObject<HTMLDivElement | null>) {
+  ref.current = document.createElement("div");
+}
+export function replaySequence(lastSeq: { current: number }) {
+  lastSeq.current = 2;
+}
+
+export function TokenInput({ token }: { token: { text: string } }) {
+  const [text, setText] = useState(token.text);
+  const [previousText, setPreviousText] = useState(text);
+  if (token.text !== previousText) {
+    setPreviousText(token.text);
+    setText(token.text);
+  }
+  return <Text>{text}</Text>;
+}
+
+declare function useSWR(key: unknown[]): void;
+export const widgetKeys = {
+  all: (queryKeyExtra: unknown[]) => ["widgets", ...queryKeyExtra],
+};
+export function usePagedWidgets(keys: { invalidationKey: unknown[] }) {
+  const [stablePrefix, ...rest] = keys.invalidationKey;
+  useSWR([stablePrefix + "-inf", ...rest]);
+}
+
+const terminatedPrefixes = ["/dev/", "/proc/"];
+export function hasVirtualPrefix(path: string) {
+  const normalized = nodePath.posix.normalize(path);
+  return terminatedPrefixes.some((prefix) => normalized.startsWith(prefix));
+}
+
+export const gradientStop = (
+  <stop style={{ stopColor: "#DA6B9D", "--trees-bg-override": "#0d0d0d" }} />
+);
 
 export interface OrderSummary {
   readonly orderId: string;
@@ -470,6 +578,14 @@ export const expectedRules = [
   "antidrift/no-contract-appeasement-projection",
   "antidrift/unknown-input-must-be-decoded",
   "antidrift/no-query-join-or-tree-reshape",
+  "antidrift/no-unlisted-external-imports",
+  "antidrift/no-todo-without-issue",
+  "antidrift/require-safe-window-open",
+  "antidrift/require-stream-reader-disposal",
+  "antidrift/no-argument-mutation-side-effect",
+  "antidrift/require-query-key-factory",
+  "antidrift/no-path-prefix-containment",
+  "antidrift/no-inline-style-colors",
 ];
 
 export const expectedDiagnostics = [
@@ -648,5 +764,71 @@ export const expectedDiagnostics = [
     ruleId: "antidrift/no-anemic-errors",
     message:
       "Catch block branches on 'caughtErr' message substring 'ENOENT'; match a typed error class (`instanceof`), structured `.code` field, or domain variant instead of substring probing.",
+  },
+  {
+    ruleId: "antidrift/no-unlisted-external-imports",
+    message:
+      "Declare 'undeclared-real-package' in the importing package's package.json; that package owns its dependency contract.",
+    count: 1,
+  },
+  {
+    ruleId: "antidrift/no-todo-without-issue",
+    message:
+      "TODO comment must include a tracked issue reference (e.g. TODO(ABC-123)).",
+    count: 1,
+  },
+  {
+    ruleId: "antidrift/no-todo-without-issue",
+    message:
+      "AI debt comment is forbidden. Replace with immediate fix or a tracked issue reference outside source files.",
+    count: 1,
+  },
+  {
+    ruleId: "antidrift/require-safe-window-open",
+    message:
+      "Pass noopener or noreferrer in the third argument to window.open() so the browser isolates the opener.",
+    count: 1,
+  },
+  {
+    ruleId: "antidrift/require-stream-reader-disposal",
+    message:
+      "Release this ReadableStream reader's lock in a finally block, or explicitly return the reader to transfer ownership.",
+    count: 1,
+  },
+  {
+    ruleId: "antidrift/require-stable-snapshot",
+    message:
+      "Selector passed to 'useSnapshotStore' returns a fresh object/array/derived collection without an equality comparator, so every store update re-renders (and Zustand v5 loops). Wrap the selector with useShallow / pass shallow, or select primitives separately.",
+    count: 1,
+  },
+  {
+    ruleId: "antidrift/no-argument-mutation-side-effect",
+    message:
+      "Function mutates argument 'options' in place instead of returning a result.",
+    count: 1,
+  },
+  {
+    ruleId: "antidrift/require-query-key-factory",
+    message:
+      "Do not spread a bare input object into a query key. Spreading leaks every property of the source into the cache identity (spurious refetches, stale reads, unbounded cache growth). Spread a `*Keys` composition call (`...entitiesKeys.all(ws)`) and list concrete cache-identity fields explicitly instead.",
+    count: 1,
+  },
+  {
+    ruleId: "antidrift/require-query-key-factory",
+    message:
+      "Pass a query-key factory call here, not an inline array. A hand-typed key silently stops matching when the factory's shape changes (QueryKey is unknown[]), leaving the cache stale.",
+    count: 1,
+  },
+  {
+    ruleId: "antidrift/no-path-prefix-containment",
+    message:
+      "A bare path prefix also accepts sibling paths such as '<root>-backup'. Use path.relative() with '..' and absolute-path checks, or an approved boundary-aware containment helper.",
+    count: 1,
+  },
+  {
+    ruleId: "antidrift/no-inline-style-colors",
+    message:
+      "Hardcoded color '#666' in 'color' breaks dark mode. Use a CSS variable or Tailwind class instead.",
+    count: 1,
   },
 ];

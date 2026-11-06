@@ -1,11 +1,11 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import { getString, toNode, toNodeArray } from "./syntax.js";
 
-const TOKEN_PATTERN = /\b(TODO|FIXME|HACK)\b/i;
-const TICKET_PATTERN = /\b(?:TODO|FIXME|HACK)\s*(?:\(|\[|:)\s*[A-Z]{2,}-\d+/i;
-const DEBT_TOKEN_PATTERN = /\b(todo|fixme|hack|temporary|later|cleanup)\b/i;
-const AI_TOKEN_PATTERN =
-  /\b(ai|llm|gpt|copilot|claude|gemini|cursor|generated)\b/i;
+const TOKEN_PATTERN = /(?:^|[\s*@/])(TODO|FIXME|HACK|@todo|@fixme)\b/gm;
+const TICKET_PATTERN =
+  /^(?:\s*(?:\(|\[|:)\s*[A-Z]{2,}-\d+|\s+[A-Z]{2,}-\d+|\s*\(#\d+\))/;
+const AI_DEBT_PATTERN =
+  /\b(?:ai[- ]generated|llm|copilot|claude|gemini|cursor)\b/i;
 const getCommentText = (comment) => {
   const commentNode = toNode(comment);
   if (!commentNode) {
@@ -51,18 +51,25 @@ const noTodoWithoutIssueRule = {
         const comments = toNodeArray(context.sourceCode.getAllComments());
         for (const comment of comments) {
           const text = getCommentText(comment);
-          if (TICKET_PATTERN.test(text)) continue;
-          if (DEBT_TOKEN_PATTERN.test(text) && AI_TOKEN_PATTERN.test(text)) {
-            context.report({ node: comment, messageId: "forbidden" });
-            continue;
+          for (const match of text.matchAll(TOKEN_PATTERN)) {
+            const token = match[1];
+            const markerEnd = match.index + match[0].length;
+            if (TICKET_PATTERN.test(text.slice(markerEnd))) continue;
+            const lineStart = text.lastIndexOf("\n", markerEnd) + 1;
+            const nextLine = text.indexOf("\n", markerEnd);
+            const line = text.slice(
+              lineStart,
+              nextLine === -1 ? text.length : nextLine
+            );
+            const forbidden = AI_DEBT_PATTERN.test(line);
+            context.report({
+              node: comment,
+              messageId: forbidden ? "forbidden" : "bareToken",
+              ...(forbidden
+                ? {}
+                : { data: { token: token.replace(/^@/u, "").toUpperCase() } }),
+            });
           }
-          const match = TOKEN_PATTERN.exec(text);
-          if (!match?.[1]) continue;
-          context.report({
-            node: comment,
-            messageId: "bareToken",
-            data: { token: match[1].toUpperCase() },
-          });
         }
       },
     };

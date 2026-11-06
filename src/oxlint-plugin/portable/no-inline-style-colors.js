@@ -106,6 +106,15 @@ export default {
         if (property.type !== "Property") {
           continue;
         }
+        const prop = getPropertyName(property.key) ?? "";
+        if (
+          prop.startsWith("--") ||
+          prop === "stopColor" ||
+          prop === "floodColor" ||
+          prop === "lightingColor"
+        ) {
+          continue;
+        }
         const initializer = property.value;
         const staticCss = getStaticStyleText(initializer);
         if (staticCss === undefined) {
@@ -120,7 +129,7 @@ export default {
           messageId: "inlineColor",
           data: {
             match,
-            prop: getPropertyName(property.key) ?? "?",
+            prop,
           },
         });
       }

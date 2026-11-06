@@ -236,8 +236,44 @@ class PathContainment {
     return this.hasPathSeparatorSuffix(expression.alternate);
   };
 
+  isTerminatedPrefixCollectionParameter = (expression) => {
+    if (!isEstreeIdentifier(expression)) return false;
+    let callback = expression.parent;
+    while (
+      callback &&
+      callback.type !== "ArrowFunctionExpression" &&
+      callback.type !== "FunctionExpression"
+    ) {
+      callback = callback.parent;
+    }
+    if (
+      !callback ||
+      !isEstreeIdentifier(callback.params[0]) ||
+      callback.params[0].name !== expression.name
+    ) {
+      return false;
+    }
+    const call = callback.parent;
+    if (
+      call?.type !== "CallExpression" ||
+      call.callee?.type !== "MemberExpression" ||
+      !["some", "every"].includes(getPropertyName(call.callee.property))
+    ) {
+      return false;
+    }
+    const prefixes = this.resolveStableExpression(call.callee.object);
+    return (
+      prefixes?.type === "ArrayExpression" &&
+      prefixes.elements.length > 0 &&
+      prefixes.elements.every(
+        (element) => element && this.hasPathSeparatorSuffix(element)
+      )
+    );
+  };
+
   hasPathSeparatorSuffix = (node) => {
     const expression = this.resolveStableExpression(node);
+    if (this.isTerminatedPrefixCollectionParameter(expression)) return true;
     if (isStringLiteral(expression)) {
       return [...PATH_SEPARATORS].some((separator) =>
         expression.value.endsWith(separator)

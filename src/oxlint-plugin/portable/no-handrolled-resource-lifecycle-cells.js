@@ -543,13 +543,44 @@ class ResourceLifecycleAnalysis {
     if (frame) frame.hasCatch = true;
   };
 
+  hasPreviousValueGuard = (node) => {
+    let child = node;
+    for (let current = node.parent; current; current = current.parent) {
+      if (isFunctionLike(current)) return false;
+      if (current.type === "IfStatement" && current.consequent === child) {
+        const test = unwrapExpression(current.test);
+        if (
+          test?.type === "BinaryExpression" &&
+          ["!==", "!=", "<", ">", "<=", ">="].includes(test.operator)
+        ) {
+          return true;
+        }
+        if (
+          test?.type === "CallExpression" &&
+          test.callee?.type === "MemberExpression" &&
+          staticPropertyName(test.callee) === "is" &&
+          test.callee.object?.type === "Identifier" &&
+          test.callee.object.name === "Object"
+        ) {
+          return true;
+        }
+      }
+      child = current;
+    }
+    return false;
+  };
+
   onCallExpression = (node) => {
     this.checkDualChannelCall(node);
     const frame = this.fnStack.at(-1);
     if (!frame || node.callee?.type !== "Identifier") return;
     const bindingSymbol = findVariable(this.sourceCode, node.callee);
     if (!bindingSymbol || !this.setterVariables.has(bindingSymbol)) return;
-    if (this.fnStack.length === 1 && enclosingUiFunction(node) === frame.node) {
+    if (
+      this.fnStack.length === 1 &&
+      enclosingUiFunction(node) === frame.node &&
+      !this.hasPreviousValueGuard(node)
+    ) {
       this.context.report({
         node,
         message: `React state setter '${node.callee.name}' is called synchronously during render; derive the value during render instead of latching state.`,

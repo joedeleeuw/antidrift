@@ -1,5 +1,5 @@
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
-import { unwrapExpression } from "../shared/scope.js";
+import { findVariable, unwrapExpression } from "../shared/scope.js";
 import { getPropertyName, isAstNode, isIdentifier } from "./ast.js";
 import { rootIdentifier } from "./static-resolution.js";
 
@@ -17,9 +17,33 @@ const isAllowedCompositionSpread = (node) => {
   }
   return false;
 };
-const isLeakySpread = (element) => {
+const hasArrayTypeAnnotation = (identifier) => {
+  const annotation = identifier.typeAnnotation?.typeAnnotation;
+  return (
+    annotation?.type === "TSArrayType" ||
+    annotation?.type === "TSTupleType" ||
+    (annotation?.type === "TSTypeReference" &&
+      annotation.typeName?.type === "Identifier" &&
+      (annotation.typeName.name === "Array" ||
+        annotation.typeName.name === "ReadonlyArray"))
+  );
+};
+const isLeakySpread = (element, sourceCode) => {
   if (!element || element.type !== "SpreadElement") {
     return false;
+  }
+  const argument = unwrapExpression(element.argument);
+  if (argument?.type === "ArrayExpression") return false;
+  if (argument?.type === "Identifier") {
+    const definition = findVariable(sourceCode, argument)?.defs?.[0];
+    if (
+      (definition?.name?.parent?.type === "RestElement" &&
+        definition.name.parent.parent?.type === "ArrayPattern") ||
+      hasArrayTypeAnnotation(definition?.name ?? {}) ||
+      unwrapExpression(definition?.node?.init)?.type === "ArrayExpression"
+    ) {
+      return false;
+    }
   }
   return !isAllowedCompositionSpread(element.argument);
 };
@@ -184,7 +208,7 @@ class QueryKeySpreadAnalysis {
         ? expression.elements
         : [];
       for (const element of elements) {
-        if (isLeakySpread(element)) {
+        if (isLeakySpread(element, this.context.sourceCode)) {
           this.context.report({
             node: element,
             messageId: "spreadInputInQueryKey",

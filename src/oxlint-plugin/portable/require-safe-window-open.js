@@ -34,7 +34,7 @@ export default {
     type: "problem",
     messages: {
       requireSafeWindowOpen:
-        "Pass noopener,noreferrer in the third argument to window.open() so the browser isolates the opener.",
+        "Pass noopener or noreferrer in the third argument to window.open() so the browser isolates the opener.",
     },
   },
   create(context) {
@@ -45,12 +45,28 @@ export default {
         if (!isBrowserOpenCallee(context.sourceCode, node.callee)) {
           return;
         }
+        const target = node.arguments[1];
+        if (target?.type === "Literal" && target.value === "_self") return;
+        const url = node.arguments[0];
+        const retained = [
+          "VariableDeclarator",
+          "AssignmentExpression",
+          "ReturnStatement",
+          "MemberExpression",
+        ].includes(node.parent?.type);
+        if (
+          retained &&
+          (!url ||
+            (url.type === "Literal" &&
+              (url.value === "" || url.value === "about:blank")))
+        ) {
+          return;
+        }
         const features = node.arguments[2];
         if (
           features?.type === "Literal" &&
           typeof features.value === "string" &&
-          /(?:^|,)\s*noopener(?:\s|,|$)/u.test(features.value) &&
-          /(?:^|,)\s*noreferrer(?:\s|,|$)/u.test(features.value)
+          /(?:^|,)\s*(?:noopener|noreferrer)(?:\s|,|$)/u.test(features.value)
         ) {
           return;
         }

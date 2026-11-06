@@ -320,15 +320,38 @@ export function outcomeTranslation(node, sourceCode) {
     : null;
 }
 
-function typeReferenceName(parameter) {
-  const annotation = parameter.typeAnnotation?.typeAnnotation;
-  return annotation?.type === "TSTypeReference" &&
-    annotation.typeName?.type === "Identifier"
-    ? annotation.typeName.name
+function qualifiedTypeName(typeName) {
+  if (typeName?.type === "Identifier") return typeName.name;
+  if (typeName?.type !== "TSQualifiedName") return "";
+  const left = qualifiedTypeName(typeName.left);
+  return left && typeName.right?.type === "Identifier"
+    ? `${left}.${typeName.right.name}`
     : "";
 }
 
-function mutationSite(reference, isMap) {
+function typeReferenceName(parameter) {
+  const annotation = parameter.typeAnnotation?.typeAnnotation;
+  return annotation?.type === "TSTypeReference"
+    ? qualifiedTypeName(annotation.typeName)
+    : "";
+}
+
+function isMutableCellParameter(parameter, typeName) {
+  if (/(?:^|\.)(?:MutableRefObject|RefObject|Ref)$/u.test(typeName)) {
+    return true;
+  }
+  const annotation = parameter.typeAnnotation?.typeAnnotation;
+  if (annotation?.type !== "TSTypeLiteral") return false;
+  return annotation.members.some(
+    (member) =>
+      member.type === "TSPropertySignature" &&
+      member.readonly !== true &&
+      ((member.key?.type === "Identifier" && member.key.name === "current") ||
+        (member.key?.type === "Literal" && member.key.value === "current"))
+  );
+}
+
+function mutationSite(reference, isMap, isMutableCell) {
   const member = reference.identifier?.parent;
   if (
     member?.type !== "MemberExpression" ||
@@ -341,7 +364,9 @@ function mutationSite(reference, isMap) {
     (site?.type === "AssignmentExpression" && site.left === member) ||
     (site?.type === "UpdateExpression" && site.argument === member)
   ) {
-    return site;
+    return isMutableCell && staticPropertyName(member) === "current"
+      ? null
+      : site;
   }
   return isMap &&
     site?.type === "CallExpression" &&
@@ -371,8 +396,11 @@ export function argumentMutations(node, sourceCode) {
       continue;
     }
     const references = findVariable(sourceCode, parameter)?.references ?? [];
+    const isMutableCell = isMutableCellParameter(parameter, typeName);
     const site = references
-      .map((reference) => mutationSite(reference, typeName === "Map"))
+      .map((reference) =>
+        mutationSite(reference, typeName === "Map", isMutableCell)
+      )
       .find(Boolean);
     if (site) mutations.push({ node: site, name: parameter.name });
   }

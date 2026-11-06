@@ -213,7 +213,8 @@ const freshSelector = (node, sourceCode) => {
     callee.name === HOOK_NAME ||
     !SELECTOR_HOOK.test(callee.name) ||
     node.arguments.length !== 1 ||
-    !isFunctionLike(selector)
+    !isFunctionLike(selector) ||
+    selector.params.length < 1
   ) {
     return null;
   }
