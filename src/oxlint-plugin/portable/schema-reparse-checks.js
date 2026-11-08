@@ -174,10 +174,13 @@ function withoutElementRefinements(expression, sourceCode) {
 
 function schemaField(object, key, sourceCode, depth = 0) {
   if (!object || depth >= 8) return null;
-  const field = object.shapeNode.properties.find(
-    (property) => staticPropertyKey(property) === key
-  );
-  if (field?.type === "Property") return field.value;
+  for (const property of object.shapeNode.properties.toReversed()) {
+    if (property.type === "SpreadElement") return null;
+    if (staticPropertyKey(property) === key) {
+      return property.type === "Property" ? property.value : null;
+    }
+    if (property.computed && staticPropertyKey(property) === null) return null;
+  }
   return object.baseSchemaNode
     ? schemaField(
         isSchemaObjectOrExtendCall(
