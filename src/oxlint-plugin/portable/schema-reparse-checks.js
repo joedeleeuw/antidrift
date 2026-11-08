@@ -135,12 +135,41 @@ function isSchemaDecodedBinding(identifier, sourceCode) {
   );
 }
 
-function memberRoot(node) {
-  let current = unwrapExpression(node);
-  while (current?.type === "MemberExpression") {
-    current = unwrapExpression(current.object);
+function resolveLocalSchema(expression, sourceCode, depth = 0) {
+  const node = unwrapAwaitedExpression(expression);
+  if (node?.type !== "Identifier" || depth >= 8) return node;
+  const initializer = constInitializer(sourceCode, node);
+  return initializer
+    ? resolveLocalSchema(initializer, sourceCode, depth + 1)
+    : node;
+}
+
+function iteratedElementSchema(collection, sourceCode) {
+  const decoded = resolveLocalSchema(collection, sourceCode);
+  if (!schemaParseCall(decoded, sourceCode)?.returnsDecodedValue) return null;
+  const schema = resolveLocalSchema(decoded.callee.object, sourceCode);
+  if (
+    schema?.type !== "CallExpression" ||
+    schema.callee.type !== "MemberExpression" ||
+    schema.callee.computed ||
+    schema.callee.property.name !== "array"
+  ) {
+    return null;
   }
-  return current?.type === "Identifier" ? current : null;
+  let element = null;
+  if (schema.arguments.length === 1) element = schema.arguments[0];
+  else if (schema.arguments.length === 0) element = schema.callee.object;
+  return resolveLocalSchema(element, sourceCode);
+}
+
+function sameSchema(left, right, sourceCode) {
+  if (!left || !right) return false;
+  if (left === right) return true;
+  return (
+    left.type === "Identifier" &&
+    right.type === "Identifier" &&
+    findVariable(sourceCode, left) === findVariable(sourceCode, right)
+  );
 }
 
 function isSchemaReceiver(expression, sourceCode) {
@@ -199,13 +228,16 @@ function isMappedSchemaDecode(node, sourceCode) {
 
 function checkIteratedElement(node, def, schemaText, context) {
   const loop = def.parent?.parent;
-  const root = memberRoot(loop?.right);
+  const sourceCode = context.sourceCode;
   if (
     loop?.type !== "ForOfStatement" ||
     loop.left !== def.parent ||
-    !root ||
-    !hasRuntimeSchemaProvenance(node.callee.object, context.sourceCode) ||
-    !isSchemaDecodedBinding(root, context.sourceCode)
+    !hasRuntimeSchemaProvenance(node.callee.object, sourceCode) ||
+    !sameSchema(
+      iteratedElementSchema(loop.right, sourceCode),
+      resolveLocalSchema(node.callee.object, sourceCode),
+      sourceCode
+    )
   ) {
     return;
   }
