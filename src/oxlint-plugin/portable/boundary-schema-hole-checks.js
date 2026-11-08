@@ -1,5 +1,6 @@
 import {
   hasRuntimeSchemaProvenance,
+  hasZodSchemaProvenance,
   resolveSchemaBuilderCall,
 } from "../shared/runtime-schema-libraries.js";
 import {
@@ -194,6 +195,7 @@ function checkUnionSchemaWidening(node, builder, context) {
 
 export function checkUnvalidatedSchemaHole(node, context) {
   const sourceCode = context.sourceCode;
+  if (!hasZodSchemaProvenance(node, sourceCode)) return;
   const builder = resolveSchemaBuilderCall(node, sourceCode);
   if (!builder) return;
   if (builder.method === "any" && builder.args.length === 0) {

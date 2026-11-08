@@ -57,7 +57,7 @@ function isRuntimeSchemaLibraryFile(fileName) {
   return isRuntimeSchemaLibrarySource(packagePath);
 }
 
-function importedSchemaLibrary(identifier, sourceCode) {
+function importedSchemaLibrary(identifier, sourceCode, library) {
   const definition = findVariable(sourceCode, identifier)?.defs?.[0];
   if (
     definition?.type !== "ImportBinding" ||
@@ -68,49 +68,60 @@ function importedSchemaLibrary(identifier, sourceCode) {
   const imported = definition.node?.imported;
   const importedName =
     imported?.type === "Identifier" ? imported.name : (imported?.value ?? null);
+  if (library === "zod") {
+    const source = definition.parent.source?.value;
+    return (
+      typeof source === "string" &&
+      (source === "zod" || source.startsWith("zod/"))
+    );
+  }
   return (
     (typeof importedName === "string" && importedName.endsWith("Schema")) ||
     isRuntimeSchemaLibrarySource(definition.parent.source?.value, importedName)
   );
 }
 
-function hasTypedSchemaDeclaration(node, sourceCode) {
-  return resolvedDeclarationFiles(node, sourceCode).some(
-    isRuntimeSchemaLibraryFile
-  );
+function hasSchemaProvenance(expression, sourceCode, library) {
+  const seen = new Set();
+  function visit(candidate, depth) {
+    if (depth > provenanceDepthLimit) return false;
+    const node = unwrapAwaitedExpression(candidate);
+    if (!node || seen.has(node)) return false;
+    seen.add(node);
+    const declarations = resolvedDeclarationFiles(node, sourceCode);
+    if (
+      declarations.some((fileName) =>
+        library === "zod"
+          ? fileName.replaceAll("\\", "/").includes("/node_modules/zod/")
+          : isRuntimeSchemaLibraryFile(fileName)
+      )
+    ) {
+      return true;
+    }
+    if (node.type === "Identifier") {
+      if (importedSchemaLibrary(node, sourceCode, library)) return true;
+      const initializer = constInitializer(sourceCode, node);
+      return initializer ? visit(initializer, depth + 1) : false;
+    }
+    if (node.type === "MemberExpression") return visit(node.object, depth + 1);
+    if (node.type === "CallExpression" || node.type === "NewExpression") {
+      const callee = unwrapAwaitedExpression(node.callee);
+      return visit(
+        callee?.type === "MemberExpression" ? callee.object : callee,
+        depth + 1
+      );
+    }
+    return false;
+  }
+  return visit(expression, 0);
 }
 
-export function hasRuntimeSchemaProvenance(
-  expression,
-  sourceCode,
-  depth = 0,
-  seen = new Set()
-) {
-  if (depth > provenanceDepthLimit) return false;
-  const node = unwrapAwaitedExpression(expression);
-  if (!node || seen.has(node)) return false;
-  seen.add(node);
-  if (hasTypedSchemaDeclaration(node, sourceCode)) return true;
-  if (node.type === "Identifier") {
-    if (importedSchemaLibrary(node, sourceCode)) return true;
-    const initializer = constInitializer(sourceCode, node);
-    return initializer
-      ? hasRuntimeSchemaProvenance(initializer, sourceCode, depth + 1, seen)
-      : false;
-  }
-  if (node.type === "MemberExpression") {
-    return hasRuntimeSchemaProvenance(node.object, sourceCode, depth + 1, seen);
-  }
-  if (node.type === "CallExpression" || node.type === "NewExpression") {
-    const callee = unwrapAwaitedExpression(node.callee);
-    return hasRuntimeSchemaProvenance(
-      callee?.type === "MemberExpression" ? callee.object : callee,
-      sourceCode,
-      depth + 1,
-      seen
-    );
-  }
-  return false;
+export function hasRuntimeSchemaProvenance(expression, sourceCode) {
+  return hasSchemaProvenance(expression, sourceCode, "runtime");
+}
+
+export function hasZodSchemaProvenance(expression, sourceCode) {
+  return hasSchemaProvenance(expression, sourceCode, "zod");
 }
 
 export function schemaReceiverVerdict(expression, sourceCode) {
