@@ -215,16 +215,46 @@ function checkTauriIpcTypeArguments(node, context) {
   });
 }
 
-function isUnknownPreservingReturnType(typeNode) {
+function isUnknownPreservingReturnType(typeNode, sourceCode, seen = new Set()) {
+  if (!typeNode || seen.has(typeNode)) return false;
+  seen.add(typeNode);
+  if (typeNode.type === "TSUnknownKeyword") return true;
+  if (typeNode.type === "TSUnionType") {
+    return typeNode.types.some((branch) =>
+      isUnknownPreservingReturnType(branch, sourceCode, seen)
+    );
+  }
   if (
-    typeNode?.type === "TSTypeReference" &&
-    typeNode.typeName?.type === "Identifier" &&
-    typeNode.typeName.name === "Promise" &&
+    typeNode.type !== "TSTypeReference" ||
+    typeNode.typeName.type !== "Identifier"
+  ) {
+    return false;
+  }
+  const definition = findVariable(sourceCode, typeNode.typeName)?.defs?.[0]
+    ?.node;
+  if (
+    definition?.type === "TSTypeAliasDeclaration" &&
+    !definition.typeParameters
+  ) {
+    return isUnknownPreservingReturnType(
+      definition.typeAnnotation,
+      sourceCode,
+      seen
+    );
+  }
+  if (definition) return false;
+  if (
+    (typeNode.typeName.name === "Promise" ||
+      typeNode.typeName.name === "PromiseLike") &&
     typeNode.typeArguments?.params.length === 1
   ) {
-    return typeNode.typeArguments.params[0].type === "TSUnknownKeyword";
+    return isUnknownPreservingReturnType(
+      typeNode.typeArguments.params[0],
+      sourceCode,
+      seen
+    );
   }
-  return isUnknownPreservingAssertionType(typeNode);
+  return false;
 }
 
 function checkUnknownFunction(node, context, probeThreshold) {
@@ -247,7 +277,7 @@ function checkUnknownFunction(node, context, probeThreshold) {
   if (
     returnAnn &&
     returnAnn.type !== "TSAnyKeyword" &&
-    !isUnknownPreservingReturnType(returnAnn) &&
+    !isUnknownPreservingReturnType(returnAnn, sourceCode) &&
     node.body?.type !== "BlockStatement" &&
     (isRawDeserializeCall(node.body, sourceCode) ||
       isAliasedRawDeserialize(node.body, sourceCode))
@@ -282,7 +312,7 @@ function checkRawDeserializeReturn(node, context) {
   if (
     !returnAnn ||
     returnAnn.type === "TSAnyKeyword" ||
-    isUnknownPreservingReturnType(returnAnn)
+    isUnknownPreservingReturnType(returnAnn, sourceCode)
   ) {
     return;
   }
