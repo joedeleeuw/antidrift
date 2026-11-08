@@ -222,7 +222,7 @@ function isUnknownPreservingReturnType(typeNode) {
     typeNode.typeName.name === "Promise" &&
     typeNode.typeArguments?.params.length === 1
   ) {
-    return isUnknownPreservingAssertionType(typeNode.typeArguments.params[0]);
+    return typeNode.typeArguments.params[0].type === "TSUnknownKeyword";
   }
   return isUnknownPreservingAssertionType(typeNode);
 }
