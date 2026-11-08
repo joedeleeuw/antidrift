@@ -272,6 +272,41 @@ export function checkDecodedBlobEquality(node, context) {
   }
 }
 
+function enclosingSwitchCase(node) {
+  for (let ancestor = node.parent; ancestor; ancestor = ancestor.parent) {
+    if (ancestor.type === "SwitchCase") return ancestor;
+    if (isFunctionLike(ancestor)) return null;
+  }
+  return null;
+}
+
+function caseCannotFallThrough(switchCase) {
+  for (
+    let ancestor = switchCase.parent;
+    ancestor && !isFunctionLike(ancestor);
+    ancestor = ancestor.parent
+  ) {
+    if (
+      ancestor.type === "ForStatement" ||
+      ancestor.type === "ForInStatement" ||
+      ancestor.type === "ForOfStatement" ||
+      ancestor.type === "WhileStatement" ||
+      ancestor.type === "DoWhileStatement"
+    )
+      return false;
+  }
+  let terminal = switchCase.consequent.at(-1);
+  while (terminal?.type === "BlockStatement") {
+    terminal = terminal.body.at(-1);
+  }
+  return (
+    terminal?.type === "ReturnStatement" ||
+    terminal?.type === "ThrowStatement" ||
+    terminal?.type === "BreakStatement" ||
+    terminal?.type === "ContinueStatement"
+  );
+}
+
 export function checkDiscardedDecode(node, context) {
   const sourceCode = context.sourceCode;
   const call = unwrapAwaitedExpression(node.expression);
@@ -288,11 +323,24 @@ export function checkDiscardedDecode(node, context) {
     return;
   }
   const statementScope = sourceCode.getScope(node).variableScope;
+  const decodeCase = enclosingSwitchCase(node);
   const readLater = findVariable(sourceCode, argument)?.references.some(
-    (ref) =>
-      ref.isRead() &&
-      ref.from.variableScope === statementScope &&
-      ref.identifier.range[0] > node.range[1]
+    (ref) => {
+      if (
+        !ref.isRead() ||
+        ref.from.variableScope !== statementScope ||
+        ref.identifier.range[0] <= node.range[1]
+      )
+        return false;
+      const readCase = enclosingSwitchCase(ref.identifier);
+      return !(
+        decodeCase &&
+        readCase &&
+        decodeCase !== readCase &&
+        decodeCase.parent === readCase.parent &&
+        caseCannotFallThrough(decodeCase)
+      );
+    }
   );
   if (readLater) {
     context.report({
