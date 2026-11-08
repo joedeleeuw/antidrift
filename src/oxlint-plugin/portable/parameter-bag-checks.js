@@ -316,12 +316,22 @@ function forwardedLocalCallee(sourceCode, parameter) {
     : null;
 }
 
-function isReturnedRootJsxElement(opening) {
+function composesJsxChildren(element) {
+  return element.children.some(
+    (child) =>
+      child.type === "JSXElement" ||
+      (child.type === "JSXFragment" && composesJsxChildren(child)) ||
+      (child.type === "JSXText" && child.value.trim() !== "")
+  );
+}
+
+function isForwardingRootJsxElement(opening) {
   const parentType = opening?.parent?.parent?.type;
   return (
     opening?.type === "JSXOpeningElement" &&
     parentType !== "JSXElement" &&
-    parentType !== "JSXFragment"
+    parentType !== "JSXFragment" &&
+    !composesJsxChildren(opening.parent)
   );
 }
 
@@ -338,7 +348,7 @@ function forwardedJsxProp(sourceCode, prop) {
   const nameNode = opening?.name;
   return container?.type === "JSXExpressionContainer" &&
     attr?.type === "JSXAttribute" &&
-    isReturnedRootJsxElement(opening) &&
+    isForwardingRootJsxElement(opening) &&
     nameNode?.type === "JSXIdentifier" &&
     isLocalFunctionBinding(nameNode, sourceCode)
     ? { node: prop.value, name: prop.value.name, callee: nameNode.name }

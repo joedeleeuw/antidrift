@@ -218,12 +218,64 @@ function corroboratesEntity(node, pair, sourceCode) {
   );
 }
 
+const ENTITY_WRITE_METHODS = new Set(["patch", "replace", "update", "upsert"]);
+
+function writesSourceEntity(call, pair, sourceCode) {
+  if (!ENTITY_WRITE_METHODS.has(staticPropertyName(call.callee))) return false;
+  return call.arguments.slice(0, -1).some((argument) => {
+    const identity = identitySource(argument, sourceCode);
+    return (
+      identity &&
+      [pair.left, pair.right].some(
+        (origin) =>
+          origin.binding === identity.binding &&
+          identity.keys.every((key, index) => origin.keys[index] === key)
+      )
+    );
+  });
+}
+
+function exclusivelyWrittenEntity(node, pair, sourceCode, seen = new Set()) {
+  let current = node;
+  while (current.parent) {
+    const parent = current.parent;
+    if (parent.type === "Property" && parent.value === current) {
+      current = parent;
+    } else if (parent.type === "ObjectExpression") {
+      current = parent;
+    } else if (
+      parent.type === "VariableDeclarator" &&
+      parent.init === current &&
+      parent.id.type === "Identifier"
+    ) {
+      const binding = findVariable(sourceCode, parent.id);
+      if (!binding || seen.has(binding)) return false;
+      seen.add(binding);
+      const reads = binding.references.filter((reference) =>
+        reference.isRead()
+      );
+      return (
+        reads.length === 1 &&
+        exclusivelyWrittenEntity(reads[0].identifier, pair, sourceCode, seen)
+      );
+    } else {
+      return (
+        parent.type === "CallExpression" &&
+        parent.arguments.at(-1) === current &&
+        writesSourceEntity(parent, pair, sourceCode)
+      );
+    }
+  }
+  return false;
+}
+
 export function checkEntityPrecedence(node, context, state) {
   const pairs = precedencePairs(node, context.sourceCode);
   const pair = pairs.find(
     (candidate) =>
-      distinctReactiveOrigins(candidate, state) ||
-      corroboratesEntity(node, candidate, context.sourceCode)
+      (distinctReactiveOrigins(candidate, state) ||
+        corroboratesEntity(node, candidate, context.sourceCode)) &&
+      !exclusivelyWrittenEntity(node, candidate, context.sourceCode)
   );
   if (!pair) return false;
   context.report({
