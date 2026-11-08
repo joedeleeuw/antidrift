@@ -1,6 +1,6 @@
 {
   "name": "@joedeleeuw/antidrift",
-  "version": "0.28.3",
+  "version": "0.28.4",
   "type": "module",
   "license": "MIT",
   "description": "Host-agnostic Oxlint and ESLint rules for TypeScript, React, boundary decoding, and AI-agent drift prevention.",
