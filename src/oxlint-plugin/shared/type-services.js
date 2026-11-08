@@ -175,7 +175,7 @@ export function propertyType(property, services) {
 }
 
 export function isEntityIdentityKey(key) {
-  return /^(?:_?id|slug|number)$|(?:Id|ID)$/u.test(key);
+  return /^(?:id|slug|number)$|(?:Id|ID)$/u.test(key);
 }
 
 export function shareEntityIdentity(left, right, services) {

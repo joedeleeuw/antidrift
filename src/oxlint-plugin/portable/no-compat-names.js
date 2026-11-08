@@ -4,9 +4,12 @@ import { findVariable, unwrapExpression } from "../shared/scope.js";
 import { patternIdentifiers } from "./static-resolution.js";
 
 const REMOVAL_VOCABULARY =
-  /legacy|compat(?!ib(?:le|ility))|deprecated|retired(?!At\b)|no_?longer/i;
+  /legacy|compat(?!ib(?:le|ility))|backwards?_?compat|deprecated|retired(?!At\b)|no_?longer/i;
+const COMPATIBILITY_TERM = /compatib(?:le|ility)/iu;
+const REMOVAL_ROLE =
+  /(?:Shims?|Fallback|Layer)(?=[A-Z_\d]|$)|(?:^|_)(?:shims?|fallback|layer|SHIMS?|FALLBACK|LAYER)(?=_|$)/u;
 const AFFIX_STRIP_RE =
-  /^(?:legacy|deprecated|compat|retired|old)_?|(?:\s|_)?(?:Legacy|Deprecated|Compat|Retired|Old|Shims?|Fallback)$/giu;
+  /^(?:legacy|deprecated|(?:backwards?_?)?compat(?:ible|ibility)?|retired|old)_?|(?:\s|_)?(?:Legacy|Deprecated|Compat|Retired|Old|Shims?|Fallback|Layer)$/giu;
 const SNAKE_KEY_PATTERN = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/u;
 const CAMEL_KEY_PATTERN = /^[a-z][a-zA-Z0-9]*$/u;
 
@@ -126,7 +129,11 @@ function canonicalReplacementName(name, sourceCode) {
 
 function createNameVisitors(context) {
   function check(node) {
-    if (node?.type === "Identifier" && REMOVAL_VOCABULARY.test(node.name)) {
+    if (
+      node?.type === "Identifier" &&
+      (REMOVAL_VOCABULARY.test(node.name) ||
+        (COMPATIBILITY_TERM.test(node.name) && REMOVAL_ROLE.test(node.name)))
+    ) {
       const canonical = canonicalReplacementName(node.name, context.sourceCode);
       context.report({
         node,
