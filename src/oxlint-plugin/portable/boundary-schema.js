@@ -215,6 +215,18 @@ function checkTauriIpcTypeArguments(node, context) {
   });
 }
 
+function isUnknownPreservingReturnType(typeNode) {
+  if (
+    typeNode?.type === "TSTypeReference" &&
+    typeNode.typeName?.type === "Identifier" &&
+    typeNode.typeName.name === "Promise" &&
+    typeNode.typeArguments?.params.length === 1
+  ) {
+    return isUnknownPreservingAssertionType(typeNode.typeArguments.params[0]);
+  }
+  return isUnknownPreservingAssertionType(typeNode);
+}
+
 function checkUnknownFunction(node, context, probeThreshold) {
   const filename = (context.filename ?? "").replaceAll("\\", "/");
   if (
@@ -235,7 +247,7 @@ function checkUnknownFunction(node, context, probeThreshold) {
   if (
     returnAnn &&
     returnAnn.type !== "TSAnyKeyword" &&
-    !isUnknownPreservingAssertionType(returnAnn) &&
+    !isUnknownPreservingReturnType(returnAnn) &&
     node.body?.type !== "BlockStatement" &&
     (isRawDeserializeCall(node.body, sourceCode) ||
       isAliasedRawDeserialize(node.body, sourceCode))
@@ -270,7 +282,7 @@ function checkRawDeserializeReturn(node, context) {
   if (
     !returnAnn ||
     returnAnn.type === "TSAnyKeyword" ||
-    isUnknownPreservingAssertionType(returnAnn)
+    isUnknownPreservingReturnType(returnAnn)
   ) {
     return;
   }
