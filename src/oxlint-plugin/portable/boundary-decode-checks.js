@@ -292,8 +292,9 @@ function caseCannotFallThrough(switchCase) {
       ancestor.type === "ForOfStatement" ||
       ancestor.type === "WhileStatement" ||
       ancestor.type === "DoWhileStatement"
-    )
+    ) {
       return false;
+    }
   }
   let terminal = switchCase.consequent.at(-1);
   while (terminal?.type === "BlockStatement") {
@@ -330,8 +331,9 @@ export function checkDiscardedDecode(node, context) {
         !ref.isRead() ||
         ref.from.variableScope !== statementScope ||
         ref.identifier.range[0] <= node.range[1]
-      )
+      ) {
         return false;
+      }
       const readCase = enclosingSwitchCase(ref.identifier);
       return !(
         decodeCase &&
