@@ -195,9 +195,13 @@ function checkUnionSchemaWidening(node, builder, context) {
 
 export function checkUnvalidatedSchemaHole(node, context) {
   const sourceCode = context.sourceCode;
-  if (!hasZodSchemaProvenance(node, sourceCode)) return;
   const builder = resolveSchemaBuilderCall(node, sourceCode);
   if (!builder) return;
+  const hasZodBranch =
+    builder.method === "or" &&
+    builder.args.length === 1 &&
+    hasZodSchemaProvenance(builder.args[0], sourceCode);
+  if (!hasZodBranch && !hasZodSchemaProvenance(node, sourceCode)) return;
   if (builder.method === "any" && builder.args.length === 0) {
     context.report({
       node,

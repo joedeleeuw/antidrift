@@ -3,6 +3,7 @@ import { topLevelTypeDeclarations } from "./type-predicate-checks.js";
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import {
   hasRuntimeSchemaProvenance,
+  isSchemaObjectOrExtendCall,
   isOpenEndedJsonSchema,
   schemaReceiverVerdict,
 } from "../shared/runtime-schema-libraries.js";
@@ -144,10 +145,80 @@ function resolveLocalSchema(expression, sourceCode, depth = 0) {
     : node;
 }
 
-function iteratedElementSchema(collection, sourceCode) {
-  const decoded = resolveLocalSchema(collection, sourceCode);
+const ELEMENT_PRESERVING_METHODS = new Set([
+  "min",
+  "max",
+  "length",
+  "nonempty",
+  "readonly",
+  "refine",
+  "superRefine",
+  "check",
+]);
+
+function withoutElementRefinements(expression, sourceCode) {
+  let schema = resolveLocalSchema(expression, sourceCode);
+  const seen = new Set();
+  while (
+    schema?.type === "CallExpression" &&
+    schema.callee.type === "MemberExpression" &&
+    !schema.callee.computed &&
+    ELEMENT_PRESERVING_METHODS.has(schema.callee.property.name)
+  ) {
+    if (seen.has(schema)) return null;
+    seen.add(schema);
+    schema = resolveLocalSchema(schema.callee.object, sourceCode);
+  }
+  return schema;
+}
+
+function schemaField(object, key, sourceCode, depth = 0) {
+  if (!object || depth >= 8) return null;
+  const field = object.shapeNode.properties.find(
+    (property) => staticPropertyKey(property) === key
+  );
+  if (field?.type === "Property") return field.value;
+  return object.baseSchemaNode
+    ? schemaField(
+        isSchemaObjectOrExtendCall(
+          withoutElementRefinements(object.baseSchemaNode, sourceCode),
+          sourceCode
+        ),
+        key,
+        sourceCode,
+        depth + 1
+      )
+    : null;
+}
+
+function decodedCollectionSchema(collection, sourceCode) {
+  let decoded = resolveLocalSchema(collection, sourceCode);
+  const keys = [];
+  while (decoded?.type === "MemberExpression") {
+    const key = decoded.computed
+      ? decoded.property.value
+      : decoded.property.name;
+    if (typeof key !== "string") return null;
+    keys.unshift(key);
+    decoded = resolveLocalSchema(decoded.object, sourceCode);
+  }
   if (!schemaParseCall(decoded, sourceCode)?.returnsDecodedValue) return null;
-  const schema = resolveLocalSchema(decoded.callee.object, sourceCode);
+  let schema = decoded.callee.object;
+  for (const key of keys) {
+    schema = schemaField(
+      isSchemaObjectOrExtendCall(
+        withoutElementRefinements(schema, sourceCode),
+        sourceCode
+      ),
+      key,
+      sourceCode
+    );
+  }
+  return withoutElementRefinements(schema, sourceCode);
+}
+
+function iteratedElementSchema(collection, sourceCode) {
+  const schema = decodedCollectionSchema(collection, sourceCode);
   if (
     schema?.type !== "CallExpression" ||
     schema.callee.type !== "MemberExpression" ||
@@ -245,6 +316,7 @@ function checkIteratedElement(node, def, schemaText, context) {
     node,
     message: `Element '${def.name.name}' of already-decoded '${context.sourceCode.getText(loop.right)}' is re-parsed by '${schemaText}'; the outer decode already validated each element.`,
   });
+  return true;
 }
 
 function checkDecodedBinding(node, schemaText, context) {
@@ -265,7 +337,7 @@ function checkDecodedBinding(node, schemaText, context) {
       });
       return;
     }
-    checkIteratedElement(node, def, schemaText, context);
+    if (checkIteratedElement(node, def, schemaText, context)) return;
   }
   if (
     matchesSchemaOutputType(
