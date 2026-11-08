@@ -316,16 +316,53 @@ function forwardedLocalCallee(sourceCode, parameter) {
     : null;
 }
 
-function isReturnedRootJsxElement(opening) {
-  const parentType = opening?.parent?.parent?.type;
-  return (
-    opening?.type === "JSXOpeningElement" &&
-    parentType !== "JSXElement" &&
-    parentType !== "JSXFragment"
-  );
+function isReturnedRootJsxElement(opening, owner) {
+  if (opening?.type !== "JSXOpeningElement") return false;
+  let expression = opening.parent;
+  while (
+    expression.parent?.type === "ConditionalExpression" ||
+    expression.parent?.type === "LogicalExpression" ||
+    unwrapExpression(expression.parent) === expression
+  ) {
+    expression = expression.parent;
+  }
+  if (expression.parent === owner && owner.body === expression) return true;
+  if (expression.parent?.type !== "ReturnStatement") return false;
+  for (
+    let ancestor = expression.parent.parent;
+    ancestor;
+    ancestor = ancestor.parent
+  ) {
+    if (isFunctionLike(ancestor)) return ancestor === owner;
+  }
+  return false;
 }
 
-function forwardedJsxProp(sourceCode, prop) {
+function ownsJsxChildren(opening, sourceCode) {
+  return opening.parent.children.some((child) => {
+    if (child.type === "JSXText") return child.value.trim().length > 0;
+    if (child.type !== "JSXExpressionContainer") return true;
+    let expression = unwrapExpression(child.expression);
+    if (expression?.type === "JSXEmptyExpression") return false;
+    if (expression?.type === "Literal") {
+      return (
+        typeof expression.value === "number" ||
+        (typeof expression.value === "string" && expression.value.length > 0)
+      );
+    }
+    while (expression?.type === "MemberExpression") {
+      expression = unwrapExpression(expression.object);
+    }
+    return (
+      expression?.type !== "Identifier" ||
+      !findVariable(sourceCode, expression)?.defs.some(
+        (definition) => definition.type === "Parameter"
+      )
+    );
+  });
+}
+
+function forwardedJsxProp(sourceCode, prop, owner) {
   if (prop.type !== "Property" || prop.value?.type !== "Identifier") {
     return null;
   }
@@ -338,18 +375,19 @@ function forwardedJsxProp(sourceCode, prop) {
   const nameNode = opening?.name;
   return container?.type === "JSXExpressionContainer" &&
     attr?.type === "JSXAttribute" &&
-    isReturnedRootJsxElement(opening) &&
+    isReturnedRootJsxElement(opening, owner) &&
+    !ownsJsxChildren(opening, sourceCode) &&
     nameNode?.type === "JSXIdentifier" &&
     isLocalFunctionBinding(nameNode, sourceCode)
     ? { node: prop.value, name: prop.value.name, callee: nameNode.name }
     : null;
 }
 
-function forwardedJsxProps(sourceCode, parameter) {
+function forwardedJsxProps(sourceCode, parameter, owner) {
   if (parameter.type !== "ObjectPattern") return [];
   const hits = [];
   for (const prop of parameter.properties) {
-    const hit = forwardedJsxProp(sourceCode, prop);
+    const hit = forwardedJsxProp(sourceCode, prop, owner);
     if (hit) hits.push(hit);
   }
   return hits;
@@ -486,7 +524,11 @@ export function passThroughVisitors(context) {
     }
     if (!isTest) {
       for (const parameter of node.params) {
-        for (const jsxForward of forwardedJsxProps(sourceCode, parameter)) {
+        for (const jsxForward of forwardedJsxProps(
+          sourceCode,
+          parameter,
+          node
+        )) {
           context.report({
             node: jsxForward.node,
             messageId: "passThrough",
