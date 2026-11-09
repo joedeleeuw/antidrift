@@ -124,7 +124,15 @@ function checkDualKeyAliasRead(node, context) {
 function canonicalReplacementName(name, sourceCode) {
   const index = getProgramIndex(sourceCode);
   if (!index) return null;
-  const stripped = name.replaceAll(AFFIX_STRIP_RE, "");
+  const words = splitIdentifierWords(name).join("\0");
+  const stripped = name.replaceAll(AFFIX_STRIP_RE, (affix, offset) => {
+    const partitioned = [
+      ...splitIdentifierWords(name.slice(0, offset)),
+      ...splitIdentifierWords(affix),
+      ...splitIdentifierWords(name.slice(offset + affix.length)),
+    ];
+    return partitioned.join("\0") === words ? "" : affix;
+  });
   if (!stripped || stripped === name) return null;
   const camel = stripped.charAt(0).toLowerCase() + stripped.slice(1);
   if (index.declaredNames.has(stripped)) return stripped;
