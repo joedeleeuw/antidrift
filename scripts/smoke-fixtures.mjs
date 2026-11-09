@@ -373,6 +373,22 @@ function LeafHeader({ title }: { title: string }) {
   return <span>{title}</span>;
 }
 
+export function ForwardedBanner({ title }: { title: string }) {
+  return <LeafHeader title={title} />;
+}
+
+function LeafBody({ title, children }: { title: string; children: string }) {
+  return <section aria-label={title}>{children}</section>;
+}
+
+export function ForwardedBody({ title, children }: { title: string; children: string }) {
+  return (
+    <LeafBody title={title}>
+      {children}
+    </LeafBody>
+  );
+}
+
 export function DrillBanner({ title, active }: { title: string; active: boolean }) {
   const [shown, setShown] = useState(false);
   if (active && !shown) setShown(true);
@@ -477,6 +493,31 @@ export function selectedPointDistance(point: { x: number; y: number }, selected:
 
 export function notifyPoint(point: { x: number; y: number }, notify: (x: number, y: number) => void) {
   notify(point.x, point.y);
+}
+
+function Label({ title, tone, children }: { title: string; tone?: string; children?: string }) {
+  return <section data-tone={tone} aria-label={title}>{children}</section>;
+}
+
+export function ErrorLabel({ title }: { title: string }) {
+  return <Label title={title} tone="error" />;
+}
+
+export function DefaultedLabel({ title, tone = "error" }: { title: string; tone?: string }) {
+  return <Label title={title} tone={tone} />;
+}
+
+export function SpacedLabel({ title, children }: { title: string; children: string }) {
+  return <Label title={title}> {children}</Label>;
+}
+
+export function DiscardedLabel({ title }: { title: string }) {
+  <Label title={title} />;
+}
+
+export function StoredLabel({ title }: { title: string }) {
+  const element = <Label title={title} />;
+  return element;
 }
 
 export function isOrderReady(status: string, retryCount: number, hasOverride: boolean): boolean {
@@ -749,6 +790,13 @@ export const expectedDiagnostics = [
     ruleId: "antidrift/no-pass-through-parameters",
     message:
       "Parameter 'title' is only forwarded unchanged to 'LeafHeader'. Resolve it at the leaf or pass a narrower domain object.",
+    count: 1,
+  },
+  {
+    ruleId: "antidrift/no-pass-through-parameters",
+    message:
+      "Parameter 'title' is only forwarded unchanged to 'LeafBody'. Resolve it at the leaf or pass a narrower domain object.",
+    count: 1,
   },
   {
     ruleId: "antidrift/unknown-input-must-be-decoded",

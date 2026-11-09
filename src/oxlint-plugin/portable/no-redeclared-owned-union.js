@@ -1,4 +1,3 @@
-import { singleReturnExpression } from "./type-predicate-checks.js";
 import {
   repeatedBranchFields,
   resolvedRepeatedFields,
@@ -25,6 +24,7 @@ import {
   constInitializer,
   findVariable,
   isFunctionLike,
+  singleReturnExpression,
   staticPropertyKey,
   unwrapExpression,
 } from "../shared/scope.js";

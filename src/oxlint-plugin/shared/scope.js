@@ -245,6 +245,14 @@ function statementReturnsJsx(stmt) {
   return false;
 }
 
+export function singleReturnExpression(body) {
+  if (body?.type !== "BlockStatement") return unwrapExpression(body);
+  const [only] = body.body;
+  return body.body.length === 1 && only.type === "ReturnStatement"
+    ? unwrapExpression(only.argument)
+    : null;
+}
+
 export function functionReturnsJsx(fnNode) {
   if (!isFunctionLike(fnNode)) return false;
   if (fnNode.body?.type === "BlockStatement") {

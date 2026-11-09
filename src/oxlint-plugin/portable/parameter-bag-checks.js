@@ -9,6 +9,8 @@ import {
   functionReturnsJsx,
   isFunctionLike,
   isTestFile,
+  singleReturnExpression,
+  staticPropertyKey,
   staticPropertyName,
   unwrapExpression,
 } from "../shared/scope.js";
@@ -372,81 +374,81 @@ function positionalForwardingCall(owner, sourceCode) {
   return forwardsArguments ? call : null;
 }
 
-function isReturnedRootJsxElement(opening, owner) {
-  if (opening?.type !== "JSXOpeningElement") return false;
-  let expression = opening.parent;
-  while (
-    expression.parent?.type === "ConditionalExpression" ||
-    expression.parent?.type === "LogicalExpression" ||
-    unwrapExpression(expression.parent) === expression
-  ) {
-    expression = expression.parent;
+function hasRenderedChild(child) {
+  if (child.type === "JSXText") {
+    return /\S/u.test(child.value) || !/[\r\n]/u.test(child.value);
   }
-  if (expression.parent === owner && owner.body === expression) return true;
-  if (expression.parent?.type !== "ReturnStatement") return false;
-  for (
-    let ancestor = expression.parent.parent;
-    ancestor;
-    ancestor = ancestor.parent
-  ) {
-    if (isFunctionLike(ancestor)) return ancestor === owner;
-  }
-  return false;
+  return (
+    child.type !== "JSXExpressionContainer" ||
+    child.expression.type !== "JSXEmptyExpression"
+  );
 }
 
-function ownsJsxChildren(opening, sourceCode) {
-  return opening.parent.children.some((child) => {
-    if (child.type === "JSXText") return child.value.trim().length > 0;
-    if (child.type !== "JSXExpressionContainer") return true;
-    let expression = unwrapExpression(child.expression);
-    if (expression?.type === "JSXEmptyExpression") return false;
-    if (expression?.type === "Literal") {
-      return (
-        typeof expression.value === "number" ||
-        (typeof expression.value === "string" && expression.value.length > 0)
-      );
+function jsxAliasBindings(parameter, sourceCode) {
+  const bindings = new Map();
+  for (const prop of parameter.properties) {
+    const name = staticPropertyKey(prop);
+    if (!name || name === "key" || prop.value.type !== "Identifier") {
+      return null;
     }
-    while (expression?.type === "MemberExpression") {
-      expression = unwrapExpression(expression.object);
-    }
-    return (
-      expression?.type !== "Identifier" ||
-      !findVariable(sourceCode, expression)?.defs.some(
-        (definition) => definition.type === "Parameter"
-      )
-    );
-  });
-}
-
-function forwardedJsxProp(sourceCode, prop, owner) {
-  if (prop.type !== "Property" || prop.value?.type !== "Identifier") {
-    return null;
+    const binding = findVariable(sourceCode, prop.value);
+    if (binding?.references.length !== 1) return null;
+    bindings.set(name, {
+      node: prop.value,
+      reference: binding.references[0].identifier,
+    });
   }
-  const binding = findVariable(sourceCode, prop.value);
-  if (!binding || binding.references.length !== 1) return null;
-  const ref = binding.references[0].identifier;
-  const container = ref?.parent;
-  const attr = container?.parent;
-  const opening = attr?.parent;
-  const nameNode = opening?.name;
-  return container?.type === "JSXExpressionContainer" &&
-    attr?.type === "JSXAttribute" &&
-    isReturnedRootJsxElement(opening, owner) &&
-    !ownsJsxChildren(opening, sourceCode) &&
-    nameNode?.type === "JSXIdentifier" &&
-    isLocalFunctionBinding(nameNode, sourceCode)
-    ? { node: prop.value, name: prop.value.name, callee: nameNode.name }
-    : null;
+  return bindings;
 }
 
 function forwardedJsxProps(sourceCode, parameter, owner) {
-  if (parameter.type !== "ObjectPattern") return [];
-  const hits = [];
-  for (const prop of parameter.properties) {
-    const hit = forwardedJsxProp(sourceCode, prop, owner);
-    if (hit) hits.push(hit);
+  if (
+    parameter.type !== "ObjectPattern" ||
+    owner.params.length !== 1 ||
+    owner.async ||
+    owner.generator
+  ) {
+    return [];
   }
-  return hits;
+  const root = singleReturnExpression(owner.body);
+  if (root?.type !== "JSXElement") return [];
+  const { name: target, attributes } = root.openingElement;
+  if (
+    target.type !== "JSXIdentifier" ||
+    !isLocalFunctionBinding(target, sourceCode)
+  ) {
+    return [];
+  }
+
+  const bindings = jsxAliasBindings(parameter, sourceCode);
+  if (!bindings) return [];
+  const hits = [];
+  for (const attr of attributes) {
+    if (attr.type !== "JSXAttribute" || attr.name.type !== "JSXIdentifier") {
+      return [];
+    }
+    const name = attr.name.name;
+    const forwarded = bindings.get(name);
+    if (
+      !forwarded ||
+      attr.value?.type !== "JSXExpressionContainer" ||
+      attr.value.expression !== forwarded.reference
+    ) {
+      return [];
+    }
+    hits.push({ node: forwarded.node, name, callee: target.name });
+    bindings.delete(name);
+  }
+
+  const children = root.children.filter(hasRenderedChild);
+  if (bindings.size === 0) return children.length === 0 ? hits : [];
+  const [child] = children;
+  return bindings.size === 1 &&
+    children.length === 1 &&
+    child.type === "JSXExpressionContainer" &&
+    bindings.get("children")?.reference === child.expression
+    ? hits
+    : [];
 }
 
 function memberExtraction(sourceCode, parameter, call) {

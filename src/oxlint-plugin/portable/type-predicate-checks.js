@@ -10,6 +10,7 @@ import {
   bindingTypeAnnotation,
   findVariable,
   isFunctionLike,
+  singleReturnExpression,
   staticPropertyName,
   unwrapExpression,
 } from "../shared/scope.js";
@@ -72,14 +73,6 @@ function predicateParts(node) {
   const target = predicate?.typeAnnotation?.typeAnnotation;
   return parameter && target
     ? { predicate, parameter, paramName, target }
-    : null;
-}
-
-export function singleReturnExpression(body) {
-  if (body?.type !== "BlockStatement") return unwrapExpression(body);
-  const [only] = body.body;
-  return body.body.length === 1 && only.type === "ReturnStatement"
-    ? unwrapExpression(only.argument)
     : null;
 }
 
