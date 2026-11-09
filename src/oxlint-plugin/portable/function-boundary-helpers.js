@@ -174,6 +174,17 @@ function forwardableCallee(node, call, binding, sourceCode) {
       ? callee
       : null;
   }
+  if (
+    findDescendant(
+      callee,
+      (receiver) =>
+        receiver.type === "CallExpression" ||
+        receiver.type === "NewExpression" ||
+        receiver.type === "AwaitExpression"
+    )
+  ) {
+    return null;
+  }
   const objectIdent =
     callee?.type === "MemberExpression" && callee.object?.type === "Identifier"
       ? callee.object.name
