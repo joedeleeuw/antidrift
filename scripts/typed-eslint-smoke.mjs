@@ -26,8 +26,8 @@ export function makeUrl(path: string) {
   return \`https://example.com\${path}\`;
 }
 
-export function combineRemoteUrl(base: string, path: string) {
-  return \`\${base}\${path}\`;
+export function combineRemoteUrl(origin: string, pathname: string, query: string, hash: string) {
+  return \`\${origin}\${pathname}\${query}\${hash}\`;
 }
 
 export interface ImportedCallbackBag {
@@ -63,10 +63,14 @@ const typedGoodSource = `
 ${mergedShapeGoodSource}
 import { invoke } from "@tauri-apps/api/core";
 import { z } from "zod";
-import { UserSchema, makeUrl } from "./schemas";
+import { UserSchema, combineRemoteUrl, makeUrl } from "./schemas";
 import type { GeneratedSessionRecord } from "./_generated/api";
 
 export const builtEndpoint = makeUrl("/health");
+
+export function describeRemoteUrl(origin: string, pathname: string, query: string, hash: string) {
+  return "Open " + combineRemoteUrl(origin, pathname, query, hash);
+}
 
 export async function fetchGeneratedSession() {
   await invoke<void>("ping_session");
@@ -309,13 +313,12 @@ export function acceptInlineSession(
 }
 
 export function forwardCrossFileUrl(
-  prefix: string,
-  first: string,
-  second: string,
-  suffix: string
+  origin: string,
+  pathname: string,
+  query: string,
+  hash: string
 ) {
-  const combined = combineRemoteUrl(first, second);
-  return \`\${prefix}:\${combined}:\${suffix}\`;
+  return combineRemoteUrl(origin, pathname, query, hash);
 }
 
 export function joinPath(root: string, leaf?: string) {
@@ -501,7 +504,7 @@ const typedBadDiagnostics = [
   {
     ruleId: "antidrift/no-pass-through-parameters",
     message:
-      "Parameter 'first' is only forwarded unchanged to 'combineRemoteUrl'. Resolve it at the leaf or pass a narrower domain object.",
+      "Parameter 'origin' is only forwarded unchanged to 'combineRemoteUrl'. Resolve it at the leaf or pass a narrower domain object.",
   },
   {
     ruleId: "antidrift/optional-input-earns-optionality",

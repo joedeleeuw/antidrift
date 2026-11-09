@@ -510,7 +510,7 @@ export function passThroughVisitors(context) {
 
   function checkFunction(node) {
     const candidate = wrapperCandidate(node, sourceCode);
-    if (node.params.length >= 4 && (!candidate || candidate.exported)) {
+    if (node.params.length >= 4 && candidate?.exported) {
       for (const parameter of node.params) {
         const callee = forwardedLocalCallee(sourceCode, parameter);
         if (callee) {
