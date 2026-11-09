@@ -115,6 +115,9 @@ export function recordProgramTypeDeclarations(programNode, typeDeclarations) {
 
 const BAG_TYPE_NAME =
   /(?:Deps|Dependencies|Options|Opts|Params|Parameters|Args|Arguments|Input|Config|Bag|Callbacks|Handlers)$/u;
+const CONFIGURATION_TYPE_NAME = /(?:Deps|Dependencies|Options|Opts|Config)$/u;
+const CONFIGURATION_PARAMETER_NAME =
+  /^(?:deps|dependencies|options|opts|config)$/u;
 const SETTER_NAME = /^set([A-Z]\w*)$/u;
 
 function localBagDeclaration(typeNode, typeDeclarations) {
@@ -137,24 +140,6 @@ function objectPatternNames(pattern) {
     .map((prop) => prop.key.name);
 }
 
-function firstStatementDestructure(node, parameter) {
-  const first =
-    node.body?.type === "BlockStatement" ? node.body.body[0] : undefined;
-  if (
-    parameter.type !== "Identifier" ||
-    first?.type !== "VariableDeclaration"
-  ) {
-    return [];
-  }
-  const declarator = first.declarations.find(
-    (candidate) =>
-      candidate.id?.type === "ObjectPattern" &&
-      candidate.init?.type === "Identifier" &&
-      candidate.init.name === parameter.name
-  );
-  return declarator ? objectPatternNames(declarator.id) : [];
-}
-
 function isBagReference(typeNode, sourceCode) {
   if (
     typeNode?.type !== "TSTypeReference" ||
@@ -171,43 +156,98 @@ function isBagReference(typeNode, sourceCode) {
   );
 }
 
-function shouldCollectAnnotatedNames(parameter, annotation, localDeclaration) {
-  return (
-    parameter.type === "ObjectPattern" ||
-    annotation?.type === "TSTypeLiteral" ||
-    annotation?.type === "TSIntersectionType" ||
-    localDeclaration !== null
-  );
-}
-
-function bagShape(parameter, typeDeclarations, sourceCode) {
+function configurationWidth(parameter, typeDeclarations, sourceCode) {
   const annotation = parameter.typeAnnotation?.typeAnnotation;
+  const configuration =
+    annotation?.type === "TSTypeReference"
+      ? annotation.typeName.type === "Identifier" &&
+        CONFIGURATION_TYPE_NAME.test(annotation.typeName.name)
+      : annotation?.type === "TSTypeLiteral" &&
+        parameter.type === "Identifier" &&
+        CONFIGURATION_PARAMETER_NAME.test(parameter.name);
+  if (!configuration) return 0;
+
   const localDeclaration = localBagDeclaration(annotation, typeDeclarations);
   const resolvedBag =
     !localDeclaration && isBagReference(annotation, sourceCode)
       ? resolvedPropertyShape(annotation, sourceCode)
       : null;
-  const isUnresolvedRef =
-    annotation?.type === "TSTypeReference" && !localDeclaration && !resolvedBag;
-  const destructured = isUnresolvedRef
-    ? []
-    : firstStatementDestructure(parameter.parent, parameter);
-  const names = new Set(
-    parameter.type === "ObjectPattern" ? objectPatternNames(parameter) : []
-  );
-  const collectAnnotated = shouldCollectAnnotatedNames(
-    parameter,
-    annotation,
-    localDeclaration
-  );
-  if (collectAnnotated) {
-    collectTypePropertyNames(annotation, typeDeclarations, names);
+  if (resolvedBag) return resolvedBag.all.length;
+  return collectTypePropertyNames(annotation, typeDeclarations).size;
+}
+
+function collectDestructuredKeys(pattern, keys) {
+  for (const property of pattern.properties) {
+    const key = staticPropertyKey(property);
+    if (key === null) return false;
+    keys.add(key);
   }
-  for (const name of resolvedBag?.all ?? []) names.add(name);
-  for (const name of destructured) names.add(name);
-  const shaped =
-    collectAnnotated || resolvedBag !== null || destructured.length > 0;
-  return { shaped, size: names.size };
+  return true;
+}
+
+function localConfigurationParameter(call, identifier, sourceCode) {
+  if (
+    call?.type !== "CallExpression" ||
+    call.callee.type !== "Identifier" ||
+    call.arguments.length !== 1 ||
+    call.arguments[0] !== identifier
+  ) {
+    return null;
+  }
+  const binding = findVariable(sourceCode, call.callee);
+  if (
+    binding?.defs.length !== 1 ||
+    binding.defs[0].type !== "FunctionName" ||
+    binding.defs[0].node.type !== "FunctionDeclaration" ||
+    binding.references.some((reference) => reference.isWrite())
+  ) {
+    return null;
+  }
+  return binding.defs[0].node.params[0] ?? null;
+}
+
+function collectConfigurationKeys(
+  parameter,
+  sourceCode,
+  keys,
+  followLocalCall
+) {
+  const ownerScope = sourceCode.getScope(parameter.parent);
+  if (ownerScope?.set.get("arguments")?.references.length) return false;
+  if (parameter.type === "ObjectPattern") {
+    return collectDestructuredKeys(parameter, keys);
+  }
+  const binding = findVariable(sourceCode, parameter);
+  if (!binding) return false;
+  for (const { identifier } of binding.references) {
+    const parent = identifier.parent;
+    if (parent?.type === "MemberExpression" && parent.object === identifier) {
+      const key = staticPropertyName(parent);
+      let member = parent;
+      while (unwrapExpression(member.parent) === parent) member = member.parent;
+      const invocation = member.parent;
+      if (!key || invocation?.callee === member || invocation?.tag === member) {
+        return false;
+      }
+      keys.add(key);
+      continue;
+    }
+    if (
+      parent?.type === "VariableDeclarator" &&
+      parent.init === identifier &&
+      parent.id.type === "ObjectPattern"
+    ) {
+      if (!collectDestructuredKeys(parent.id, keys)) return false;
+      continue;
+    }
+    const target = followLocalCall
+      ? localConfigurationParameter(parent, identifier, sourceCode)
+      : null;
+    if (!target || !collectConfigurationKeys(target, sourceCode, keys, false)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function memberList(typeNode) {
@@ -553,11 +593,21 @@ function checkParameterBags(node, typeDeclarations, context) {
     ? null
     : unwrapForwardingExpression(forwardingBodyExpression(node.body));
   for (const parameter of node.params) {
-    const bag = bagShape(parameter, typeDeclarations, context.sourceCode);
-    if (bag.shaped && bag.size > max) {
+    const width = configurationWidth(
+      parameter,
+      typeDeclarations,
+      context.sourceCode
+    );
+    const keys = new Set();
+    if (
+      width > max &&
+      collectConfigurationKeys(parameter, context.sourceCode, keys, true) &&
+      keys.size > 0 &&
+      keys.size <= max
+    ) {
       context.report({
         node: parameter,
-        message: `Function parameter bag accepts ${bag.size} properties (max ${max}); group cohesive domain concepts or move behavior onto the owning object.`,
+        message: `Configuration parameter accepts ${width} properties but uses only ${keys.size} (max ${max}). Narrow the parameter to the fields this function needs.`,
       });
     }
     reportForeignCallbacks(parameter, typeDeclarations, context);

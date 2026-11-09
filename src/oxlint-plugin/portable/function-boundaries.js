@@ -124,7 +124,7 @@ export const noPassThroughParametersRule = {
     type: "problem",
     docs: {
       description:
-        "Disallow pass-through parameters, member-extraction forwarding, wide parameter bags (> 10 properties), foreign state-callback bags, and call-site mutator closures.",
+        "Disallow pass-through parameters, member-extraction forwarding, oversized configuration inputs, foreign state-callback bags, and call-site mutator closures.",
     },
     schema: [
       {

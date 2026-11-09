@@ -301,6 +301,29 @@ export function missingLabel(entry: { label?: string }) {
   return entry.label ?? "unknown";
 }
 
+type DeliveryOptions = {
+  email: boolean; push: boolean; sms: boolean; retries: number; batchSize: number;
+  audit: boolean; debounce: number; rate: number; timeout: number; parallel: boolean;
+  region: string;
+};
+
+export function hasNotificationChannel(options: DeliveryOptions) {
+  const { email, push } = options;
+  return email || push;
+}
+
+export function canRetryNotification(options: DeliveryOptions) {
+  return options.retries > 0 && hasNotificationChannel(options);
+}
+
+export function composeNotificationDelivery(options: DeliveryOptions) {
+  return { options, enabled: hasNotificationChannel(options) };
+}
+
+export function readNotificationArguments(options: DeliveryOptions) {
+  return { enabled: options.email || options.push, original: arguments[0] };
+}
+
 export function shredUnionAndRepeatNullable(
   scope: { kind: "machine"; machineId: string } | { kind: "project"; projectId: string },
   entry: { a: string; b: number; c: boolean } | null,
@@ -750,7 +773,14 @@ export const expectedDiagnostics = [
   {
     ruleId: "antidrift/no-pass-through-parameters",
     message:
-      "Function parameter bag accepts 11 properties (max 10); group cohesive domain concepts or move behavior onto the owning object.",
+      "Configuration parameter accepts 11 properties but uses only 2 (max 10). Narrow the parameter to the fields this function needs.",
+    count: 1,
+  },
+  {
+    ruleId: "antidrift/no-pass-through-parameters",
+    message:
+      "Configuration parameter accepts 11 properties but uses only 3 (max 10). Narrow the parameter to the fields this function needs.",
+    count: 1,
   },
   {
     ruleId: "antidrift/no-pass-through-parameters",
