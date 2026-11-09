@@ -1,3 +1,11 @@
+const queryGateBadSource = [
+  `export function ReadinessSkipView() {\n  const projects = useEntityQuery<QueryProject[]>("projects");\n  const rows = useEntityQuery<QueryProject[]>(projects.isPending ? null : "rows");\n  return <div data-rows={rows.data} />;\n}`,
+  `export function AliasedReadinessSkipView() {\n  const projects = useEntityQuery<QueryProject[]>("projects");\n  const pending = projects.isPending;\n  const rows = useEntityQuery<QueryProject[]>(pending ? null : "rows");\n  return <div data-rows={rows.data} />;\n}`,
+  `export function DestructuredReadinessEnabledView() {\n  const projects = useEntityQuery<QueryProject[]>("projects");\n  const { isPending } = projects;\n  const rows = useEntityQuery<QueryProject[]>({ key: "rows", enabled: !isPending });\n  return <div data-rows={rows.data} />;\n}`,
+  `export function AliasedCollectionSkipView() {\n  const projects = useEntityQuery<QueryProject[]>("projects");\n  const projectData = projects.data;\n  const rows = useEntityQuery<QueryProject[]>(projectData.length > 0 ? "rows" : null);\n  return <div data-rows={rows.data} />;\n}`,
+  `export function DestructuredCollectionEnabledView() {\n  const projects = useEntityQuery<QueryProject[]>("projects");\n  const { data: projectData } = projects;\n  const rows = useEntityQuery<QueryProject[]>({ key: "rows", enabled: projectData.length > 0 });\n  return <div data-rows={rows.data} />;\n}`,
+  `export function MixedReadinessSkipView() {\n  const projects = useEntityQuery<QueryProject[]>("projects");\n  const rows = useEntityQuery<QueryProject[]>(!projects.isPending && projects.data.length > 0 ? "rows" : null);\n  return <div data-rows={rows.data} />;\n}`,
+].join("\n");
 const mergedShapeBadSource = `
 type InlineNodePair =
   | { id: string; parentId: string; text: string }
@@ -7,7 +15,13 @@ interface BaseRoot { rootId: string; }
 interface FirstExtended extends BaseRoot { role: string; scope: string; }
 interface DuplicateExtended extends BaseRoot { role: string; scope: string; }
 
-declare function useEntityQuery<T>(key: string): { data: T; isPending: boolean; error: Error | null };
+declare function useEntityQuery<T>(
+  key: string | null | { key: string | null; enabled: boolean }
+): { data: T; isPending: boolean; error: Error | null };
+interface QueryProject { id: string; }
+
+${queryGateBadSource}
+
 declare function useAtomValue<T>(atom: string): T;
 declare function useSelector<T>(selector: string): T;
 declare function useStore<T>(store: string): T;
@@ -62,6 +76,14 @@ export function padThreadCard(thread: { id: string; title: string }) {
 }
 `;
 
+const queryGateGoodSource = [
+  `export function DomainAuthorizationSkipView() {\n  const access = useAccessQuery<QueryAccess>("access");\n  const rows = useCollectionQuery<QueryRow[]>(access?.isOwner ? "rows" : null);\n  return <div data-rows={rows.data} />;\n}`,
+  `export function AliasedAuthorizationSkipView() {\n  const access = useAccessQuery<QueryAccess>("access");\n  const isOwner = access?.isOwner;\n  const rows = useCollectionQuery<QueryRow[]>(isOwner ? "rows" : null);\n  return <div data-rows={rows.data} />;\n}`,
+  `export function DestructuredAuthorizationEnabledView() {\n  const access = useAccessQuery<QueryAccess>("access");\n  const { isOwner } = access;\n  const rows = useCollectionQuery<QueryRow[]>({ key: "rows", enabled: isOwner });\n  return <div data-rows={rows.data} />;\n}`,
+  `export function MixedAuthorizationSkipView() {\n  const projects = useCollectionQuery<QueryRow[]>("projects");\n  const access = useAccessQuery<QueryAccess>("access");\n  const rows = useCollectionQuery<QueryRow[]>(projects.data.length > 0 && access?.isOwner ? "rows" : null);\n  return <div data-rows={rows.data} />;\n}`,
+  `export function EnvelopeAuthorizationEnabledView() {\n  const access = useCollectionQuery<QueryAccess>("access");\n  const rows = useCollectionQuery<QueryRow[]>({ key: "rows", enabled: access.data.isOwner });\n  return <div data-rows={rows.data} />;\n}`,
+  `export function DependentRowsView() {\n  const projects = useCollectionQuery<QueryRow[]>("projects");\n  const rows = useCollectionQuery<QueryRow[]>(projects.data.length > 0 ? projects.data[0].id : null);\n  return <div data-rows={rows.data} />;\n}`,
+].join("\n");
 export const mergedShapeGoodSource = `
 interface NodeBase { id: string; parentId: string; }
 interface TextNode extends NodeBase { text: string; }
@@ -95,7 +117,15 @@ export function createTask(command: CreateTask): Task {
   };
 }
 
-declare function useCollectionQuery<T>(key: string): { data: T; isPending: boolean; error: Error | null };
+declare function useCollectionQuery<T>(
+  key: string | null | { key: string | null; enabled: boolean }
+): { data: T; isPending: boolean; error: Error | null };
+declare function useAccessQuery<T>(key: string): T;
+interface QueryAccess { isOwner: boolean; }
+interface QueryRow { id: string; }
+
+${queryGateGoodSource}
+
 declare function useAtomValue<T>(atom: string): T;
 declare function useMemo<T>(build: () => T, dependencies: unknown[]): T;
 export function useSeparateQueryProperties() {
@@ -723,6 +753,12 @@ export const expectedDiagnostics = [
     ruleId: "antidrift/no-contract-appeasement-projection",
     message:
       "Object literal adapts 'thread' by copying its identity and padding 3 required fields with empty/placeholder constants; project a narrower view contract or union instead of fabricating missing entity state.",
+  },
+  {
+    ruleId: "antidrift/no-query-join-or-tree-reshape",
+    message:
+      "Reactive query is gated on an earlier query's completion even though its input does not depend on that query's data; run independent queries in parallel.",
+    count: 6,
   },
   {
     ruleId: "antidrift/no-query-join-or-tree-reshape",

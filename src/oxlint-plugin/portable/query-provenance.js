@@ -21,9 +21,15 @@ export const lifecycleKeys = new Set([
   "error",
 ]);
 
-function referenceOrigin(identifier, origin, includeLifecycle) {
+function referenceAccess(identifier, origin, includeLifecycle) {
   let current = identifier;
   let selected = origin;
+  let path = [];
+  if (origin.path === null) path = null;
+  else if (origin.path) path = [...origin.path];
+  if (!includeLifecycle && path?.some((key) => lifecycleKeys.has(key))) {
+    return null;
+  }
   while (
     current.parent?.type === "MemberExpression" &&
     current.parent.object === current
@@ -32,11 +38,14 @@ function referenceOrigin(identifier, origin, includeLifecycle) {
     if (!includeLifecycle && lifecycleKeys.has(key)) return null;
     if (selected.properties && key) {
       selected = selected.properties.get(key);
+      path = selected?.path ? [...selected.path] : (selected?.path ?? null);
+    } else if (path) {
+      path.push(key || null);
     }
     if (!selected) return null;
     current = current.parent;
   }
-  return selected;
+  return { origin: selected, path };
 }
 
 function dependencyOnly(identifier, boundary) {
@@ -83,7 +92,10 @@ export function queriesInRange(node, state, includeLifecycle = false) {
   const queries = new Set();
   const mapSites = new Set();
   const contributors = new Set();
-  if (!Array.isArray(node?.range)) return { queries, mapSites, contributors };
+  const accesses = [];
+  if (!Array.isArray(node?.range)) {
+    return { queries, mapSites, contributors, accesses };
+  }
   const [start, end] = node.range;
   for (const [binding, origin] of state.provenance) {
     for (const reference of binding.references) {
@@ -99,14 +111,16 @@ export function queriesInRange(node, state, includeLifecycle = false) {
       if (!includeLifecycle && effectReceiver(identifier, state.sourceCode)) {
         continue;
       }
-      const selected = referenceOrigin(identifier, origin, includeLifecycle);
+      const access = referenceAccess(identifier, origin, includeLifecycle);
+      const selected = access?.origin;
       if (!selected || selected.queries.size === 0) continue;
       contributors.add(selected);
+      accesses.push({ queries: selected.queries, path: access.path });
       for (const query of selected.queries) queries.add(query);
       for (const site of selected.mapSites) mapSites.add(site);
     }
   }
-  return { queries, mapSites, contributors };
+  return { queries, mapSites, contributors, accesses };
 }
 
 export function hasNewJoin(summary) {
@@ -119,19 +133,20 @@ export function hasNewJoin(summary) {
 }
 
 function expressionOrigin(expression, state) {
-  const summary = queriesInRange(expression, state);
+  const summary = queriesInRange(expression, state, true);
   return {
     queries: summary.queries,
     mapSites: summary.mapSites,
     alreadyReportedJoin: summary.queries.size > 1 && !hasNewJoin(summary),
     properties: propertyOrigins(expression, state),
+    path: summary.accesses.length === 1 ? summary.accesses[0].path : null,
   };
 }
 
 function propertyOrigins(expression, state) {
   const node = unwrapExpression(expression);
   if (node?.type === "Identifier" || node?.type === "MemberExpression") {
-    const summary = queriesInRange(node, state);
+    const summary = queriesInRange(node, state, true);
     return summary.contributors.size === 1
       ? [...summary.contributors][0].properties
       : null;
@@ -158,8 +173,13 @@ function bindPattern(pattern, origin, state) {
   if (pattern.type !== "ObjectPattern") return;
   for (const property of pattern.properties) {
     const key = staticPropertyKey(property);
-    if (!key || lifecycleKeys.has(key)) continue;
-    const selected = origin.properties ? origin.properties.get(key) : origin;
+    if (!key) continue;
+    const selected = origin.properties
+      ? origin.properties.get(key)
+      : {
+          ...origin,
+          path: origin.path === null ? null : [...(origin.path ?? []), key],
+        };
     if (selected) bindPattern(property.value, selected, state);
   }
 }

@@ -298,6 +298,25 @@ function isSkipSentinel(node) {
   );
 }
 
+function isReadinessOnlyAccess(access) {
+  if (access.path?.length === 1) return lifecycleKeys.has(access.path[0]);
+  return (
+    access.path?.length === 2 &&
+    (access.path[0] === "data" || access.path[0] === "results") &&
+    (access.path[1] === "length" || access.path[1] === "size")
+  );
+}
+
+function hasReadinessOnlyWaterfall(condition, usedInPayload, state) {
+  const summary = queriesInRange(condition, state, true);
+  const gatedOn = asyncQueriesOnly(summary.queries, state);
+  if (gatedOn.length === 0) return false;
+  if (summary.accesses.some((access) => !isReadinessOnlyAccess(access))) {
+    return false;
+  }
+  return gatedOn.some((qid) => !usedInPayload.has(qid));
+}
+
 function hasGatedArgWaterfall(arg, state) {
   const expr = unwrapExpression(arg);
   if (expr?.type === "ConditionalExpression") {
@@ -305,29 +324,20 @@ function hasGatedArgWaterfall(arg, state) {
     const skipAlternate = isSkipSentinel(expr.alternate);
     if (!skipConsequent && !skipAlternate) return false;
     const payload = skipConsequent ? expr.alternate : expr.consequent;
-    const gatedOn = asyncQueriesOnly(
-      queriesInRange(expr.test, state, true).queries,
-      state
-    );
     const usedInPayload = queriesInRange(payload, state, true).queries;
-    return gatedOn.some((qid) => !usedInPayload.has(qid));
+    return hasReadinessOnlyWaterfall(expr.test, usedInPayload, state);
   }
   if (expr?.type !== "ObjectExpression") return false;
   const enabledProp = expr.properties.find(
     (prop) => staticPropertyKey(prop) === "enabled"
   );
   if (!enabledProp) return false;
-  const gatedOn = asyncQueriesOnly(
-    queriesInRange(enabledProp.value, state, true).queries,
-    state
-  );
-  if (gatedOn.length === 0) return false;
   const usedInRest = new Set(
     expr.properties
       .filter((prop) => prop !== enabledProp)
       .flatMap((prop) => [...queriesInRange(prop, state, true).queries])
   );
-  return gatedOn.some((qid) => !usedInRest.has(qid));
+  return hasReadinessOnlyWaterfall(enabledProp.value, usedInRest, state);
 }
 
 function isUnnecessaryQueryGate(call, state) {
@@ -374,7 +384,7 @@ function recordDeclaratorOrigin(init, state) {
     const qid = state.nextQueryId;
     state.nextQueryId += 1;
     if (isStore) state.storeQueryIds.add(qid);
-    return { queries: new Set([qid]), mapSites: new Set() };
+    return { queries: new Set([qid]), mapSites: new Set(), path: [] };
   }
   const hook = calleeName(init);
   if (
@@ -384,7 +394,7 @@ function recordDeclaratorOrigin(init, state) {
     return null;
   }
   const joinSite = findDirectJoinSite(init, state);
-  const summary = queriesInRange(init, state);
+  const summary = queriesInRange(init, state, true);
   const { queries, mapSites } = summary;
   if (queries.size === 0) return null;
   if (joinSite) {
@@ -393,6 +403,7 @@ function recordDeclaratorOrigin(init, state) {
       queries: new Set([[...queries][0]]),
       mapSites: new Set(),
       alreadyReportedJoin: true,
+      path: null,
     };
   }
   const nextMaps = new Set(mapSites);
@@ -407,6 +418,7 @@ function recordDeclaratorOrigin(init, state) {
     mapSites: nextMaps,
     alreadyReportedJoin:
       queries.size > 1 && asyncQueries.length < 2 && nextMaps.size === 0,
+    path: summary.accesses.length === 1 ? summary.accesses[0].path : null,
   };
 }
 
