@@ -267,7 +267,7 @@ export function JoinedFeedView() {
   const projects = useEnvironmentQuery<{ id: string; label: string }>("projects");
   const projectLabels = new Map(projects.data.map((proj) => [proj.id, proj.label]));
   const rows = useEnvironmentQuery<{ id: string; projectId: string }>(
-    projects.data.length > 0 ? "rows" : null
+    projects.isPending ? null : "rows"
   );
   const labelFor = (projectId: string) => projectLabels.get(projectId) ?? "";
   return <div data-rows={rows.data} data-label={labelFor} />;

@@ -21,15 +21,9 @@ export const lifecycleKeys = new Set([
   "error",
 ]);
 
-function referenceAccess(identifier, origin, includeLifecycle) {
+function referenceOrigin(identifier, origin, includeLifecycle) {
   let current = identifier;
   let selected = origin;
-  let path = [];
-  if (origin.path === null) path = null;
-  else if (origin.path) path = [...origin.path];
-  if (!includeLifecycle && path?.some((key) => lifecycleKeys.has(key))) {
-    return null;
-  }
   while (
     current.parent?.type === "MemberExpression" &&
     current.parent.object === current
@@ -38,14 +32,11 @@ function referenceAccess(identifier, origin, includeLifecycle) {
     if (!includeLifecycle && lifecycleKeys.has(key)) return null;
     if (selected.properties && key) {
       selected = selected.properties.get(key);
-      path = selected?.path ? [...selected.path] : (selected?.path ?? null);
-    } else if (path) {
-      path.push(key || null);
     }
     if (!selected) return null;
     current = current.parent;
   }
-  return { origin: selected, path };
+  return selected;
 }
 
 function dependencyOnly(identifier, boundary) {
@@ -92,10 +83,7 @@ export function queriesInRange(node, state, includeLifecycle = false) {
   const queries = new Set();
   const mapSites = new Set();
   const contributors = new Set();
-  const accesses = [];
-  if (!Array.isArray(node?.range)) {
-    return { queries, mapSites, contributors, accesses };
-  }
+  if (!Array.isArray(node?.range)) return { queries, mapSites, contributors };
   const [start, end] = node.range;
   for (const [binding, origin] of state.provenance) {
     for (const reference of binding.references) {
@@ -111,16 +99,14 @@ export function queriesInRange(node, state, includeLifecycle = false) {
       if (!includeLifecycle && effectReceiver(identifier, state.sourceCode)) {
         continue;
       }
-      const access = referenceAccess(identifier, origin, includeLifecycle);
-      const selected = access?.origin;
+      const selected = referenceOrigin(identifier, origin, includeLifecycle);
       if (!selected || selected.queries.size === 0) continue;
       contributors.add(selected);
-      accesses.push({ queries: selected.queries, path: access.path });
       for (const query of selected.queries) queries.add(query);
       for (const site of selected.mapSites) mapSites.add(site);
     }
   }
-  return { queries, mapSites, contributors, accesses };
+  return { queries, mapSites, contributors };
 }
 
 export function hasNewJoin(summary) {
@@ -133,20 +119,19 @@ export function hasNewJoin(summary) {
 }
 
 function expressionOrigin(expression, state) {
-  const summary = queriesInRange(expression, state, true);
+  const summary = queriesInRange(expression, state);
   return {
     queries: summary.queries,
     mapSites: summary.mapSites,
     alreadyReportedJoin: summary.queries.size > 1 && !hasNewJoin(summary),
     properties: propertyOrigins(expression, state),
-    path: summary.accesses.length === 1 ? summary.accesses[0].path : null,
   };
 }
 
 function propertyOrigins(expression, state) {
   const node = unwrapExpression(expression);
   if (node?.type === "Identifier" || node?.type === "MemberExpression") {
-    const summary = queriesInRange(node, state, true);
+    const summary = queriesInRange(node, state);
     return summary.contributors.size === 1
       ? [...summary.contributors][0].properties
       : null;
@@ -173,13 +158,8 @@ function bindPattern(pattern, origin, state) {
   if (pattern.type !== "ObjectPattern") return;
   for (const property of pattern.properties) {
     const key = staticPropertyKey(property);
-    if (!key) continue;
-    const selected = origin.properties
-      ? origin.properties.get(key)
-      : {
-          ...origin,
-          path: origin.path === null ? null : [...(origin.path ?? []), key],
-        };
+    if (!key || lifecycleKeys.has(key)) continue;
+    const selected = origin.properties ? origin.properties.get(key) : origin;
     if (selected) bindPattern(property.value, selected, state);
   }
 }
@@ -187,4 +167,134 @@ function bindPattern(pattern, origin, state) {
 export function bindQueryOrigin(declarator, origin, state) {
   const properties = propertyOrigins(declarator.init, state);
   bindPattern(declarator.id, { ...origin, properties }, state);
+}
+
+function isUndefinedNode(node) {
+  return (
+    (node?.type === "Identifier" && node.name === "undefined") ||
+    (node?.type === "UnaryExpression" && node.operator === "void")
+  );
+}
+
+function isUndefinedCheck(node) {
+  const parent = node.parent;
+  return (
+    parent?.type === "BinaryExpression" &&
+    ["===", "!==", "==", "!="].includes(parent.operator) &&
+    (isUndefinedNode(parent.left) || isUndefinedNode(parent.right))
+  );
+}
+
+function extendGateAccesses(accesses, key) {
+  return accesses.map((access) => ({
+    ...access,
+    path: access.path === null ? null : [...access.path, key],
+    undefinedCheck: false,
+  }));
+}
+
+function gateReferenceAccess(identifier, origin) {
+  let current = identifier;
+  let selected = origin;
+  let accesses = origin.accesses;
+  while (
+    current.parent?.type === "MemberExpression" &&
+    current.parent.object === current
+  ) {
+    const key = staticPropertyName(current.parent);
+    if (selected.properties && key) {
+      selected = selected.properties.get(key);
+      accesses = selected?.accesses;
+    } else {
+      accesses = extendGateAccesses(accesses, key);
+    }
+    if (!selected || !accesses) return null;
+    current = current.parent;
+  }
+  while (current.parent?.type === "ChainExpression") current = current.parent;
+  const directReference = current === identifier;
+  return accesses.map((access) => ({
+    ...access,
+    undefinedCheck:
+      isUndefinedCheck(current) || (directReference && access.undefinedCheck),
+  }));
+}
+
+export function queryGateAccesses(node, state) {
+  const accesses = [];
+  const contributors = new Set();
+  if (!Array.isArray(node?.range)) return { accesses, contributors };
+  const [start, end] = node.range;
+  for (const [binding, origin] of state.gateProvenance) {
+    for (const reference of binding.references) {
+      const identifier = reference.identifier;
+      if (
+        !reference.isRead() ||
+        identifier.range[0] < start ||
+        identifier.range[1] > end ||
+        dependencyOnly(identifier, node)
+      ) {
+        continue;
+      }
+      const selected = gateReferenceAccess(identifier, origin);
+      if (!selected) continue;
+      contributors.add(origin);
+      accesses.push(...selected);
+    }
+  }
+  return { accesses, contributors };
+}
+
+export function expressionGateOrigin(expression, state) {
+  const summary = queryGateAccesses(expression, state);
+  return {
+    accesses: summary.accesses,
+    properties: gatePropertyOrigins(expression, state),
+  };
+}
+
+function gatePropertyOrigins(expression, state) {
+  const node = unwrapExpression(expression);
+  if (node?.type === "Identifier" || node?.type === "MemberExpression") {
+    const summary = queryGateAccesses(node, state);
+    return summary.contributors.size === 1
+      ? [...summary.contributors][0].properties
+      : null;
+  }
+  if (node?.type !== "ObjectExpression") return null;
+  const properties = new Map();
+  for (const property of node.properties) {
+    const key = staticPropertyKey(property);
+    if (key) properties.set(key, expressionGateOrigin(property.value, state));
+  }
+  return properties;
+}
+
+function bindGatePattern(pattern, origin, state) {
+  if (pattern.type === "Identifier") {
+    const binding = findVariable(state.sourceCode, pattern);
+    if (binding) state.gateProvenance.set(binding, origin);
+    return;
+  }
+  if (pattern.type === "AssignmentPattern") {
+    bindGatePattern(pattern.left, origin, state);
+    return;
+  }
+  if (pattern.type !== "ObjectPattern") return;
+  for (const property of pattern.properties) {
+    const key = staticPropertyKey(property);
+    if (!key) continue;
+    const selected = origin.properties
+      ? origin.properties.get(key)
+      : {
+          accesses: extendGateAccesses(origin.accesses, key),
+          properties: null,
+        };
+    if (selected) bindGatePattern(property.value, selected, state);
+  }
+}
+
+export function bindQueryGateOrigin(declarator, origin, state) {
+  const properties = gatePropertyOrigins(declarator.init, state);
+  bindGatePattern(declarator.id, { ...origin, properties }, state);
 }

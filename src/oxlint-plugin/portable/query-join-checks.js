@@ -4,10 +4,13 @@ import { patternIdentifiers } from "./static-resolution.js";
 import { checkEntityPrecedence } from "./entity-precedence.js";
 import { keyedCollectionJoin } from "./keyed-collection-joins.js";
 import {
+  bindQueryGateOrigin,
   bindQueryOrigin,
+  expressionGateOrigin,
   hasNewJoin,
   lifecycleKeys,
   queriesInRange,
+  queryGateAccesses,
 } from "./query-provenance.js";
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import {
@@ -184,9 +187,10 @@ function isEnvelopePropertyList(keys) {
   );
 }
 
-function isImportedQueryCallee(call, sourceCode) {
+function importedQueryHook(call, sourceCode) {
   const callee = unwrapExpression(call.callee);
   let ident = null;
+  let importedName = null;
   if (callee?.type === "Identifier") {
     ident = callee;
   } else if (
@@ -194,12 +198,36 @@ function isImportedQueryCallee(call, sourceCode) {
     callee.object?.type === "Identifier"
   ) {
     ident = callee.object;
+    importedName = staticPropertyName(callee);
   }
   const def = ident ? findVariable(sourceCode, ident)?.defs?.[0] : null;
-  return (
-    def?.type === "ImportBinding" &&
-    REACTIVE_QUERY_PACKAGES.test(def.parent?.source?.value ?? "")
-  );
+  const source = def?.parent?.source?.value ?? "";
+  if (def?.type !== "ImportBinding" || !REACTIVE_QUERY_PACKAGES.test(source)) {
+    return null;
+  }
+  if (def.node?.type === "ImportSpecifier") {
+    importedName = def.node.imported?.name ?? def.node.imported?.value;
+  }
+  return { importedName, source };
+}
+
+function isImportedQueryCallee(call, sourceCode) {
+  return importedQueryHook(call, sourceCode) !== null;
+}
+
+function queryResultKind(call, sourceCode) {
+  const imported = importedQueryHook(call, sourceCode);
+  if (imported?.source === "convex/react") {
+    if (imported.importedName === "useQuery") return "raw";
+    if (imported.importedName === "usePaginatedQuery") return "paginated";
+  }
+  if (
+    imported?.source === "@tanstack/react-query" &&
+    imported.importedName === "useQuery"
+  ) {
+    return "envelope";
+  }
+  return imported ? "unknown" : "envelope";
 }
 
 const STORE_HOOK_NAMES = new Set(["useAtomValue", "useSelector", "useStore"]);
@@ -298,23 +326,38 @@ function isSkipSentinel(node) {
   );
 }
 
+const PAGINATED_LIFECYCLE_KEYS = new Set(["status", "isLoading"]);
+
 function isReadinessOnlyAccess(access) {
-  if (access.path?.length === 1) return lifecycleKeys.has(access.path[0]);
+  if (access.result === "raw") {
+    return access.path?.length === 0 && access.undefinedCheck;
+  }
+  if (access.result === "paginated") {
+    return (
+      access.path?.length === 1 && PAGINATED_LIFECYCLE_KEYS.has(access.path[0])
+    );
+  }
+  if (access.result !== "envelope" || access.path?.length !== 1) return false;
   return (
-    access.path?.length === 2 &&
-    (access.path[0] === "data" || access.path[0] === "results") &&
-    (access.path[1] === "length" || access.path[1] === "size")
+    lifecycleKeys.has(access.path[0]) ||
+    (access.path[0] === "data" && access.undefinedCheck)
+  );
+}
+
+function gateQueryIds(node, state) {
+  return new Set(
+    queryGateAccesses(node, state).accesses.flatMap((access) => [
+      ...access.queries,
+    ])
   );
 }
 
 function hasReadinessOnlyWaterfall(condition, usedInPayload, state) {
-  const summary = queriesInRange(condition, state, true);
-  const gatedOn = asyncQueriesOnly(summary.queries, state);
-  if (gatedOn.length === 0) return false;
-  if (summary.accesses.some((access) => !isReadinessOnlyAccess(access))) {
-    return false;
-  }
-  return gatedOn.some((qid) => !usedInPayload.has(qid));
+  const { accesses } = queryGateAccesses(condition, state);
+  const gatedOn = new Set(accesses.flatMap((access) => [...access.queries]));
+  if (gatedOn.size === 0) return false;
+  if (accesses.some((access) => !isReadinessOnlyAccess(access))) return false;
+  return [...gatedOn].some((qid) => !usedInPayload.has(qid));
 }
 
 function hasGatedArgWaterfall(arg, state) {
@@ -324,8 +367,11 @@ function hasGatedArgWaterfall(arg, state) {
     const skipAlternate = isSkipSentinel(expr.alternate);
     if (!skipConsequent && !skipAlternate) return false;
     const payload = skipConsequent ? expr.alternate : expr.consequent;
-    const usedInPayload = queriesInRange(payload, state, true).queries;
-    return hasReadinessOnlyWaterfall(expr.test, usedInPayload, state);
+    return hasReadinessOnlyWaterfall(
+      expr.test,
+      gateQueryIds(payload, state),
+      state
+    );
   }
   if (expr?.type !== "ObjectExpression") return false;
   const enabledProp = expr.properties.find(
@@ -335,14 +381,14 @@ function hasGatedArgWaterfall(arg, state) {
   const usedInRest = new Set(
     expr.properties
       .filter((prop) => prop !== enabledProp)
-      .flatMap((prop) => [...queriesInRange(prop, state, true).queries])
+      .flatMap((prop) => [...gateQueryIds(prop, state)])
   );
   return hasReadinessOnlyWaterfall(enabledProp.value, usedInRest, state);
 }
 
 function isUnnecessaryQueryGate(call, state) {
   return (
-    state.provenance.size > 0 &&
+    state.gateProvenance.size > 0 &&
     call.arguments.some((arg) => hasGatedArgWaterfall(arg, state))
   );
 }
@@ -384,7 +430,7 @@ function recordDeclaratorOrigin(init, state) {
     const qid = state.nextQueryId;
     state.nextQueryId += 1;
     if (isStore) state.storeQueryIds.add(qid);
-    return { queries: new Set([qid]), mapSites: new Set(), path: [] };
+    return { queries: new Set([qid]), mapSites: new Set() };
   }
   const hook = calleeName(init);
   if (
@@ -394,7 +440,7 @@ function recordDeclaratorOrigin(init, state) {
     return null;
   }
   const joinSite = findDirectJoinSite(init, state);
-  const summary = queriesInRange(init, state, true);
+  const summary = queriesInRange(init, state);
   const { queries, mapSites } = summary;
   if (queries.size === 0) return null;
   if (joinSite) {
@@ -403,7 +449,6 @@ function recordDeclaratorOrigin(init, state) {
       queries: new Set([[...queries][0]]),
       mapSites: new Set(),
       alreadyReportedJoin: true,
-      path: null,
     };
   }
   const nextMaps = new Set(mapSites);
@@ -418,26 +463,51 @@ function recordDeclaratorOrigin(init, state) {
     mapSites: nextMaps,
     alreadyReportedJoin:
       queries.size > 1 && asyncQueries.length < 2 && nextMaps.size === 0,
-    path: summary.accesses.length === 1 ? summary.accesses[0].path : null,
   };
+}
+
+function recordGateOrigin(init, state) {
+  const { sourceCode } = state;
+  if (isReactiveQueryCall(init, sourceCode)) {
+    const qid = state.nextGateQueryId;
+    state.nextGateQueryId += 1;
+    return {
+      accesses: [
+        {
+          queries: new Set([qid]),
+          path: [],
+          result: queryResultKind(init, sourceCode),
+          undefinedCheck: false,
+        },
+      ],
+      properties: null,
+    };
+  }
+  const hook = calleeName(init);
+  if (HOOK_NAME.test(hook) && hook !== "useMemo") return null;
+  const origin = expressionGateOrigin(init, state);
+  return origin.accesses.length > 0 ? origin : null;
 }
 
 function collectOwnerJoinState(owner, sourceCode) {
   const state = {
     sourceCode,
     provenance: new Map(),
+    gateProvenance: new Map(),
     storeQueryIds: new Set(),
     reportedSites: new Set(),
     waterfallSites: new Set(),
     nextQueryId: 0,
+    nextGateQueryId: 0,
   };
   for (const statement of owner.body.body) {
     if (statement.type !== "VariableDeclaration") continue;
     for (const declarator of statement.declarations) {
       const init = unwrapExpression(declarator.init);
       const origin = init ? recordDeclaratorOrigin(init, state) : null;
-      if (!origin) continue;
-      bindQueryOrigin(declarator, origin, state);
+      if (origin) bindQueryOrigin(declarator, origin, state);
+      const gateOrigin = init ? recordGateOrigin(init, state) : null;
+      if (gateOrigin) bindQueryGateOrigin(declarator, gateOrigin, state);
     }
   }
   return state;
