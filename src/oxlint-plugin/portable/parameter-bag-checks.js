@@ -449,12 +449,13 @@ function forwardedJsxProps(sourceCode, parameter, owner) {
   return hits;
 }
 
-function memberExtraction(sourceCode, parameter) {
-  if (parameter.type !== "Identifier") return null;
+function memberExtraction(sourceCode, parameter, call) {
+  if (parameter.type !== "Identifier" || call?.type !== "CallExpression") {
+    return null;
+  }
   const references = findVariable(sourceCode, parameter)?.references ?? [];
+  if (references.length < 2) return null;
   const members = references.map((reference) => reference.identifier.parent);
-  const call = members[0]?.parent;
-  if (references.length < 2 || call?.type !== "CallExpression") return null;
   const extracted = members.every(
     (member, index) =>
       member?.type === "MemberExpression" &&
@@ -466,7 +467,8 @@ function memberExtraction(sourceCode, parameter) {
   if (
     !extracted ||
     call.callee?.type !== "Identifier" ||
-    !isLocalFunctionBinding(call.callee, sourceCode)
+    !isLocalFunctionBinding(call.callee, sourceCode) ||
+    findVariable(sourceCode, call.callee)?.defs?.[0]?.type === "Parameter"
   ) {
     return null;
   }
@@ -539,6 +541,12 @@ function checkMutatorClosures(node, context) {
 function checkParameterBags(node, typeDeclarations, context) {
   if (functionReturnsJsx(node)) return;
   const max = context.options[0]?.max ?? 10;
+  const parent = node.parent;
+  const inlineCallback =
+    parent?.type === "CallExpression" && parent.arguments.includes(node);
+  const forwardingCall = inlineCallback
+    ? null
+    : unwrapForwardingExpression(forwardingBodyExpression(node.body));
   for (const parameter of node.params) {
     const bag = bagShape(parameter, typeDeclarations, context.sourceCode);
     if (bag.shaped && bag.size > max) {
@@ -548,7 +556,11 @@ function checkParameterBags(node, typeDeclarations, context) {
       });
     }
     reportForeignCallbacks(parameter, typeDeclarations, context);
-    const extraction = memberExtraction(context.sourceCode, parameter);
+    const extraction = memberExtraction(
+      context.sourceCode,
+      parameter,
+      forwardingCall
+    );
     if (extraction) {
       context.report({
         node: parameter,

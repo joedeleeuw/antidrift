@@ -293,6 +293,10 @@ export function forwardLabels(first: string, second: string, third: string, four
   return combineLabels(first, second, third, fourth);
 }
 
+export function forwardLabelPair(label: { first: string; second: string }) {
+  return combineLabels(label.first, label.second, "third", "fourth");
+}
+
 export function missingLabel(entry: { label?: string }) {
   return entry.label ?? "unknown";
 }
@@ -457,6 +461,22 @@ export interface OrderSummary {
 
 export function formatOrderSummary(summary: OrderSummary): string {
   return \`\${summary.orderId}: \${summary.totalCents}\`;
+}
+
+function pointDistance(x: number, y: number) {
+  return Math.hypot(x, y);
+}
+
+export function mapPointDistances(points: { x: number; y: number }[]) {
+  return points.map((point) => pointDistance(point.x, point.y));
+}
+
+export function selectedPointDistance(point: { x: number; y: number }, selected: boolean) {
+  return selected ? pointDistance(point.x, point.y) : null;
+}
+
+export function notifyPoint(point: { x: number; y: number }, notify: (x: number, y: number) => void) {
+  notify(point.x, point.y);
 }
 
 export function isOrderReady(status: string, retryCount: number, hasOverride: boolean): boolean {
@@ -679,6 +699,11 @@ export const expectedDiagnostics = [
     ruleId: "antidrift/no-pass-through-parameters",
     message:
       "Parameter 'first' is only forwarded unchanged to 'combineLabels'. Resolve it at the leaf or pass a narrower domain object.",
+  },
+  {
+    ruleId: "antidrift/no-pass-through-parameters",
+    message:
+      "Parameter 'label' is only unpacked into 'combineLabels' (first, second); pass 'label' itself or let 'combineLabels' accept the owning object.",
   },
   {
     ruleId: "antidrift/no-unresolved-dependency-types",
