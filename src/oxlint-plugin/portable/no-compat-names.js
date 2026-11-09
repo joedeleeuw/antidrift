@@ -1,10 +1,15 @@
 import { getProgramIndex } from "../shared/program-index.js";
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
-import { findVariable, unwrapExpression } from "../shared/scope.js";
+import {
+  findVariable,
+  splitIdentifierWords,
+  unwrapExpression,
+} from "../shared/scope.js";
 import { patternIdentifiers } from "./static-resolution.js";
 
 const REMOVAL_VOCABULARY =
-  /legacy|compat(?!ib(?:le|ility))|backwards?_?compat|deprecated|retired(?!At\b)|no_?longer/i;
+  /legacy|compat(?!ib(?:le|ility))|backwards?_?compat|deprecated|no_?longer/i;
+const RETIREMENT_VOCABULARY = /retired(?!At\b)/iu;
 const COMPATIBILITY_TERM = /compatib(?:le|ility)/iu;
 const REMOVAL_ROLE =
   /(?:Shims?|Fallback|Layer)(?=[A-Z_\d]|$)|(?:^|_)(?:shims?|fallback|layer|SHIMS?|FALLBACK|LAYER)(?=_|$)/u;
@@ -132,6 +137,10 @@ function createNameVisitors(context) {
     if (
       node?.type === "Identifier" &&
       (REMOVAL_VOCABULARY.test(node.name) ||
+        (RETIREMENT_VOCABULARY.test(node.name) &&
+          splitIdentifierWords(node.name).some((word) =>
+            word.startsWith("retired")
+          )) ||
         (COMPATIBILITY_TERM.test(node.name) && REMOVAL_ROLE.test(node.name)))
     ) {
       const canonical = canonicalReplacementName(node.name, context.sourceCode);
