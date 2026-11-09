@@ -134,7 +134,7 @@ export function distinctAliasBindings(firstId: string, secondId: string) {
 
 export const badSource = `
 ${mergedShapeBadSource}
-import { useState, useSyncExternalStore } from "react";
+import { memo as memoComponent, useState, useSyncExternalStore } from "react";
 import { TouchableOpacity } from "react-native";
 import { Text as WidgetText } from "@expo/ui/swift-ui";
 import { z } from "zod";
@@ -377,6 +377,14 @@ export function ForwardedBanner({ title }: { title: string }) {
   return <LeafHeader title={title} />;
 }
 
+function MemoLeaf({ label }: { label: string }) {
+  return <span>{label}</span>;
+}
+
+export const MemoAlias = memoComponent(({ label }: { label: string }) => (
+  <MemoLeaf label={label} />
+));
+
 function LeafBody({ title, children }: { title: string; children: string }) {
   return <section aria-label={title}>{children}</section>;
 }
@@ -518,6 +526,19 @@ export function DiscardedLabel({ title }: { title: string }) {
 export function StoredLabel({ title }: { title: string }) {
   const element = <Label title={title} />;
   return element;
+}
+
+function LabelList({ renderItem }: { renderItem: (item: { title: string }) => React.ReactNode }) {
+  return <section>{renderItem({ title: "First" })}</section>;
+}
+
+const RenderLabel = ({ title }: { title: string }) => <Label title={title} />;
+
+export const namedLabelRenderer = <LabelList renderItem={RenderLabel} />;
+export const inlineLabelRenderer = <LabelList renderItem={({ title }) => <Label title={title} />} />;
+
+export function mapLabels(labels: { title: string }[]) {
+  return labels.map(({ title }) => <Label title={title} />);
 }
 
 export function isOrderReady(status: string, retryCount: number, hasOverride: boolean): boolean {
@@ -796,6 +817,12 @@ export const expectedDiagnostics = [
     ruleId: "antidrift/no-pass-through-parameters",
     message:
       "Parameter 'title' is only forwarded unchanged to 'LeafBody'. Resolve it at the leaf or pass a narrower domain object.",
+    count: 1,
+  },
+  {
+    ruleId: "antidrift/no-pass-through-parameters",
+    message:
+      "Parameter 'label' is only forwarded unchanged to 'MemoLeaf'. Resolve it at the leaf or pass a narrower domain object.",
     count: 1,
   },
   {

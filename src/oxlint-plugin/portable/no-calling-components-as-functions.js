@@ -1,5 +1,6 @@
 // Rule ported from getsentry/sentry static/eslint/eslintPluginSentry
 // (no-calling-components-as-functions). See that repo's LICENSE.
+import { isComponentWrapperCall } from "../shared/react-component-bindings.js";
 import {
   findVariable,
   functionReturnsJsx,
@@ -59,8 +60,6 @@ function buildJsxFix(fixer, callTarget, sourceCode) {
   return fixer.replaceText(node, `<${name} ${attrs.join(" ")} />`);
 }
 
-const COMPONENT_WRAPPERS = new Set(["forwardRef", "memo"]);
-
 // JSX in these files belongs to another framework, where calling a
 // JSX-returning function is ordinary. JSX with no framework import stays in
 // scope because React's automatic runtime needs no import.
@@ -78,48 +77,6 @@ function isNonReactJsxFile(program) {
     } else if (/^preact(?:\/|$)/u.test(source)) importsPreact = true;
   }
   return importsPreact && !importsPreactReactBridge;
-}
-
-function moduleExportName(node) {
-  if (node?.type === "Identifier") return node.name;
-  return typeof node?.value === "string" ? node.value : null;
-}
-
-function reactImportSpecifier(sourceCode, identifier) {
-  const definition = findVariable(sourceCode, identifier)?.defs?.[0];
-  if (definition?.type !== "ImportBinding") return null;
-  return definition.parent?.source?.value === "react" ? definition.node : null;
-}
-
-function isReactNamespace(sourceCode, node) {
-  const specifier = reactImportSpecifier(sourceCode, node);
-  return (
-    specifier?.type === "ImportDefaultSpecifier" ||
-    specifier?.type === "ImportNamespaceSpecifier" ||
-    (specifier?.type === "ImportSpecifier" &&
-      moduleExportName(specifier.imported) === "default")
-  );
-}
-
-// Only React's own forwardRef/memo (named, aliased, default or namespace
-// import) prove a component; a local helper spelled `memo` does not.
-function isComponentWrapperCall(sourceCode, node) {
-  if (node?.type !== "CallExpression") return false;
-  const callee = node.callee;
-  if (callee.type === "Identifier") {
-    const specifier = reactImportSpecifier(sourceCode, callee);
-    return (
-      specifier?.type === "ImportSpecifier" &&
-      COMPONENT_WRAPPERS.has(moduleExportName(specifier.imported))
-    );
-  }
-  return (
-    callee.type === "MemberExpression" &&
-    !callee.computed &&
-    callee.property.type === "Identifier" &&
-    COMPONENT_WRAPPERS.has(callee.property.name) &&
-    isReactNamespace(sourceCode, callee.object)
-  );
 }
 
 function resolvesImportedComponent(sourceCode, identifier) {

@@ -3,6 +3,7 @@ import {
   isLocalFunctionBinding,
   wrapperCandidate,
 } from "./function-boundary-helpers.js";
+import { hasComponentBinding } from "../shared/react-component-bindings.js";
 import { ruleFilename } from "../shared/rule-scope.js";
 import {
   findVariable,
@@ -411,7 +412,9 @@ function forwardedJsxProps(sourceCode, parameter, owner) {
     return [];
   }
   const root = singleReturnExpression(owner.body);
-  if (root?.type !== "JSXElement") return [];
+  if (root?.type !== "JSXElement" || !hasComponentBinding(sourceCode, owner)) {
+    return [];
+  }
   const { name: target, attributes } = root.openingElement;
   if (
     target.type !== "JSXIdentifier" ||
