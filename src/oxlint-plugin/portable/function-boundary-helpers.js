@@ -121,7 +121,7 @@ const BUILTIN_CALL_OBJECTS = new Set([
   "console",
 ]);
 
-function isConstantCallArgument(arg) {
+export function isConstantCallArgument(arg) {
   const expr = unwrapExpression(arg);
   if (!expr) return false;
   if (expr.type === "Literal") return true;

@@ -1,4 +1,5 @@
 import {
+  isConstantCallArgument,
   isLocalFunctionBinding,
   wrapperCandidate,
 } from "./function-boundary-helpers.js";
@@ -301,19 +302,74 @@ function reportForeignCallbacks(parameter, typeDeclarations, context) {
   }
 }
 
-function forwardedLocalCallee(sourceCode, parameter) {
-  if (parameter.type !== "Identifier") return null;
+function isDirectlyForwarded(sourceCode, parameter, call) {
+  if (parameter.type !== "Identifier") return false;
   const binding = findVariable(sourceCode, parameter);
-  if (!binding || binding.references.length !== 1) return null;
+  if (!binding || binding.references.length !== 1) return false;
   const identifier = binding.references[0].identifier;
-  const call = identifier?.parent;
-  return call?.type === "CallExpression" &&
-    call.arguments.length >= 2 &&
-    call.arguments.includes(identifier) &&
-    call.callee?.type === "Identifier" &&
-    isLocalFunctionBinding(call.callee, sourceCode)
-    ? call.callee.name
+  return identifier?.parent === call && call.arguments.includes(identifier);
+}
+
+function unwrapForwardingExpression(expression) {
+  const unwrapped = unwrapExpression(expression);
+  return unwrapped?.type === "AwaitExpression"
+    ? unwrapExpression(unwrapped.argument)
+    : unwrapped;
+}
+
+function forwardingBodyExpression(body) {
+  if (body.type !== "BlockStatement") return body;
+  const [first, second] = body.body;
+  if (body.body.length === 1) {
+    if (first.type === "ReturnStatement") return first.argument;
+    if (first.type === "ExpressionStatement") return first.expression;
+  }
+  if (
+    body.body.length !== 2 ||
+    first.type !== "VariableDeclaration" ||
+    first.declarations.length !== 1 ||
+    second.type !== "ReturnStatement"
+  ) {
+    return null;
+  }
+  const [binding] = first.declarations;
+  const returned = unwrapForwardingExpression(second.argument);
+  return binding.id.type === "Identifier" &&
+    returned?.type === "Identifier" &&
+    returned.name === binding.id.name
+    ? binding.init
     : null;
+}
+
+function positionalForwardingCall(owner, sourceCode) {
+  const call = unwrapForwardingExpression(forwardingBodyExpression(owner.body));
+  if (
+    call?.type !== "CallExpression" ||
+    call.arguments.length < 2 ||
+    call.callee.type !== "Identifier" ||
+    !isLocalFunctionBinding(call.callee, sourceCode)
+  ) {
+    return null;
+  }
+  const parameterNames = new Set(
+    owner.params.flatMap((parameter) => {
+      let binding = parameter;
+      if (parameter.type === "AssignmentPattern") binding = parameter.left;
+      if (parameter.type === "RestElement") binding = parameter.argument;
+      return binding.type === "Identifier" ? [binding.name] : [];
+    })
+  );
+  const forwardsArguments = call.arguments.every((argument) => {
+    const forwarded = unwrapExpression(
+      argument.type === "SpreadElement" ? argument.argument : argument
+    );
+    return (
+      (forwarded?.type === "Identifier" &&
+        parameterNames.has(forwarded.name)) ||
+      isConstantCallArgument(argument)
+    );
+  });
+  return forwardsArguments ? call : null;
 }
 
 function isReturnedRootJsxElement(opening, owner) {
@@ -510,14 +566,17 @@ export function passThroughVisitors(context) {
 
   function checkFunction(node) {
     const candidate = wrapperCandidate(node, sourceCode);
-    if (node.params.length >= 4 && candidate?.exported) {
+    const forwardingCall =
+      node.params.length >= 4 && (!candidate || candidate.exported)
+        ? positionalForwardingCall(node, sourceCode)
+        : null;
+    if (forwardingCall) {
       for (const parameter of node.params) {
-        const callee = forwardedLocalCallee(sourceCode, parameter);
-        if (callee) {
+        if (isDirectlyForwarded(sourceCode, parameter, forwardingCall)) {
           context.report({
             node: parameter,
             messageId: "passThrough",
-            data: { name: parameter.name, callee },
+            data: { name: parameter.name, callee: forwardingCall.callee.name },
           });
         }
       }

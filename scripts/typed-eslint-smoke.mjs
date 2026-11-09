@@ -318,7 +318,8 @@ export function forwardCrossFileUrl(
   query: string,
   hash: string
 ) {
-  return combineRemoteUrl(origin, pathname, query, hash);
+  const forwardedUrl = combineRemoteUrl(origin, pathname, query, hash);
+  return forwardedUrl;
 }
 
 export function joinPath(root: string, leaf?: string) {
