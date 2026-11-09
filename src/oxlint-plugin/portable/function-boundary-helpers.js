@@ -163,6 +163,19 @@ function isModuleLevel(node) {
   return true;
 }
 
+function passedAsArgument(node, sourceCode) {
+  const identifier =
+    node.parent?.type === "VariableDeclarator" ? node.parent.id : node.id;
+  if (identifier?.type !== "Identifier") return false;
+  return Boolean(
+    findVariable(sourceCode, identifier)?.references.some(
+      (reference) =>
+        reference.identifier.parent?.type === "CallExpression" &&
+        reference.identifier.parent.arguments.includes(reference.identifier)
+    )
+  );
+}
+
 function forwardableCallee(node, call, binding, sourceCode) {
   const callee = unwrapExpression(call.callee);
   if (callee?.type === "Identifier") {
@@ -175,12 +188,14 @@ function forwardableCallee(node, call, binding, sourceCode) {
       : null;
   }
   if (
+    passedAsArgument(node, sourceCode) &&
     findDescendant(
       callee,
       (receiver) =>
         receiver.type === "CallExpression" ||
         receiver.type === "NewExpression" ||
-        receiver.type === "AwaitExpression"
+        receiver.type === "AwaitExpression",
+      (receiver) => !isFunctionLike(receiver)
     )
   ) {
     return null;
