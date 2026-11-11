@@ -136,6 +136,19 @@ export function Hints() {
 function SpreadHint({ text, detail }: { text: string; detail?: string }) {
   return <span title={detail}>{text}</span>;
 }
+
+function NamespacedHint({ label, detail }: { label: string; detail?: string }) {
+  return <span title={detail}>{label}</span>;
+}
+
+export function NamespacedHints() {
+  return (
+    <p>
+      <NamespacedHint label="plain" detail="shown" />
+      <NamespacedHint label="namespaced" data:detail="not-the-prop" />
+    </p>
+  );
+}
 interface PullSummary { number: number; title: string; }
 interface PullDetail extends PullSummary { changedFiles?: string[]; }
 export function readOptionalDetail(pr: PullSummary | PullDetail) {
@@ -804,7 +817,7 @@ function assertCommentAndStringUnionsExcluded(snapshot) {
   }
 }
 
-function verifyUnloadedPackageSnapshotCommentsAndStrings(workDir) {
+function verifyUnloadedPackageSnapshot(workDir) {
   const packageDir = join(workDir, "packages/unloaded-pkg/src");
   mkdirSync(packageDir, { recursive: true });
   const packageFile = join(packageDir, "index.ts");
@@ -834,6 +847,49 @@ function verifyUnloadedPackageSnapshotCommentsAndStrings(workDir) {
     [],
     "Unloaded package snapshot must have empty exportedOwners"
   );
+  verifyUnloadedPackageSeams(packageDir);
+}
+
+function verifyUnloadedPackageSeams(packageDir) {
+  const seamFile = join(packageDir, "seams.ts");
+  const seamContent = [
+    "export function makeAdapter() {",
+    "  return { run() {} } satisfies NestedPort;",
+    "}",
+    "export default { send() {} } satisfies DefaultSender;",
+    "export const asyncGateway = { call() {} } satisfies Promise<AsyncGateway>;",
+    "export const castBridge = { open() {} } as CastBridge;",
+    "export class Holder {",
+    "  readonly store: PropStore = { get() {} };",
+    "}",
+    "function factory() {",
+    "  return class LocalRunner implements FactoryRunner {",
+    "    exec() {}",
+    "  };",
+    "}",
+    "export class Child extends AbstractSeam {}",
+    "export const runner = factory();",
+  ].join("\n");
+  writeFileSync(seamFile, seamContent, "utf8");
+  const seams = buildUnloadedPackageSnapshot(seamFile, seamContent, 2);
+  for (const seamName of [
+    "NestedPort",
+    "DefaultSender",
+    "AsyncGateway",
+    "CastBridge",
+    "PropStore",
+    "FactoryRunner",
+    "AbstractSeam",
+  ]) {
+    assert.ok(
+      seams.implementedSeams.get(seamName)?.size === 1,
+      `Unloaded package snapshot must record one ${seamName} implementation, got: ${JSON.stringify([...seams.implementedSeams].map(([name, impls]) => [name, [...impls]]))}`
+    );
+  }
+  assert.ok(
+    !seams.implementedSeams.has("Promise"),
+    "Promise<Seam> must unwrap to the seam name"
+  );
 }
 
 export async function runTypedEslintSmoke({
@@ -844,7 +900,7 @@ export async function runTypedEslintSmoke({
   expectedRules,
   expectedDiagnostics,
 }) {
-  verifyUnloadedPackageSnapshotCommentsAndStrings(workDir);
+  verifyUnloadedPackageSnapshot(workDir);
   const { typedGoodFile, typedBadFile } = writeTypedProject(workDir, repoRoot);
   writeModuleFlowProject(workDir);
   const eslint = createTypedEslint(workDir);

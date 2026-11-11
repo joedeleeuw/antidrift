@@ -89,16 +89,21 @@ function moduleExports(tsSourceFile, checker) {
   return { named, defaultExport };
 }
 
+function jsxAttributeName(ts, nameNode) {
+  if (ts.isIdentifier(nameNode)) return nameNode.text;
+  if (ts.isJsxNamespacedName(nameNode)) {
+    return `${nameNode.namespace.text}:${nameNode.name.text}`;
+  }
+  return null;
+}
+
 function jsxSite(element) {
   const supplied = new Set();
   const attributeValues = new Map();
   const ts = getTypeScript();
   for (const attribute of element.attributes.properties) {
     if (!attribute.name) return null;
-    const name =
-      ts && ts.isIdentifier(attribute.name)
-        ? attribute.name.text
-        : attribute.name.name?.text;
+    const name = jsxAttributeName(ts, attribute.name);
     if (!name) return null;
     supplied.add(name);
     attributeValues.set(name, attribute.initializer?.expression ?? null);

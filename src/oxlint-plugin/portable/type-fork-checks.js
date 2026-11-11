@@ -1,4 +1,5 @@
-import { getProgramIndex, resolveSymbolKey } from "../shared/program-index.js";
+import { getProgramIndex } from "../shared/program-index.js";
+import { resolveSymbolKey } from "../shared/implemented-seams.js";
 import {
   isRuleFile,
   ruleFilename,

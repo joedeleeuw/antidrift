@@ -7,7 +7,8 @@ import {
   wrapperCandidate,
 } from "./function-boundary-helpers.js";
 import { passThroughVisitors } from "./parameter-bag-checks.js";
-import { getProgramIndex, resolveSymbolKey } from "../shared/program-index.js";
+import { getProgramIndex } from "../shared/program-index.js";
+import { resolveSymbolKey } from "../shared/implemented-seams.js";
 import { getTypeServices } from "../shared/type-services.js";
 import { isRuleFile, scopeProperties } from "../shared/rule-scope.js";
 import { findVariable } from "../shared/scope.js";

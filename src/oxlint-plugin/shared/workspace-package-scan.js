@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { recordImplementedSeams } from "./implemented-seams.js";
 import { isTestFile } from "./scope.js";
 import { getTypeScript } from "./type-services.js";
 
@@ -76,15 +77,6 @@ function extractStringLiteralsFromUnion(ts, typeNode) {
     : null;
 }
 
-function addSeamImplementation(implementedSeams, seamName, location) {
-  let bucket = implementedSeams.get(seamName);
-  if (!bucket) {
-    bucket = new Set();
-    implementedSeams.set(seamName, bucket);
-  }
-  bucket.add(location);
-}
-
 function extractArrayLiteralsFromInit(ts, init) {
   if (ts.isAsExpression(init)) {
     const isConst =
@@ -107,42 +99,6 @@ function extractArrayLiteralsFromInit(ts, init) {
     }
   }
   return null;
-}
-
-function typeRefNameText(ts, typeNode) {
-  if (!typeNode || !ts.isTypeReferenceNode(typeNode)) return null;
-  const name = typeNode.typeName;
-  if (ts.isIdentifier(name)) return name.text;
-  if (name?.right && ts.isIdentifier(name.right)) return name.right.text;
-  return null;
-}
-
-function indexVariableSeam(decl, init, context) {
-  const { ts, fileName, sourceFile, snapshot } = context;
-  const seamFromType =
-    decl.type && init && ts.isObjectLiteralExpression(init)
-      ? typeRefNameText(ts, decl.type)
-      : null;
-  if (seamFromType) {
-    addSeamImplementation(
-      snapshot.implementedSeams,
-      seamFromType,
-      `${fileName}:${decl.getStart(sourceFile)}`
-    );
-    return;
-  }
-  if (init && ts.isSatisfiesExpression(init)) {
-    const seamFromSatisfies = ts.isObjectLiteralExpression(init.expression)
-      ? typeRefNameText(ts, init.type)
-      : null;
-    if (seamFromSatisfies) {
-      addSeamImplementation(
-        snapshot.implementedSeams,
-        seamFromSatisfies,
-        `${fileName}:${decl.getStart(sourceFile)}`
-      );
-    }
-  }
 }
 
 function recordVariableDeclaredNames(ts, nameNode, snapshot) {
@@ -183,32 +139,12 @@ function indexVariableDeclaration(decl, exported, context) {
       }
     }
   }
-  indexVariableSeam(decl, init, context);
 }
 
 function indexClassDeclaration(statement, exported, context) {
-  const { ts, fileName, sourceFile, snapshot } = context;
+  const { ts, snapshot } = context;
   if (exported && statement.name && ts.isIdentifier(statement.name)) {
     snapshot.declaredNames.add(statement.name.text);
-  }
-  for (const clause of statement.heritageClauses ?? []) {
-    if (clause.token !== ts.SyntaxKind.ImplementsKeyword) continue;
-    for (const heritageType of clause.types ?? []) {
-      const expr = heritageType.expression;
-      let seamName = null;
-      if (ts.isIdentifier(expr)) {
-        seamName = expr.text;
-      } else if (ts.isPropertyAccessExpression(expr)) {
-        seamName = expr.name.text;
-      }
-      if (seamName) {
-        addSeamImplementation(
-          snapshot.implementedSeams,
-          seamName,
-          `${fileName}:${statement.getStart(sourceFile)}`
-        );
-      }
-    }
   }
 }
 
@@ -273,10 +209,15 @@ function indexStatement(statement, context) {
   }
 }
 
+function recordFileImplementedSeams(tsNode, snapshot) {
+  recordImplementedSeams(tsNode, null, snapshot);
+  tsNode.forEachChild((child) => recordFileImplementedSeams(child, snapshot));
+}
+
 export function buildUnloadedPackageSnapshot(fileName, text, packagePriority) {
   const snapshot = createEmptyFileSnapshot(fileName, "package", true);
   snapshot.signature = contentSignature(text);
-  const ts = getTypeScript();
+  const ts = getTypeScript(dirname(fileName));
   if (!ts) return snapshot;
 
   const sourceFile = ts.createSourceFile(
@@ -290,12 +231,14 @@ export function buildUnloadedPackageSnapshot(fileName, text, packagePriority) {
     ts,
     fileName,
     packagePriority,
-    sourceFile,
     snapshot,
   };
 
   for (const statement of sourceFile.statements ?? []) {
     indexStatement(statement, context);
+  }
+  if (!isTestFile(fileName)) {
+    recordFileImplementedSeams(sourceFile, snapshot);
   }
 
   return snapshot;
