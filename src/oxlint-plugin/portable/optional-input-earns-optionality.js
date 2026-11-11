@@ -5,10 +5,8 @@ import {
   rootSymbols,
 } from "../shared/program-references.js";
 import { isFunctionLike, unwrapExpression } from "../shared/scope.js";
-import { getTypeServices } from "../shared/type-services.js";
+import { getTypeServices, getTypeScript } from "../shared/type-services.js";
 
-const SYMBOL_FLAG_OPTIONAL = 16_777_216;
-const TYPE_FLAG_ANY_OR_UNKNOWN = 3;
 const COMPONENT_WRAPPERS = new Set(["memo", "forwardRef"]);
 const NEUTRAL_REFERENCE = "neutral";
 
@@ -94,9 +92,14 @@ function moduleExports(tsSourceFile, checker) {
 function jsxSite(element) {
   const supplied = new Set();
   const attributeValues = new Map();
+  const ts = getTypeScript();
   for (const attribute of element.attributes.properties) {
     if (!attribute.name) return null;
-    const name = attribute.name.getText();
+    const name =
+      ts && ts.isIdentifier(attribute.name)
+        ? attribute.name.text
+        : attribute.name.name?.text;
+    if (!name) return null;
     supplied.add(name);
     attributeValues.set(name, attribute.initializer?.expression ?? null);
   }
@@ -117,7 +120,8 @@ function jsxSite(element) {
 
 function invocationSite(call) {
   const args = [...call.arguments];
-  if (args.some((argument) => argument.getText().startsWith("..."))) {
+  const ts = getTypeScript();
+  if (args.some((argument) => ts && ts.isSpreadElement(argument))) {
     return null;
   }
   const [first] = args;
@@ -167,19 +171,24 @@ function callSites(references) {
 
 function suppliedByType(argument, name, checker) {
   const type = checker.getTypeAtLocation(argument);
-  if (type.isUnion() || (type.flags & TYPE_FLAG_ANY_OR_UNKNOWN) !== 0) {
+  const ts = getTypeScript();
+  const anyOrUnknown = ts ? ts.TypeFlags.Any | ts.TypeFlags.Unknown : 0;
+  if (type.isUnion() || (ts && (type.flags & anyOrUnknown) !== 0)) {
     return undefined;
   }
   const property = checker.getPropertyOfType(type, name);
-  return property && (property.flags & SYMBOL_FLAG_OPTIONAL) === 0
-    ? true
-    : undefined;
+  const isOptional = Boolean(
+    ts && property && (property.flags & ts.SymbolFlags.Optional) !== 0
+  );
+  return property && !isOptional ? true : undefined;
 }
 
 function suppliedExpression(expression, checker) {
   if (!expression) return true;
   const type = checker.getTypeAtLocation(expression);
-  return (type.flags & TYPE_FLAG_ANY_OR_UNKNOWN) !== 0 ||
+  const ts = getTypeScript();
+  const anyOrUnknown = ts ? ts.TypeFlags.Any | ts.TypeFlags.Unknown : 0;
+  return (ts && (type.flags & anyOrUnknown) !== 0) ||
     (type.isUnion() &&
       type.types.some(
         (constituent) => constituent.intrinsicName === "undefined"
@@ -223,8 +232,12 @@ function ownedByParameter(member, parameter, services) {
 
 function isOptionalMember(property, parameter, services) {
   const declarations = property.declarations ?? [];
+  const ts = getTypeScript();
+  const isOptional = Boolean(
+    ts && (property.flags & ts.SymbolFlags.Optional) !== 0
+  );
   return (
-    (property.flags & SYMBOL_FLAG_OPTIONAL) !== 0 &&
+    isOptional &&
     declarations.length > 0 &&
     declarations.every(
       (member) =>
@@ -251,8 +264,10 @@ function memberInputs(parameter, services) {
 
 function optionalInputs(tsFunction, wrapped, services) {
   const { checker } = services;
+  const ts = services.ts ?? getTypeScript();
   const callableParameters = tsFunction.parameters.filter(
-    (parameter) => parameter.name.getText() !== "this"
+    (parameter) =>
+      !(ts && ts.isIdentifier(parameter.name) && parameter.name.text === "this")
   );
   const inputs = [];
   for (const [position, parameter] of callableParameters.entries()) {

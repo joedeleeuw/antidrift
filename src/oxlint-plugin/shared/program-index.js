@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 
-import { getTypeServices } from "./type-services.js";
+import { getTypeServices, getTypeScript } from "./type-services.js";
 import { isTestFile } from "./scope.js";
 import {
   contentSignature,
@@ -549,7 +549,33 @@ function recordCallNode(tsNode, inTestFile, snapshot) {
   return argCount;
 }
 
-function recordImportAndEffectSignals(sourceFile, snapshot) {
+function isEffectPropertyAccess(node, ts) {
+  if (
+    ts
+      ? !ts.isPropertyAccessExpression(node)
+      : !node || !node.expression || !node.name
+  ) {
+    return false;
+  }
+  const target = node.expression.text;
+  const property = node.name.text;
+  if (target === "Context" && property === "Tag") return true;
+  if (target === "Effect" && (property === "Service" || property === "Tag")) {
+    return true;
+  }
+  if (
+    target === "Layer" &&
+    (property === "succeed" ||
+      property === "effect" ||
+      property === "scoped" ||
+      property === "provide")
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function recordImportSignals(sourceFile, snapshot) {
   for (const statement of sourceFile.statements ?? []) {
     const moduleSpec = statement.moduleSpecifier?.text;
     if (typeof moduleSpec !== "string") continue;
@@ -568,10 +594,12 @@ function recordImportAndEffectSignals(sourceFile, snapshot) {
       }
     }
   }
+}
+
+function recordEffectSignal(snapshot, tsNode) {
   if (
-    /\b(?:Context\.Tag|Effect\.(?:Service|Tag)|Layer\.(?:succeed|effect|scoped|provide))\b/u.test(
-      sourceFile.text ?? ""
-    )
+    !snapshot.isEffectModule &&
+    isEffectPropertyAccess(tsNode, getTypeScript())
   ) {
     snapshot.isEffectModule = true;
   }
@@ -579,6 +607,7 @@ function recordImportAndEffectSignals(sourceFile, snapshot) {
 
 function walkSourceFileNode(tsNode, inTestFile, checker, snapshot) {
   if (!tsNode || typeof tsNode !== "object") return;
+  recordEffectSignal(snapshot, tsNode);
   if (typeof tsNode.name?.text === "string" && tsNode.parent?.statements) {
     snapshot.declaredNames.add(tsNode.name.text);
   }
@@ -622,7 +651,7 @@ function buildSourceFileSnapshot(sourceFile, origin, checker) {
     }
   }
   if (!sourceFile.isDeclarationFile && origin !== "generated") {
-    recordImportAndEffectSignals(sourceFile, snapshot);
+    recordImportSignals(sourceFile, snapshot);
     walkSourceFileNode(sourceFile, inTest, checker, snapshot);
   }
   return snapshot;

@@ -5,6 +5,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { join, resolve } from "node:path";
@@ -75,6 +76,16 @@ async function verifyExportSubpaths(consumerDir, pkgDir, expectedRuleCount) {
     manifest.dependencies ?? {},
     {},
     "Packed manifest must have zero runtime dependencies"
+  );
+  assert.equal(
+    manifest.peerDependencies?.typescript,
+    ">=5.0.0",
+    "Packed manifest must declare typescript peerDependency"
+  );
+  assert.equal(
+    manifest.peerDependenciesMeta?.typescript?.optional,
+    true,
+    "Packed manifest must declare typescript as optional peerDependency"
   );
   const entries = assertExportTargetsExist(pkgDir, manifest.exports ?? {});
   const loadedPairs = await Promise.all(
@@ -201,6 +212,201 @@ async function verifyConsumerEslint({
   }
 }
 
+function populateAndVerifyOxlint({
+  consumerDir,
+  pkgDir,
+  repoRoot,
+  goodFile,
+  badFile,
+  createOxlintConfig,
+  expectedRules,
+}) {
+  const consumerGood = join(consumerDir, "good.tsx");
+  const consumerBad = join(consumerDir, "bad.tsx");
+  copyFileSync(goodFile, consumerGood);
+  copyFileSync(badFile, consumerBad);
+  verifyConsumerOxlint({
+    consumerDir,
+    pkgDir,
+    repoRoot,
+    createOxlintConfig,
+    consumerGood,
+    consumerBad,
+    expectedRules,
+  });
+  return { consumerGood, consumerBad };
+}
+
+function assertTypeScriptAbsentAndPluginLoads(consumerDir) {
+  execFileSync(
+    process.execPath,
+    [
+      "--input-type=module",
+      "-e",
+      'try { await import("typescript"); process.exit(1); } catch { process.exit(0); }',
+    ],
+    { cwd: consumerDir, encoding: "utf8" }
+  );
+  execFileSync(
+    process.execPath,
+    [
+      "--input-type=module",
+      "-e",
+      'import plugin from "@joedeleeuw/antidrift/oxlint-plugin"; if (!plugin?.rules) process.exit(1);',
+    ],
+    { cwd: consumerDir, encoding: "utf8" }
+  );
+}
+
+function verifyOxlintOnlyConsumer({
+  tarballPath,
+  workDir,
+  repoRoot,
+  goodFile,
+  badFile,
+  createOxlintConfig,
+  expectedRules,
+}) {
+  const consumerDir = join(workDir, "oxlint-only-consumer");
+  const pkgDir = join(consumerDir, "node_modules/@joedeleeuw/antidrift");
+  mkdirSync(pkgDir, { recursive: true });
+  execFileSync("tar", [
+    "-xzf",
+    tarballPath,
+    "--strip-components=1",
+    "-C",
+    pkgDir,
+  ]);
+  writeFileSync(
+    join(consumerDir, "package.json"),
+    JSON.stringify({
+      name: "oxlint-only-consumer",
+      private: true,
+      type: "module",
+      dependencies: {
+        "@expo/ui": "1.0.0",
+        react: "19.0.0",
+        zod: "4.0.0",
+      },
+    }),
+    "utf8"
+  );
+  assertTypeScriptAbsentAndPluginLoads(consumerDir);
+  populateAndVerifyOxlint({
+    consumerDir,
+    pkgDir,
+    repoRoot,
+    goodFile,
+    badFile,
+    createOxlintConfig,
+    expectedRules,
+  });
+}
+
+function setupPackedTypedConsumer(tarballPath, workDir, repoRoot) {
+  const consumerDir = join(workDir, "packed-typed-consumer");
+  const pkgDir = join(consumerDir, "node_modules/@joedeleeuw/antidrift");
+  mkdirSync(pkgDir, { recursive: true });
+  execFileSync("tar", [
+    "-xzf",
+    tarballPath,
+    "--strip-components=1",
+    "-C",
+    pkgDir,
+  ]);
+  writeFileSync(
+    join(consumerDir, "package.json"),
+    JSON.stringify({
+      name: "packed-typed-consumer",
+      private: true,
+      type: "module",
+    }),
+    "utf8"
+  );
+  writeFileSync(
+    join(consumerDir, "tsconfig.json"),
+    JSON.stringify({
+      compilerOptions: {
+        strict: true,
+        target: "ES2022",
+        module: "ESNext",
+        moduleResolution: "Bundler",
+        jsx: "preserve",
+        skipLibCheck: true,
+        noEmit: true,
+      },
+      include: ["*.ts", "*.tsx"],
+    }),
+    "utf8"
+  );
+  mkdirSync(join(consumerDir, "node_modules/@typescript-eslint"), {
+    recursive: true,
+  });
+  symlinkSync(
+    resolve(repoRoot, "node_modules/@typescript-eslint/parser"),
+    join(consumerDir, "node_modules/@typescript-eslint/parser"),
+    "dir"
+  );
+  symlinkSync(
+    resolve(repoRoot, "node_modules/typescript"),
+    join(consumerDir, "node_modules/typescript"),
+    "dir"
+  );
+  return consumerDir;
+}
+
+async function verifyPackedTypedConsumer({
+  tarballPath,
+  workDir,
+  repoRoot,
+  createEslintConfig,
+}) {
+  const consumerDir = setupPackedTypedConsumer(tarballPath, workDir, repoRoot);
+  const typedGood = join(consumerDir, "good.ts");
+  const typedBad = join(consumerDir, "bad.ts");
+  writeFileSync(
+    typedGood,
+    'export function greet(name: string) { return "Hello " + name; }\n',
+    "utf8"
+  );
+  writeFileSync(
+    typedBad,
+    'export function joinPath(root: string, leaf?: string) {\n  return leaf === undefined ? root : root + "/" + leaf;\n}\nexport const assetPaths = [joinPath("/a", "b"), joinPath("/c", "d")];\n',
+    "utf8"
+  );
+  const eslint = new ESLint({
+    cwd: consumerDir,
+    overrideConfigFile: true,
+    overrideConfig: [
+      {
+        files: ["**/*.{ts,tsx}"],
+        languageOptions: {
+          parser: tsParser,
+          parserOptions: {
+            projectService: true,
+            tsconfigRootDir: consumerDir,
+          },
+        },
+      },
+      createEslintConfig({ files: ["**/*.{ts,tsx}"] }),
+    ],
+  });
+  const [eslintGood, eslintBad] = await eslint.lintFiles([typedGood, typedBad]);
+  assert.equal(
+    eslintGood.messages.length,
+    0,
+    `Packed typed ESLint reported on good.ts: ${JSON.stringify(eslintGood.messages)}`
+  );
+  assert.ok(
+    eslintBad.messages.some(
+      (message) =>
+        message.ruleId === "antidrift/optional-input-earns-optionality" ||
+        message.ruleId?.startsWith("antidrift/")
+    ),
+    `Packed typed ESLint should report antidrift diagnostics on bad.ts: ${JSON.stringify(eslintBad.messages)}`
+  );
+}
+
 export async function runPackedConsumerSmoke(options) {
   const {
     tarballPath,
@@ -222,17 +428,13 @@ export async function runPackedConsumerSmoke(options) {
   );
   const { createEslintConfig } = loadedModules.get("./eslint-config");
   const { createOxlintConfig } = loadedModules.get("./oxlint-config");
-  const consumerGood = join(consumerDir, "good.tsx");
-  const consumerBad = join(consumerDir, "bad.tsx");
-  copyFileSync(goodFile, consumerGood);
-  copyFileSync(badFile, consumerBad);
-  verifyConsumerOxlint({
+  const { consumerGood, consumerBad } = populateAndVerifyOxlint({
     consumerDir,
     pkgDir,
     repoRoot,
+    goodFile,
+    badFile,
     createOxlintConfig,
-    consumerGood,
-    consumerBad,
     expectedRules,
   });
   await verifyConsumerEslint({
@@ -241,5 +443,20 @@ export async function runPackedConsumerSmoke(options) {
     consumerGood,
     consumerBad,
     expectedRules,
+  });
+  verifyOxlintOnlyConsumer({
+    tarballPath,
+    workDir,
+    repoRoot,
+    goodFile,
+    badFile,
+    createOxlintConfig,
+    expectedRules,
+  });
+  await verifyPackedTypedConsumer({
+    tarballPath,
+    workDir,
+    repoRoot,
+    createEslintConfig,
   });
 }

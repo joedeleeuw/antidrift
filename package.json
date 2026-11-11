@@ -70,8 +70,15 @@
     "check": "pnpm typecheck && pnpm lint && pnpm fallow && pnpm smoke",
     "prepare": "simple-git-hooks"
   },
+  "dependencies": {},
   "peerDependencies": {
-    "@typescript-eslint/parser": "^8.0.0"
+    "@typescript-eslint/parser": "^8.0.0",
+    "typescript": ">=5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@joedeleeuw/typescript-tooling": "github:joedeleeuw/typescript-tooling#a4bf4ef73914038ec2c0bdbc925bdf332d7dc94f",

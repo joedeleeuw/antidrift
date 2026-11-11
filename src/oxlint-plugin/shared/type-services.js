@@ -1,13 +1,44 @@
-const typeCheckerBySourceCode = new WeakMap();
+import { createRequire } from "node:module";
+import { join } from "node:path";
 
-const SYMBOL_FLAG_ALIAS = 2_097_152;
-const SYMBOL_FLAG_OPTIONAL = 16_777_216;
-const TYPE_FLAG_ANY = 1;
-const TYPE_FLAG_UNKNOWN = 2;
+const localRequire = createRequire(import.meta.url);
+let ts = null;
+
+export function getTypeScript(baseDir) {
+  if (!ts) {
+    try {
+      ts = localRequire("typescript");
+    } catch {
+      if (baseDir) {
+        try {
+          const consumerRequire = createRequire(join(baseDir, "package.json"));
+          ts = consumerRequire("typescript");
+        } catch {
+          ts = null;
+        }
+      } else {
+        ts = null;
+      }
+    }
+  }
+  return ts;
+}
+
+const typeCheckerBySourceCode = new WeakMap();
 
 export function getTypeServices(sourceCode) {
   const services = sourceCode?.parserServices;
   if (!services?.program || !services.esTreeNodeToTSNodeMap) return null;
+  const baseDir =
+    typeof services.program.getCurrentDirectory === "function"
+      ? services.program.getCurrentDirectory()
+      : process.cwd();
+  const tsInstance = getTypeScript(baseDir);
+  if (!tsInstance) {
+    throw new Error(
+      `@joedeleeuw/antidrift: Parser services contain TypeScript program but 'typescript' could not be resolved from ${baseDir} or plugin imports. Please declare 'typescript' as a dependency in your project.`
+    );
+  }
   let checker = typeCheckerBySourceCode.get(sourceCode);
   if (!checker) {
     checker = services.program.getTypeChecker();
@@ -17,6 +48,7 @@ export function getTypeServices(sourceCode) {
     checker,
     nodeMap: services.esTreeNodeToTSNodeMap,
     program: services.program,
+    ts: tsInstance,
   };
 }
 
@@ -34,7 +66,12 @@ export function getResolvedType(node, sourceCode) {
     typeof services.checker.getTypeFromTypeNode === "function"
   ) {
     const fromTypeNode = services.checker.getTypeFromTypeNode(tsNode);
-    if (fromTypeNode && (fromTypeNode.flags & TYPE_FLAG_ANY) === 0) {
+    const tsInstance = getTypeScript();
+    if (
+      fromTypeNode &&
+      tsInstance &&
+      (fromTypeNode.flags & tsInstance.TypeFlags.Any) === 0
+    ) {
       return fromTypeNode;
     }
   }
@@ -64,9 +101,11 @@ function namedSymbol(symbol) {
 
 function resolveAliasSymbol(symbol, checker) {
   const named = namedSymbol(symbol);
+  const tsInstance = getTypeScript();
   if (
     !named ||
-    (named.flags & SYMBOL_FLAG_ALIAS) === 0 ||
+    !tsInstance ||
+    (named.flags & tsInstance.SymbolFlags.Alias) === 0 ||
     typeof checker.getAliasedSymbol !== "function"
   ) {
     return named;
@@ -138,7 +177,10 @@ function isStructuralPropertySymbol(prop, program, ownedOnly) {
 }
 
 export function isOptionalProperty(property) {
-  return (property.flags & SYMBOL_FLAG_OPTIONAL) !== 0;
+  const tsInstance = getTypeScript();
+  return Boolean(
+    tsInstance && (property.flags & tsInstance.SymbolFlags.Optional) !== 0
+  );
 }
 
 export function firstPartyContract(type, services) {
@@ -214,11 +256,14 @@ export function resolvedOwnedPropertyNames(node, sourceCode) {
 export function resolvedPropertyShape(node, sourceCode, options = {}) {
   const services = getTypeServices(sourceCode);
   const type = getResolvedType(node, sourceCode);
+  const tsInstance = getTypeScript();
   if (
     !type ||
     !services ||
+    !tsInstance ||
     type.intrinsicName === "error" ||
-    (type.flags & (TYPE_FLAG_ANY | TYPE_FLAG_UNKNOWN)) !== 0 ||
+    (type.flags & (tsInstance.TypeFlags.Any | tsInstance.TypeFlags.Unknown)) !==
+      0 ||
     type.isUnion?.() ||
     !type.objectFlags
   ) {
@@ -249,7 +294,13 @@ export function isBroadResolvedType(node, sourceCode) {
   const type = getResolvedType(node, sourceCode);
   if (!type || !services) return false;
   const flags = type.flags ?? 0;
-  if ((flags & (TYPE_FLAG_ANY | TYPE_FLAG_UNKNOWN)) !== 0) return true;
+  const tsInstance = getTypeScript();
+  if (
+    tsInstance &&
+    (flags & (tsInstance.TypeFlags.Any | tsInstance.TypeFlags.Unknown)) !== 0
+  ) {
+    return true;
+  }
   if (type.isTypeParameter?.()) {
     const constraint = services.checker.getBaseConstraintOfType?.(type);
     return !constraint;

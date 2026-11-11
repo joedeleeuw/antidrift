@@ -9,6 +9,7 @@ import "zod";
 
 import { createEslintConfig, createOxlintConfig } from "../src/index.js";
 import { typedRuleNames } from "../src/oxlint-config/index.js";
+import { buildUnloadedPackageSnapshot } from "../src/oxlint-plugin/shared/workspace-package-scan.js";
 import {
   assertModuleFlowCompleteness,
   writeModuleFlowProject,
@@ -784,6 +785,57 @@ async function assertUntypedHostsAbstain({ workDir, repoRoot, typedBadFile }) {
   );
 }
 
+function assertCommentAndStringUnionsExcluded(snapshot) {
+  const unionNames = new Set(snapshot.unionOwners.map((owner) => owner.name));
+  for (const name of [
+    "CommentUnion",
+    "BlockCommentUnion",
+    "StringUnion",
+    "TemplateUnion",
+  ]) {
+    assert.ok(
+      !unionNames.has(name),
+      `${name} must not be indexed in unionOwners`
+    );
+    assert.ok(
+      !snapshot.declaredNames.has(name),
+      `${name} must not be in declaredNames`
+    );
+  }
+}
+
+function verifyUnloadedPackageSnapshotCommentsAndStrings(workDir) {
+  const packageDir = join(workDir, "packages/unloaded-pkg/src");
+  mkdirSync(packageDir, { recursive: true });
+  const packageFile = join(packageDir, "index.ts");
+  const packageContent = [
+    '// export type CommentUnion = "alpha" | "beta";',
+    '/* export type BlockCommentUnion = "one" | "two"; */',
+    'export const codeSnippet = \'export type StringUnion = "gamma" | "delta";\';',
+    'export const templateSnippet = `export type TemplateUnion = "foo" | "bar";`;',
+    'export type LegitimateUnion = "first" | "second";',
+  ].join("\n");
+  writeFileSync(packageFile, packageContent, "utf8");
+
+  const snapshot = buildUnloadedPackageSnapshot(packageFile, packageContent, 2);
+  assertCommentAndStringUnionsExcluded(snapshot);
+  assert.ok(
+    snapshot.unionOwners.some((owner) => owner.name === "LegitimateUnion"),
+    "Legitimate exported union must be indexed in unionOwners"
+  );
+  assert.ok(
+    snapshot.declaredNames.has("codeSnippet") &&
+      snapshot.declaredNames.has("templateSnippet") &&
+      snapshot.declaredNames.has("LegitimateUnion"),
+    "Legitimate exported names must be in declaredNames"
+  );
+  assert.deepEqual(
+    snapshot.exportedOwners,
+    [],
+    "Unloaded package snapshot must have empty exportedOwners"
+  );
+}
+
 export async function runTypedEslintSmoke({
   workDir,
   repoRoot,
@@ -792,6 +844,7 @@ export async function runTypedEslintSmoke({
   expectedRules,
   expectedDiagnostics,
 }) {
+  verifyUnloadedPackageSnapshotCommentsAndStrings(workDir);
   const { typedGoodFile, typedBadFile } = writeTypedProject(workDir, repoRoot);
   writeModuleFlowProject(workDir);
   const eslint = createTypedEslint(workDir);

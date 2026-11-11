@@ -1,4 +1,5 @@
-const SYMBOL_FLAG_ALIAS = 2_097_152;
+import { getTypeScript } from "./type-services.js";
+
 const IGNORED_SOURCE_FILE_RE =
   /(?:^|\/)(?:node_modules|dist|build|coverage|_generated)\/|\.d\.[cm]?ts$/u;
 
@@ -53,10 +54,9 @@ function collectNames(tsNode, index) {
 
 export function rootSymbols(symbol, checker) {
   if (!symbol) return [];
-  const target =
-    (symbol.flags & SYMBOL_FLAG_ALIAS) === 0
-      ? symbol
-      : checker.getAliasedSymbol(symbol);
+  const ts = getTypeScript();
+  const isAlias = Boolean(ts && (symbol.flags & ts.SymbolFlags.Alias) !== 0);
+  const target = !isAlias ? symbol : checker.getAliasedSymbol(symbol);
   const roots = checker
     .getRootSymbols(checker.getExportSymbolOfSymbol(target))
     .map((root) => checker.getExportSymbolOfSymbol(root));
@@ -66,11 +66,12 @@ export function rootSymbols(symbol, checker) {
 function bindingPropertySymbol(tsNode, checker) {
   const binding = tsNode.parent;
   const pattern = binding?.parent;
+  const ts = getTypeScript();
   if (
     binding?.name !== tsNode ||
     binding.propertyName ||
-    !Array.isArray(pattern?.elements) ||
-    !pattern.getText().startsWith("{")
+    !ts ||
+    !ts.isObjectBindingPattern(pattern)
   ) {
     return undefined;
   }

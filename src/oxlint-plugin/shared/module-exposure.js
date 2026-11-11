@@ -9,6 +9,7 @@ import {
   rootSymbols,
   workspaceSourceFiles,
 } from "./program-references.js";
+import { getTypeScript } from "./type-services.js";
 
 const OUTPUT_EXTENSION_RE = /(?:\.d)?\.[cm]?[jt]sx?$/u;
 const PROGRAM_EXTENSIONS = [
@@ -206,12 +207,12 @@ function loadedModule(specifier, exposure, checker) {
 
 function isImmediateMemberAccess(loadCall) {
   let loaded = loadCall;
+  const ts = getTypeScript();
   while (
     loaded.parent?.expression === loaded &&
-    loaded.parent.name === undefined &&
-    loaded.parent.argumentExpression === undefined &&
-    loaded.parent.arguments === undefined &&
-    /^(?:await\b|\()/u.test(loaded.parent.getText())
+    ts &&
+    (ts.isAwaitExpression(loaded.parent) ||
+      ts.isParenthesizedExpression(loaded.parent))
   ) {
     loaded = loaded.parent;
   }
@@ -228,9 +229,14 @@ function moduleLoadSpecifier(tsNode) {
     return { specifier: tsNode.moduleReference.expression };
   }
   if (!Array.isArray(tsNode.arguments)) return null;
-  const callee = tsNode.expression?.getText();
-  return (callee === "import" || callee === "require") &&
-    !isImmediateMemberAccess(tsNode)
+  const ts = getTypeScript();
+  const isImportOrRequire = Boolean(
+    ts &&
+    (ts.isImportCall(tsNode) ||
+      (ts.isIdentifier(tsNode.expression) &&
+        tsNode.expression.text === "require"))
+  );
+  return isImportOrRequire && !isImmediateMemberAccess(tsNode)
     ? { specifier: tsNode.arguments[0] }
     : null;
 }
